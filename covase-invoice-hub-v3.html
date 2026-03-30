@@ -255,6 +255,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .btn-flag:hover{background:var(--tl-yellow);color:#4a3900}
 .btn-recharge{background:var(--purple-l);color:var(--purple);border:1px solid var(--purple)}
 .btn-recharge:hover{background:var(--purple);color:#fff}
+.btn-pdf{background:#e8f4fd;color:#1a6dab;border:1px solid #7dbde8}
+.btn-pdf:hover{background:#1a6dab;color:#fff}
 .btn-edit{background:var(--covase-l);color:#0a7a72;border:1px solid var(--covase)}
 .btn-edit:hover{background:var(--covase);color:var(--indigo)}
 .btn-paid{background:var(--tl-green-l);color:var(--tl-green-t);border:1px solid var(--tl-green)}
@@ -548,7 +550,7 @@ function buildInvoiceCard(inv) {
     <div class="invoice-header" onclick="toggleCard('${inv.id}')">
       <div class="inv-vendor">
         <div class="inv-vendor-name">${esc(inv.vendor || inv.source_email || 'Unknown vendor')}</div>
-        <div class="inv-vendor-meta">${esc(inv.invoice_number || '—')} · ${esc(inv.email_subject || '')}</div>
+        <div class="inv-vendor-meta">${esc(inv.invoice_number || '—')} · ${esc(inv.email_subject || '')}${inv.pdf_url ? ' · <span style="color:var(--covase)" title="PDF attached">📄</span>' : ''}</div>
       </div>
       <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
       <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
@@ -582,6 +584,7 @@ function buildInvoiceCard(inv) {
       </div>
       <div class="action-row">
         <textarea class="notes-input" id="notes-${inv.id}" placeholder="Notes (optional)…">${esc(inv.notes || '')}</textarea>
+        ${inv.pdf_url ? '<button class="btn btn-pdf" onclick="window.open(\'' + esc(inv.pdf_url) + '\', \'_blank\')">📄 View PDF</button>' : ''}
         <button class="btn btn-approve" onclick="updateStatus('${inv.id}', 'approved')">✓ Approve</button>
         <button class="btn btn-flag" onclick="updateStatus('${inv.id}', 'flagged')">⚑ Flag</button>
         <button class="btn btn-reject" onclick="updateStatus('${inv.id}', 'rejected')">✗ Reject</button>
@@ -726,6 +729,7 @@ function buildOutgoingCard(inv) {
       ${inv.description ? '<div class="desc-box">' + esc(inv.description) + '</div>' : ''}
       ${inv.client_address ? '<div class="desc-box" style="font-size:11px;color:var(--n400)">📍 ' + esc(inv.client_address).replace(/\n/g, ', ') + '</div>' : ''}
       <div class="action-row">
+        ${inv.pdf_url ? '<button class="btn btn-pdf" onclick="window.open(\'' + esc(inv.pdf_url) + '\', \'_blank\')">📄 View PDF</button>' : ''}
         <button class="btn btn-edit" onclick="openGenerator('${esc(inv.id)}')">✎ Edit</button>
         <button class="btn btn-paid" onclick="updateOutStatus('${inv.id}', 'approved')">✓ Mark Paid</button>
         <button class="btn btn-flag" onclick="updateOutStatus('${inv.id}', 'flagged')">⚑ Flag</button>
