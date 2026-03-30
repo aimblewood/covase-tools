@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORBIS — Invoice Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --sidebar-w:240px;
+  --bg:#f4f5fa;
+  --card:#fff;
+
+  /* Orbis Brand */
+  --indigo:#242254;
+  --mid-indigo:#301d7e;
+  --light-indigo:#4b2ebc;
+  --blue-black:#020029;
+  --covase:#03d3c6;
+  --covase-l:#d6fbf8;
+  --grey:#acacac;
+
+  /* Traffic Light */
+  --tl-green:#A7EB52;
+  --tl-green-l:#edfcd4;
+  --tl-green-t:#3d7a00;
+  --tl-yellow:#ffd72e;
+  --tl-yellow-l:#fff9dd;
+  --tl-yellow-t:#8a6d00;
+  --tl-orange:#ff7650;
+  --tl-orange-l:#fff0ec;
+  --tl-orange-t:#b83d1a;
+  --tl-red:#e6333a;
+  --tl-red-l:#fdeaeb;
+  --tl-red-t:#a81d23;
+  --purple:#8b5cf6;
+  --purple-l:#f0ebff;
+
+  /* Neutrals */
+  --n50:#f8f8fc;--n100:#eeeff5;--n200:#dfe0ea;--n300:#c5c6d4;--n400:#9294a8;
+  --n500:#6b6d82;--n600:#4e5068;--n700:#363850;--n800:#242540;
+
+  --radius:12px;
+  --shadow:0 1px 3px rgba(36,34,84,.04),0 4px 14px rgba(36,34,84,.06);
+  --shadow-lg:0 4px 20px rgba(36,34,84,.08),0 1px 4px rgba(36,34,84,.04);
+}
+
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;font-size:14px}
+
+/* ─── SIDEBAR ─── */
+.sidebar{
+  width:var(--sidebar-w);min-height:100vh;
+  background:var(--indigo);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;
+  overflow-y:auto;
+}
+.sidebar::-webkit-scrollbar{width:0}
+.sb-logo{padding:24px 20px 28px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-logo-mark{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--covase);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--indigo);font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;
+  box-shadow:0 2px 12px rgba(3,211,198,.3);
+}
+.sb-logo-text{display:flex;flex-direction:column}
+.sb-logo-text .name{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.sb-logo-text .tag{font-size:10px;color:rgba(255,255,255,.35);font-weight:500;letter-spacing:.5px}
+
+.sb-nav{flex:1;padding:16px 0}
+.sb-group{margin-bottom:6px}
+.sb-group-label{font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:rgba(255,255,255,.22);padding:8px 20px 6px}
+.sb-item{
+  display:flex;align-items:center;gap:10px;padding:9px 20px;margin:1px 8px;border-radius:8px;
+  font-size:13px;font-weight:500;color:rgba(255,255,255,.5);cursor:pointer;
+  transition:all .15s;user-select:none;
+}
+.sb-item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.75)}
+.sb-item.active{background:rgba(3,211,198,.12);color:var(--covase)}
+.sb-item .icon{width:18px;text-align:center;font-size:14px;opacity:.7}
+.sb-item.active .icon{opacity:1}
+.sb-badge{
+  margin-left:auto;background:var(--covase);color:var(--indigo);
+  font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;
+  font-family:'DM Mono',monospace;
+}
+
+/* Sidebar config */
+.sb-config-toggle{
+  padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);
+  font-size:11px;color:rgba(255,255,255,.3);cursor:pointer;
+  display:flex;align-items:center;gap:6px;transition:color .15s;
+}
+.sb-config-toggle:hover{color:rgba(255,255,255,.5)}
+.sb-config-panel{
+  display:none;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.15);
+}
+.sb-config-panel.open{display:block}
+.sb-config-panel label{display:block;font-size:10px;color:rgba(255,255,255,.3);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+.sb-config-panel input{
+  width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;font-family:'DM Mono',monospace;outline:none;
+}
+.sb-config-panel input:focus{border-color:var(--covase)}
+.sb-config-panel .save-btn{
+  margin-top:12px;width:100%;background:var(--covase);color:var(--indigo);border:none;
+  padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+}
+
+/* ─── MAIN ─── */
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ─── TOPBAR ─── */
+.topbar{
+  padding:18px 28px;border-bottom:1px solid var(--n200);
+  display:flex;align-items:center;gap:14px;
+  background:var(--card);position:sticky;top:0;z-index:10;
+  box-shadow:0 1px 3px rgba(36,34,84,.03);
+}
+.topbar h1{
+  font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;
+  color:var(--n800);letter-spacing:-.3px;flex:1;
+}
+.topbar-filters{display:flex;gap:6px}
+.filter-pill{
+  padding:6px 14px;border-radius:20px;border:1px solid var(--n200);
+  background:transparent;color:var(--n500);font-size:12px;font-weight:500;
+  cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;
+}
+.filter-pill:hover{border-color:var(--covase);color:var(--covase)}
+.filter-pill.active{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.refresh-btn{
+  padding:7px 14px;background:var(--n50);border:1px solid var(--n200);
+  color:var(--n500);border-radius:8px;font-size:12px;font-weight:500;
+  cursor:pointer;font-family:'DM Sans',sans-serif;
+  display:flex;align-items:center;gap:5px;transition:all .15s;
+}
+.refresh-btn:hover{border-color:var(--n300);color:var(--n700)}
+.new-btn{
+  padding:7px 14px;background:var(--covase);border:none;color:var(--indigo);
+  border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'DM Sans',sans-serif;box-shadow:0 2px 8px rgba(3,211,198,.25);
+  transition:all .15s;
+}
+.new-btn:hover{box-shadow:0 4px 14px rgba(3,211,198,.35);transform:translateY(-1px)}
+
+/* ─── STATS ─── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 28px}
+.stat-card{
+  background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);
+  padding:18px 20px;box-shadow:var(--shadow);transition:box-shadow .15s;
+}
+.stat-card:hover{box-shadow:var(--shadow-lg)}
+.stat-label{font-size:11px;color:var(--n400);text-transform:uppercase;letter-spacing:.06em;font-weight:500;margin-bottom:8px}
+.stat-val{font-family:'Outfit',sans-serif;font-size:26px;font-weight:700;line-height:1.1;color:var(--n800)}
+.stat-sub{font-size:11px;color:var(--n400);margin-top:4px}
+.stat-card.pending .stat-val{color:var(--tl-orange)}
+.stat-card.total .stat-val{color:var(--indigo)}
+.stat-card.approved .stat-val{color:var(--tl-green-t)}
+.stat-card.errors .stat-val{color:var(--tl-red)}
+
+/* ─── CONTENT ─── */
+.content{flex:1;padding:20px 28px 40px}
+.invoice-list{display:flex;flex-direction:column;gap:8px}
+
+/* ─── INVOICE CARD ─── */
+.invoice-card{
+  background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);
+  overflow:hidden;transition:all .15s;box-shadow:var(--shadow);
+}
+.invoice-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.invoice-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+
+.invoice-header{
+  display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1fr auto;
+  align-items:center;gap:12px;padding:14px 18px;cursor:pointer;user-select:none;
+}
+
+.inv-vendor{display:flex;flex-direction:column;gap:2px}
+.inv-vendor-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.inv-vendor-meta{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace}
+
+.inv-col{display:flex;flex-direction:column;gap:2px}
+.inv-col-label{font-size:10px;color:var(--n400);text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.inv-col-val{font-size:13px;color:var(--n700);font-family:'DM Mono',monospace}
+
+.inv-amount{font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:var(--n800)}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em}
+.badge-pending{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.badge-sent{background:var(--covase-l);color:#0a7a72}
+.badge-approved{background:var(--tl-green-l);color:var(--tl-green-t)}
+.badge-rejected{background:var(--tl-red-l);color:var(--tl-red-t)}
+.badge-flagged{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
+.badge-direct_debit{background:var(--purple-l);color:var(--purple)}
+.badge-bacs{background:#e8f4fd;color:#1a6dab}
+.badge-unknown{background:var(--n100);color:var(--n500)}
+
+.expand-arrow{color:var(--n300);font-size:11px;transition:transform .2s}
+.invoice-card.expanded .expand-arrow{transform:rotate(90deg);color:var(--covase)}
+
+/* ─── DETAIL PANEL ─── */
+.invoice-detail{display:none;border-top:1px solid var(--n100);padding:20px;background:var(--n50)}
+.invoice-card.expanded .invoice-detail{display:block}
+
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.detail-field{display:flex;flex-direction:column;gap:3px}
+.detail-label{font-size:10px;color:var(--n400);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.detail-val{font-size:13px;color:var(--n700);font-family:'DM Mono',monospace}
+
+.vat-row{
+  display:flex;gap:28px;padding:12px 16px;
+  background:var(--card);border:1px solid var(--n100);border-radius:8px;
+  margin-bottom:16px;font-family:'DM Mono',monospace;font-size:12px;
+  box-shadow:0 1px 2px rgba(36,34,84,.03);
+}
+.vat-row span{color:var(--n400)}
+.vat-row strong{color:var(--n800);margin-left:6px}
+
+.desc-box{
+  background:var(--card);border:1px solid var(--n100);border-radius:8px;
+  padding:12px 14px;font-size:12px;color:var(--n500);margin-bottom:16px;
+  min-height:36px;line-height:1.6;
+}
+
+.confidence-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.confidence-bar-wrap{flex:1;height:5px;background:var(--n100);border-radius:99px;overflow:hidden}
+.confidence-bar{height:100%;border-radius:99px;background:var(--tl-green);transition:width .3s}
+.confidence-bar.mid{background:var(--tl-yellow)}
+.confidence-bar.low{background:var(--tl-red)}
+.confidence-label{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace;min-width:30px}
+
+.action-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.notes-input{
+  flex:1;min-width:200px;background:var(--card);border:1px solid var(--n200);
+  border-radius:8px;color:var(--n800);padding:9px 12px;font-size:12px;
+  font-family:'DM Sans',sans-serif;resize:none;height:40px;outline:none;
+  transition:border-color .15s;
+}
+.notes-input:focus{border-color:var(--covase)}
+
+.btn{
+  padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;
+  cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;
+}
+.btn-approve{background:var(--tl-green-l);color:var(--tl-green-t);border:1px solid var(--tl-green)}
+.btn-approve:hover{background:var(--tl-green);color:#1a3a00}
+.btn-reject{background:var(--tl-red-l);color:var(--tl-red-t);border:1px solid var(--tl-red)}
+.btn-reject:hover{background:var(--tl-red);color:#fff}
+.btn-flag{background:var(--tl-yellow-l);color:var(--tl-yellow-t);border:1px solid var(--tl-yellow)}
+.btn-flag:hover{background:var(--tl-yellow);color:#4a3900}
+.btn-recharge{background:var(--purple-l);color:var(--purple);border:1px solid var(--purple)}
+.btn-recharge:hover{background:var(--purple);color:#fff}
+.btn-edit{background:var(--covase-l);color:#0a7a72;border:1px solid var(--covase)}
+.btn-edit:hover{background:var(--covase);color:var(--indigo)}
+.btn-paid{background:var(--tl-green-l);color:var(--tl-green-t);border:1px solid var(--tl-green)}
+.btn-paid:hover{background:var(--tl-green);color:#1a3a00}
+
+.parse-error-banner{
+  background:var(--tl-red-l);border:1px solid var(--tl-red);border-radius:8px;
+  padding:10px 14px;font-size:12px;color:var(--tl-red-t);margin-bottom:14px;
+}
+
+/* ─── EMPTY/LOADING ─── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:60px 24px;color:var(--n400);text-align:center}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-title{font-family:'Outfit',sans-serif;font-size:17px;font-weight:600;color:var(--n500)}
+.empty-sub{font-size:13px;max-width:360px;line-height:1.7;color:var(--n400)}
+.loading{text-align:center;padding:50px;color:var(--n400);font-size:13px}
+
+/* ─── SETUP ─── */
+.setup-prompt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 24px;text-align:center}
+.setup-card{
+  background:var(--card);border:1px solid var(--n200);border-radius:var(--radius);
+  padding:32px 36px;max-width:440px;width:100%;box-shadow:var(--shadow-lg);
+}
+.setup-card h2{font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;color:var(--indigo)}
+.setup-card p{font-size:13px;color:var(--n500);margin-bottom:20px;line-height:1.7}
+.setup-card label{display:block;font-size:10px;color:var(--n400);margin-bottom:5px;margin-top:16px;text-align:left;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.setup-card input{
+  width:100%;background:var(--n50);border:1px solid var(--n200);color:var(--n800);
+  padding:10px 12px;border-radius:8px;font-size:13px;font-family:'DM Mono',monospace;outline:none;
+}
+.setup-card input:focus{border-color:var(--covase)}
+.setup-submit{
+  margin-top:22px;width:100%;background:var(--covase);color:var(--indigo);border:none;
+  padding:11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;
+  font-family:'Outfit',sans-serif;box-shadow:0 2px 10px rgba(3,211,198,.25);
+}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--n200);
+  border-radius:var(--radius);padding:11px 18px;font-size:13px;font-weight:500;color:var(--n700);
+  z-index:999;transform:translateY(80px);opacity:0;transition:all .25s;box-shadow:var(--shadow-lg);
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--tl-green);color:var(--tl-green-t)}
+.toast.error{border-color:var(--tl-red);color:var(--tl-red-t)}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.invoice-card{animation:fadeIn .25s ease both}
+.invoice-card:nth-child(1){animation-delay:0s}
+.invoice-card:nth-child(2){animation-delay:.03s}
+.invoice-card:nth-child(3){animation-delay:.06s}
+.invoice-card:nth-child(4){animation-delay:.09s}
+.invoice-card:nth-child(5){animation-delay:.12s}
+.stat-card{animation:fadeIn .3s ease both}
+.stat-card:nth-child(1){animation-delay:.05s}
+.stat-card:nth-child(2){animation-delay:.1s}
+.stat-card:nth-child(3){animation-delay:.15s}
+.stat-card:nth-child(4){animation-delay:.2s}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-mark">O</div>
+    <div class="sb-logo-text">
+      <div class="name">ORBIS</div>
+      <div class="tag">INVOICE HUB</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-group">
+      <div class="sb-group-label">Invoices</div>
+      <div class="sb-item active" onclick="setView('incoming', this)">
+        <span class="icon">↓</span> Received
+        <span class="sb-badge" id="pending-badge">—</span>
+      </div>
+      <div class="sb-item" onclick="setView('outgoing', this)">
+        <span class="icon">↑</span> Outgoing
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-label">Reports</div>
+      <div class="sb-item" onclick="setView('debtors', this)">
+        <span class="icon">▦</span> Debtors
+      </div>
+      <div class="sb-item" onclick="setView('creditors', this)">
+        <span class="icon">▦</span> Creditors
+      </div>
+      <div class="sb-item" onclick="setView('reconcile', this)">
+        <span class="icon">⟷</span> Reconciliation
+      </div>
+    </div>
+    <div class="sb-group">
+      <div class="sb-group-label">Integrations</div>
+      <div class="sb-item" onclick="setView('sage', this)">
+        <span class="icon">◎</span> Sage
+      </div>
+      <div class="sb-item" onclick="setView('gocardless', this)">
+        <span class="icon">◉</span> GoCardless
+      </div>
+    </div>
+  </nav>
+
+  <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Supabase settings</div>
+  <div class="sb-config-panel" id="config-panel">
+    <label>Project URL</label>
+    <input type="text" id="sb-url-sidebar" placeholder="https://xxx.supabase.co" />
+    <label>Anon Key</label>
+    <input type="password" id="sb-key-sidebar" placeholder="eyJ..." />
+    <button class="save-btn" onclick="saveConfig()">Save & reload</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- INCOMING -->
+  <div id="view-incoming">
+    <div class="topbar">
+      <h1>Received invoices</h1>
+      <div class="topbar-filters">
+        <button class="filter-pill active" onclick="setFilter('all', this)">All</button>
+        <button class="filter-pill" onclick="setFilter('pending', this)">Pending</button>
+        <button class="filter-pill" onclick="setFilter('approved', this)">Approved</button>
+        <button class="filter-pill" onclick="setFilter('rejected', this)">Rejected</button>
+      </div>
+      <button class="refresh-btn" onclick="loadInvoices()">↻ Refresh</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card pending"><div class="stat-label">Pending review</div><div class="stat-val" id="stat-pending">—</div><div class="stat-sub">awaiting action</div></div>
+      <div class="stat-card total"><div class="stat-label">Total value</div><div class="stat-val" id="stat-total">—</div><div class="stat-sub">all invoices</div></div>
+      <div class="stat-card approved"><div class="stat-label">Approved</div><div class="stat-val" id="stat-approved">—</div><div class="stat-sub">this month</div></div>
+      <div class="stat-card errors"><div class="stat-label">Parse errors</div><div class="stat-val" id="stat-errors">—</div><div class="stat-sub">need manual check</div></div>
+    </div>
+    <div class="content"><div class="invoice-list" id="invoice-list"><div class="loading">Loading invoices…</div></div></div>
+  </div>
+
+  <!-- OUTGOING -->
+  <div id="view-outgoing" style="display:none">
+    <div class="topbar">
+      <h1>Outgoing invoices</h1>
+      <div class="topbar-filters">
+        <button class="filter-pill active" onclick="setOutFilter('all', this)">All</button>
+        <button class="filter-pill" onclick="setOutFilter('sent', this)">Sent</button>
+        <button class="filter-pill" onclick="setOutFilter('approved', this)">Paid</button>
+      </div>
+      <button class="refresh-btn" onclick="loadOutgoing()">↻ Refresh</button>
+      <button class="new-btn" onclick="openGenerator()">+ New Invoice</button>
+    </div>
+    <div class="content"><div class="invoice-list" id="outgoing-list"><div class="loading">Loading outgoing invoices…</div></div></div>
+  </div>
+
+  <!-- FUTURE VIEWS -->
+  <div id="view-debtors" style="display:none"><div class="topbar"><h1>Debtors report</h1></div><div class="content"><div class="empty-state"><div class="empty-icon">▦</div><div class="empty-title">Coming soon</div><div class="empty-sub">Debtors report will pull from approved outgoing invoices and flag outstanding balances.</div></div></div></div>
+  <div id="view-creditors" style="display:none"><div class="topbar"><h1>Creditors report</h1></div><div class="content"><div class="empty-state"><div class="empty-icon">▦</div><div class="empty-title">Coming soon</div><div class="empty-sub">Creditors report will pull from approved incoming invoices and flag outstanding payments.</div></div></div></div>
+  <div id="view-reconcile" style="display:none"><div class="topbar"><h1>Reconciliation</h1></div><div class="content"><div class="empty-state"><div class="empty-icon">⟷</div><div class="empty-title">Coming soon</div><div class="empty-sub">Bank reconciliation will cross-reference approved invoices against GoCardless and bank feeds.</div></div></div></div>
+  <div id="view-sage" style="display:none"><div class="topbar"><h1>Sage integration</h1></div><div class="content"><div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">Coming soon</div><div class="empty-sub">Sage integration will sync approved invoices to your accounting software automatically.</div></div></div></div>
+  <div id="view-gocardless" style="display:none"><div class="topbar"><h1>GoCardless</h1></div><div class="content"><div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Coming soon</div><div class="empty-sub">GoCardless direct debit collection for outgoing invoices — automated payment collection.</div></div></div></div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL_KEY = 'covase_sb_url';
+const SB_KEY_KEY = 'covase_sb_key';
+const TABLE = 'covase_invoices';
+let allInvoices = [];
+let currentFilter = 'all';
+
+function getConfig() {
+  return { url: localStorage.getItem(SB_URL_KEY) || '', key: localStorage.getItem(SB_KEY_KEY) || '' };
+}
+
+function saveConfig() {
+  const url = document.getElementById('sb-url-sidebar').value.trim();
+  const key = document.getElementById('sb-key-sidebar').value.trim();
+  if (!url || !key) { showToast('Enter both URL and key', 'error'); return; }
+  localStorage.setItem(SB_URL_KEY, url);
+  localStorage.setItem(SB_KEY_KEY, key);
+  showToast('Saved — loading invoices…', 'success');
+  document.getElementById('config-panel').classList.remove('open');
+  setTimeout(loadInvoices, 300);
+}
+
+function toggleConfig() {
+  const panel = document.getElementById('config-panel');
+  panel.classList.toggle('open');
+  const cfg = getConfig();
+  document.getElementById('sb-url-sidebar').value = cfg.url;
+  document.getElementById('sb-key-sidebar').value = cfg.key;
+}
+
+async function sbFetch(path, options = {}) {
+  const cfg = getConfig();
+  const res = await fetch(`${cfg.url}/rest/v1/${path}`, {
+    headers: {
+      'apikey': cfg.key, 'Authorization': `Bearer ${cfg.key}`,
+      'Content-Type': 'application/json', 'Prefer': options.prefer || 'return=representation',
+      ...options.headers
+    },
+    method: options.method || 'GET',
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function loadInvoices() {
+  const cfg = getConfig();
+  const list = document.getElementById('invoice-list');
+  if (!cfg.url || !cfg.key) {
+    list.innerHTML = `<div class="setup-prompt"><div class="setup-card">
+      <h2>Connect Supabase</h2>
+      <p>Enter your Supabase project URL and anon key to start loading invoices. You'll find these in your Supabase project settings under API.</p>
+      <label>Project URL</label><input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+      <label>Anon Key</label><input type="password" id="setup-key" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+      <button class="setup-submit" onclick="submitSetup()">Connect & load invoices</button>
+    </div></div>`;
+    return;
+  }
+  list.innerHTML = '<div class="loading">Fetching invoices…</div>';
+  try {
+    const data = await sbFetch(`${TABLE}?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);
+    allInvoices = data;
+    renderInvoices();
+    updateStats();
+    updateBadge();
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Connection failed</div><div class="empty-sub">${e.message}<br><br>Check your Supabase URL and key via the settings panel.</div></div>`;
+  }
+}
+
+function submitSetup() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  if (!url || !key) { showToast('Fill in both fields', 'error'); return; }
+  localStorage.setItem(SB_URL_KEY, url);
+  localStorage.setItem(SB_KEY_KEY, key);
+  loadInvoices();
+}
+
+function updateStats() {
+  const pending = allInvoices.filter(i => i.status === 'pending').length;
+  const approved = allInvoices.filter(i => i.status === 'approved');
+  const errors = allInvoices.filter(i => i.parse_error).length;
+  const total = allInvoices.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-approved').textContent = approved.length;
+  document.getElementById('stat-errors').textContent = errors;
+  document.getElementById('stat-total').textContent = '£' + total.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function updateBadge() {
+  const pending = allInvoices.filter(i => i.status === 'pending').length;
+  document.getElementById('pending-badge').textContent = pending || '0';
+}
+
+function renderInvoices() {
+  const list = document.getElementById('invoice-list');
+  let invoices = allInvoices;
+  if (currentFilter !== 'all') invoices = invoices.filter(i => i.status === currentFilter);
+  if (!invoices.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-title">All clear</div><div class="empty-sub">No invoices with status "${currentFilter}".</div></div>`;
+    return;
+  }
+  list.innerHTML = invoices.map((inv, idx) => buildInvoiceCard(inv)).join('');
+}
+
+function buildInvoiceCard(inv) {
+  const conf = parseFloat(inv.confidence) || 0;
+  const confClass = conf >= 0.85 ? '' : conf >= 0.6 ? 'mid' : 'low';
+  const confPct = Math.round(conf * 100);
+  const amount = parseFloat(inv.total) || 0;
+  const amountFmt = '£' + amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const subtotal = parseFloat(inv.subtotal) || 0;
+  const vat = parseFloat(inv.vat_amount) || 0;
+  const dateStr = inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : '—';
+  const dueStr = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
+  const receivedStr = inv.received_at ? new Date(inv.received_at).toLocaleDateString('en-GB') : '—';
+  const pm = (inv.payment_method || 'unknown').toLowerCase();
+  const pmBadgeClass = pm === 'direct_debit' ? 'badge-direct_debit' : pm === 'bacs' ? 'badge-bacs' : 'badge-unknown';
+  const pmLabel = pm === 'direct_debit' ? 'Direct Debit' : pm === 'bacs' ? 'BACS' : pm;
+  const statusBadgeClass = `badge-${inv.status || 'pending'}`;
+
+  return `<div class="invoice-card" id="card-${inv.id}">
+    <div class="invoice-header" onclick="toggleCard('${inv.id}')">
+      <div class="inv-vendor">
+        <div class="inv-vendor-name">${esc(inv.vendor || inv.source_email || 'Unknown vendor')}</div>
+        <div class="inv-vendor-meta">${esc(inv.invoice_number || '—')} · ${esc(inv.email_subject || '')}</div>
+      </div>
+      <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Amount</div><div class="inv-amount">${amountFmt}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+        <span class="badge ${statusBadgeClass}">${inv.status || 'pending'}</span>
+        <span class="badge ${pmBadgeClass}">${pmLabel}</span>
+      </div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="invoice-detail">
+      ${inv.parse_error ? '<div class="parse-error-banner">⚠ Could not fully parse this invoice — check fields manually before approving.</div>' : ''}
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Vendor</div><div class="detail-val">${esc(inv.vendor || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Invoice no.</div><div class="detail-val">${esc(inv.invoice_number || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Category</div><div class="detail-val">${esc(inv.category || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">VAT number</div><div class="detail-val">${esc(inv.vat_number || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Received</div><div class="detail-val">${receivedStr}</div></div>
+        <div class="detail-field"><div class="detail-label">Currency</div><div class="detail-val">${esc(inv.currency || 'GBP')}</div></div>
+      </div>
+      <div class="vat-row">
+        <div><span>Subtotal</span><strong>£${subtotal.toFixed(2)}</strong></div>
+        <div><span>VAT</span><strong>£${vat.toFixed(2)}</strong></div>
+        <div><span>Total</span><strong>${amountFmt}</strong></div>
+      </div>
+      ${inv.description ? '<div class="desc-box">' + esc(inv.description) + '</div>' : ''}
+      <div class="confidence-row">
+        <span class="confidence-label" style="font-size:11px">AI confidence</span>
+        <div class="confidence-bar-wrap"><div class="confidence-bar ${confClass}" style="width:${confPct}%"></div></div>
+        <span class="confidence-label">${confPct}%</span>
+      </div>
+      <div class="action-row">
+        <textarea class="notes-input" id="notes-${inv.id}" placeholder="Notes (optional)…">${esc(inv.notes || '')}</textarea>
+        <button class="btn btn-approve" onclick="updateStatus('${inv.id}', 'approved')">✓ Approve</button>
+        <button class="btn btn-flag" onclick="updateStatus('${inv.id}', 'flagged')">⚑ Flag</button>
+        <button class="btn btn-reject" onclick="updateStatus('${inv.id}', 'rejected')">✗ Reject</button>
+        <button class="btn btn-recharge" onclick="rechargeInvoice('${inv.id}')">↑ Recharge</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleCard(id) { document.getElementById(`card-${id}`).classList.toggle('expanded'); }
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('#view-incoming .filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInvoices();
+}
+
+async function updateStatus(id, status) {
+  const notes = document.getElementById(`notes-${id}`)?.value || '';
+  const cfg = getConfig();
+  if (!cfg.url || !cfg.key) { showToast('Configure Supabase first', 'error'); return; }
+  try {
+    await sbFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { status, notes }, prefer: 'return=minimal' });
+    const inv = allInvoices.find(i => i.id === id);
+    if (inv) { inv.status = status; inv.notes = notes; }
+    renderInvoices(); updateStats(); updateBadge();
+    showToast(`Invoice ${status}`, 'success');
+  } catch(e) { showToast('Update failed: ' + e.message, 'error'); }
+}
+
+function setView(view, el) {
+  ['incoming','outgoing','debtors','creditors','reconcile','sage','gocardless'].forEach(v => {
+    const viewEl = document.getElementById(`view-${v}`);
+    if (viewEl) viewEl.style.display = v === view ? 'block' : 'none';
+  });
+  document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (view === 'incoming') loadInvoices();
+  if (view === 'outgoing') loadOutgoing();
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── OUTGOING INVOICES ──
+let outgoingInvoices = [];
+let outFilter = 'all';
+const GENERATOR_URL_KEY = 'covase_generator_url';
+
+function getGeneratorUrl() {
+  return localStorage.getItem(GENERATOR_URL_KEY) || 'covase-invoice-generator-v20.html';
+}
+
+function openGenerator(id) {
+  const base = getGeneratorUrl();
+  if (id) window.open(base + '?id=' + encodeURIComponent(id), '_blank');
+  else window.open(base, '_blank');
+}
+
+async function loadOutgoing() {
+  const cfg = getConfig();
+  const list = document.getElementById('outgoing-list');
+  if (!cfg.url || !cfg.key) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚙</div><div class="empty-title">Configure Supabase</div><div class="empty-sub">Set your Supabase URL and key via the settings panel.</div></div>'; return; }
+  list.innerHTML = '<div class="loading">Fetching outgoing invoices…</div>';
+  try {
+    const data = await sbFetch(`${TABLE}?category=eq.outgoing&order=invoice_date.desc&limit=200`);
+    outgoingInvoices = data;
+    renderOutgoing();
+  } catch(e) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${e.message}</div></div>`;
+  }
+}
+
+function setOutFilter(f, btn) {
+  outFilter = f;
+  document.querySelectorAll('#view-outgoing .filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOutgoing();
+}
+
+function renderOutgoing() {
+  const list = document.getElementById('outgoing-list');
+  let inv = outgoingInvoices;
+  if (outFilter !== 'all') inv = inv.filter(i => i.status === outFilter);
+  if (!inv.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">↑</div><div class="empty-title">${outFilter==='all'?'No outgoing invoices yet':'No invoices with status "'+outFilter+'"'}</div><div class="empty-sub">Click "+ New Invoice" above to create one with the invoice generator.</div></div>`;
+    return;
+  }
+  list.innerHTML = inv.map(i => buildOutgoingCard(i)).join('');
+}
+
+function buildOutgoingCard(inv) {
+  const amount = parseFloat(inv.total) || 0;
+  const amountFmt = '£' + amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const dateStr = inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString('en-GB') : '—';
+  const dueStr = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB') : '—';
+  const pm = (inv.payment_method || 'unknown').toLowerCase();
+  const pmBadgeClass = pm === 'direct_debit' ? 'badge-direct_debit' : pm === 'bacs' ? 'badge-bacs' : 'badge-unknown';
+  const pmLabel = pm === 'direct_debit' ? 'Direct Debit' : pm === 'bacs' ? 'BACS' : pm;
+  const statusBadgeClass = `badge-${inv.status || 'sent'}`;
+  const clientName = inv.client_name || inv.description?.split(';')[0] || '—';
+
+  return `<div class="invoice-card" id="ocard-${inv.id}">
+    <div class="invoice-header" onclick="toggleOutCard('${inv.id}')">
+      <div class="inv-vendor">
+        <div class="inv-vendor-name">${esc(clientName)}</div>
+        <div class="inv-vendor-meta">${esc(inv.invoice_number || '—')} · ${esc(inv.prepared_by || '')}</div>
+      </div>
+      <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Amount</div><div class="inv-amount">${amountFmt}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+        <span class="badge ${statusBadgeClass}">${inv.status || 'sent'}</span>
+        <span class="badge ${pmBadgeClass}">${pmLabel}</span>
+      </div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="invoice-detail" id="odetail-${inv.id}">
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Client</div><div class="detail-val">${esc(inv.client_name || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Invoice no.</div><div class="detail-val">${esc(inv.invoice_number || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Prepared by</div><div class="detail-val">${esc(inv.prepared_by || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Payment terms</div><div class="detail-val">${esc(inv.payment_terms || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Payment method</div><div class="detail-val">${pmLabel}</div></div>
+        <div class="detail-field"><div class="detail-label">Currency</div><div class="detail-val">${esc(inv.currency || 'GBP')}</div></div>
+      </div>
+      <div class="vat-row">
+        <div><span>Net</span><strong>£${(parseFloat(inv.subtotal)||0).toFixed(2)}</strong></div>
+        <div><span>VAT</span><strong>£${(parseFloat(inv.vat_amount)||0).toFixed(2)}</strong></div>
+        <div><span>Total</span><strong>${amountFmt}</strong></div>
+      </div>
+      ${inv.description ? '<div class="desc-box">' + esc(inv.description) + '</div>' : ''}
+      ${inv.client_address ? '<div class="desc-box" style="font-size:11px;color:var(--n400)">📍 ' + esc(inv.client_address).replace(/\n/g, ', ') + '</div>' : ''}
+      <div class="action-row">
+        <button class="btn btn-edit" onclick="openGenerator('${esc(inv.id)}')">✎ Edit</button>
+        <button class="btn btn-paid" onclick="updateOutStatus('${inv.id}', 'approved')">✓ Mark Paid</button>
+        <button class="btn btn-flag" onclick="updateOutStatus('${inv.id}', 'flagged')">⚑ Flag</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleOutCard(id) { document.getElementById(`ocard-${id}`).classList.toggle('expanded'); }
+
+async function updateOutStatus(id, status) {
+  try {
+    await sbFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: { status }, prefer: 'return=minimal' });
+    const inv = outgoingInvoices.find(i => i.id === id);
+    if (inv) inv.status = status;
+    renderOutgoing();
+    showToast(`Invoice ${status}`, 'success');
+  } catch(e) { showToast('Update failed: ' + e.message, 'error'); }
+}
+
+function rechargeInvoice(id) {
+  const base = getGeneratorUrl();
+  window.open(base + '?recharge_from=' + encodeURIComponent(id), '_blank');
+}
+
+loadInvoices();
+</script>
+</body>
+</html>

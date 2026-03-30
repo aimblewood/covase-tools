@@ -563,6 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
+  const rechargeFrom = params.get('recharge_from');
+
+  if (rechargeFrom) return loadRecharge(rechargeFrom);
   if (!id) return;
   if (!SB_URL || !SB_KEY) { toast('Supabase not configured — cannot load invoice', 'error'); return; }
   try {
@@ -611,22 +614,100 @@ async function loadFromUrl() {
     editMode = true;
     editId = inv.id;
     document.querySelector('.btn-primary').textContent = '✓ Update in Invoice Hub';
-    // Add "back to hub" link
-    const footer = document.querySelector('.builder-footer');
-    if (!document.getElementById('back-hub-link')) {
-      const link = document.createElement('button');
-      link.id = 'back-hub-link';
-      link.className = 'btn-secondary';
-      link.textContent = '← Back to Invoice Hub';
-      link.style.marginTop = '4px';
-      link.onclick = () => { window.location.href = (localStorage.getItem('covase_hub_url') || 'covase-invoice-hub.html'); };
-      footer.appendChild(link);
-    }
+    addBackToHubLink();
 
     up();
     toast('Loaded invoice ' + (inv.invoice_number || id), 'success');
   } catch(e) {
     toast('Failed to load: ' + e.message, 'error');
+  }
+}
+
+// ── RECHARGE: Load incoming invoice as basis for new outgoing ──
+let rechargedFromId = null;
+
+async function loadRecharge(sourceId) {
+  if (!SB_URL || !SB_KEY) { toast('Supabase not configured', 'error'); return; }
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/covase_invoices?id=eq.${encodeURIComponent(sourceId)}&limit=1`, {
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    if (!rows.length) { toast('Source invoice not found: ' + sourceId, 'error'); return; }
+    const inv = rows[0];
+
+    rechargedFromId = inv.id;
+
+    // New outgoing invoice — fresh date, keep sequential number
+    document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+
+    // Pre-fill line items from the incoming invoice
+    if (inv.line_items) {
+      try {
+        const li = typeof inv.line_items === 'string' ? JSON.parse(inv.line_items) : inv.line_items;
+        if (Array.isArray(li) && li.length) {
+          items = li.map(x => ({ id: Date.now() + Math.random(), desc: x.desc || '', amt: x.amt || '', vatExempt: !!x.vatExempt }));
+        }
+      } catch(e) {}
+    }
+    // Fallback: use description + total as a single line
+    if (!items.length || (items.length === 1 && !items[0].desc)) {
+      const desc = inv.description || inv.email_subject || inv.vendor || 'Recharged item';
+      items = [{ id: Date.now(), desc: 'Recharge: ' + desc, amt: String(inv.subtotal || inv.total || ''), vatExempt: false }];
+    }
+    renderLines();
+
+    // Copy VAT treatment
+    const hasVat = (parseFloat(inv.vat_amount) || 0) > 0;
+    setVAT(hasVat);
+
+    // Copy payment terms if set
+    if (inv.payment_terms) {
+      const sel = document.getElementById('inv-terms');
+      const opt = Array.from(sel.options).find(o => o.value === inv.payment_terms);
+      if (opt) sel.value = opt.value;
+    }
+
+    // Client fields left BLANK — user picks who to recharge to
+    document.getElementById('c-name').value = '';
+    document.getElementById('c-addr').value = '';
+    document.getElementById('c-email').value = '';
+
+    // NOT edit mode — this is a new invoice
+    editMode = false;
+    editId = null;
+
+    // Show recharge banner
+    const footer = document.querySelector('.builder-footer');
+    if (!document.getElementById('recharge-banner')) {
+      const banner = document.createElement('div');
+      banner.id = 'recharge-banner';
+      banner.style.cssText = 'background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:8px 12px;font-size:11px;color:#8b5cf6;margin-bottom:6px;';
+      banner.innerHTML = '↑ Recharging from: <strong>' + (inv.vendor || inv.invoice_number || sourceId) + '</strong>' +
+        (inv.invoice_number ? ' (#' + inv.invoice_number + ')' : '') +
+        '<br><span style="font-size:10px;color:#9ca3af">Fill in the client to recharge to, adjust amounts if needed, then save.</span>';
+      footer.insertBefore(banner, footer.firstChild);
+    }
+    addBackToHubLink();
+
+    up();
+    toast('Loaded for recharge — pick your client', 'success');
+  } catch(e) {
+    toast('Failed to load source invoice: ' + e.message, 'error');
+  }
+}
+
+function addBackToHubLink() {
+  const footer = document.querySelector('.builder-footer');
+  if (!document.getElementById('back-hub-link')) {
+    const link = document.createElement('button');
+    link.id = 'back-hub-link';
+    link.className = 'btn-secondary';
+    link.textContent = '← Back to Invoice Hub';
+    link.style.marginTop = '4px';
+    link.onclick = () => { window.location.href = (localStorage.getItem('covase_hub_url') || 'covase-invoice-hub-v2.html'); };
+    footer.appendChild(link);
   }
 }
 
@@ -746,7 +827,8 @@ async function save() {
     client_name: document.getElementById('c-name').value || null,
     client_address: document.getElementById('c-addr').value || null,
     client_email: document.getElementById('c-email').value || null,
-    line_items: JSON.stringify(items.map(i => ({desc: i.desc, amt: i.amt, vatExempt: i.vatExempt})))
+    line_items: JSON.stringify(items.map(i => ({desc: i.desc, amt: i.amt, vatExempt: i.vatExempt}))),
+    recharged_from: rechargedFromId || null
   };
 
   // Remove undefined keys
