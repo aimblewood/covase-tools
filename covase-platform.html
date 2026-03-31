@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORBIS — Covase</title>
+<!--
+  ORBIS PLATFORM — Covase Ltd
+  ────────────────────────────
+  Supabase tables required (run once in SQL Editor):
+
+  -- Invoices (may already exist)
+  CREATE TABLE IF NOT EXISTS covase_invoices (
+    id text PRIMARY KEY,
+    status text DEFAULT 'pending',
+    source_email text,
+    email_subject text,
+    received_at timestamptz DEFAULT now(),
+    vendor text, invoice_number text,
+    invoice_date date, due_date date,
+    payment_terms text,
+    subtotal numeric(10,2), vat_amount numeric(10,2), total numeric(10,2),
+    currency text DEFAULT 'GBP', payment_method text,
+    description text, category text,
+    confidence numeric(3,2), notes text,
+    parse_error boolean DEFAULT false,
+    pdf_url text,
+    client_name text, client_address text, client_email text,
+    prepared_by text, line_items jsonb,
+    recharged_from text,
+    created_at timestamptz DEFAULT now()
+  );
+
+  -- Hires
+  CREATE TABLE IF NOT EXISTS covase_hires (
+    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    customer text NOT NULL, driver text, reference text,
+    vehicle_reg text, make_model text, category text, fuel_type text,
+    supplier text, agreement_ref text, supplier_ref text,
+    start_date date, end_date date,
+    cost_per_day numeric(10,2), sell_per_day numeric(10,2),
+    supplementary_charges numeric(10,2) DEFAULT 0,
+    supplementary_notes text, notes text,
+    status text DEFAULT 'active',
+    incoming_invoice_id text, outgoing_invoice_id text,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+
+  -- Clients (CRM foundation)
+  CREATE TABLE IF NOT EXISTS covase_clients (
+    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    company_name text NOT NULL,
+    contact_name text, contact_email text, contact_phone text,
+    address text, payment_method text DEFAULT 'BACS',
+    payment_terms text DEFAULT '28 days',
+    account_manager text DEFAULT 'Simon Homer',
+    dynamics_id text, notes text,
+    status text DEFAULT 'active',
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+-->
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --sidebar-w:248px;--bg:#f4f5fa;--card:#fff;
+  --indigo:#242254;--covase:#03d3c6;--covase-l:#d6fbf8;
+  --tl-green:#A7EB52;--tl-green-l:#edfcd4;--tl-green-t:#3d7a00;
+  --tl-yellow:#ffd72e;--tl-yellow-l:#fff9dd;--tl-yellow-t:#8a6d00;
+  --tl-orange:#ff7650;--tl-orange-l:#fff0ec;--tl-orange-t:#b83d1a;
+  --tl-red:#e6333a;--tl-red-l:#fdeaeb;--tl-red-t:#a81d23;
+  --purple:#8b5cf6;--purple-l:#f0ebff;
+  --n50:#f8f8fc;--n100:#eeeff5;--n200:#dfe0ea;--n300:#c5c6d4;--n400:#9294a8;
+  --n500:#6b6d82;--n600:#4e5068;--n700:#363850;--n800:#242540;
+  --radius:12px;
+  --shadow:0 1px 3px rgba(36,34,84,.04),0 4px 14px rgba(36,34,84,.06);
+  --shadow-lg:0 4px 20px rgba(36,34,84,.08),0 1px 4px rgba(36,34,84,.04);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;font-size:14px}
+
+/* ─── SIDEBAR ─── */
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;overflow-y:auto;}
+.sidebar::-webkit-scrollbar{width:0}
+.sb-logo{padding:22px 20px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-logo-mark{width:36px;height:36px;border-radius:10px;background:var(--covase);display:flex;align-items:center;justify-content:center;color:var(--indigo);font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;box-shadow:0 2px 12px rgba(3,211,198,.3);flex-shrink:0}
+.sb-logo-text .name{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.sb-logo-text .tag{font-size:10px;color:rgba(255,255,255,.35);font-weight:500;letter-spacing:.5px}
+.sb-nav{flex:1;padding:12px 0}
+.sb-section{margin-bottom:4px}
+.sb-section-label{font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:rgba(255,255,255,.22);padding:10px 20px 5px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 20px;margin:1px 8px;border-radius:8px;font-size:13px;font-weight:500;color:rgba(255,255,255,.45);cursor:pointer;transition:all .15s;user-select:none;text-decoration:none;}
+.sb-item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.75)}
+.sb-item.active{background:rgba(3,211,198,.12);color:var(--covase)}
+.sb-item.disabled{opacity:.4;cursor:not-allowed}
+.sb-item .icon{width:18px;text-align:center;font-size:13px;opacity:.7;flex-shrink:0}
+.sb-item.active .icon{opacity:1}
+.sb-badge{margin-left:auto;background:var(--covase);color:var(--indigo);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace;}
+.sb-badge.purple{background:var(--purple);color:#fff}
+.sb-new-btn{display:flex;align-items:center;gap:8px;margin:6px 14px 2px;padding:8px 14px;background:rgba(3,211,198,.1);border:1px solid rgba(3,211,198,.25);border-radius:8px;color:var(--covase);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;}
+.sb-new-btn:hover{background:rgba(3,211,198,.18)}
+.sb-divider{border-top:1px solid rgba(255,255,255,.06);margin:8px 0}
+.sb-config-toggle{padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.28);cursor:pointer;display:flex;align-items:center;gap:6px;transition:color .15s;}
+.sb-config-toggle:hover{color:rgba(255,255,255,.5)}
+.sb-config-panel{display:none;padding:12px 16px 16px;background:rgba(0,0,0,.15);border-top:1px solid rgba(255,255,255,.06)}
+.sb-config-panel.open{display:block}
+.sb-config-panel label{display:block;font-size:10px;color:rgba(255,255,255,.28);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+.sb-config-panel input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;font-family:'DM Mono',monospace;outline:none;}
+.sb-config-panel input:focus{border-color:var(--covase)}
+.sb-config-panel .save-btn{margin-top:12px;width:100%;background:var(--covase);color:var(--indigo);border:none;padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* ─── MAIN ─── */
+.main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.view{display:none}
+.view.active{display:flex;flex-direction:column;flex:1}
+
+/* ─── TOPBAR ─── */
+.topbar{padding:16px 28px;border-bottom:1px solid var(--n200);display:flex;align-items:center;gap:12px;background:var(--card);position:sticky;top:0;z-index:10;box-shadow:0 1px 3px rgba(36,34,84,.03);}
+.topbar h1{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--n800);letter-spacing:-.3px;flex:1;}
+.filter-pill{padding:5px 13px;border-radius:20px;border:1px solid var(--n200);background:transparent;color:var(--n500);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.filter-pill:hover{border-color:var(--covase);color:var(--covase)}
+.filter-pill.active{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.topbar-btn{padding:7px 13px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;border:1px solid var(--n200);background:var(--n50);color:var(--n500);display:flex;align-items:center;gap:5px;}
+.topbar-btn:hover{border-color:var(--n300);color:var(--n700)}
+.topbar-btn.primary{background:var(--covase);border-color:var(--covase);color:var(--indigo);font-weight:700;box-shadow:0 2px 8px rgba(3,211,198,.25);}
+.topbar-btn.primary:hover{box-shadow:0 4px 14px rgba(3,211,198,.35);transform:translateY(-1px)}
+
+/* ─── STATS ─── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 28px}
+.stat-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);}
+.stat-label{font-size:11px;color:var(--n400);text-transform:uppercase;letter-spacing:.06em;font-weight:500;margin-bottom:7px}
+.stat-val{font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;line-height:1.1;color:var(--n800)}
+.stat-sub{font-size:11px;color:var(--n400);margin-top:3px}
+.stat-orange .stat-val{color:var(--tl-orange)}
+.stat-indigo .stat-val{color:var(--indigo)}
+.stat-green .stat-val{color:var(--tl-green-t)}
+.stat-purple .stat-val{color:var(--purple)}
+.stat-covase .stat-val{color:#0a7a72}
+
+/* ─── CONTENT ─── */
+.content{flex:1;padding:0 28px 40px}
+.card-list{display:flex;flex-direction:column;gap:8px}
+
+/* ─── INVOICE CARD ─── */
+.inv-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.inv-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.inv-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.inv-header{display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.inv-vendor-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.inv-meta{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace;margin-top:2px}
+.inv-col{display:flex;flex-direction:column;gap:2px}
+.inv-col-label{font-size:10px;color:var(--n400);text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.inv-col-val{font-size:12px;color:var(--n700);font-family:'DM Mono',monospace}
+.inv-amount{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:var(--n800)}
+.expand-arrow{color:var(--n300);font-size:11px;transition:transform .2s;flex-shrink:0}
+.inv-card.expanded .expand-arrow,.hire-card.expanded .expand-arrow,.client-card.expanded .expand-arrow{transform:rotate(90deg);color:var(--covase)}
+
+/* ─── DETAIL PANEL ─── */
+.card-detail{display:none;border-top:1px solid var(--n100);padding:18px 20px;background:var(--n50)}
+.inv-card.expanded .card-detail,.hire-card.expanded .card-detail,.client-card.expanded .card-detail{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.detail-field{display:flex;flex-direction:column;gap:3px}
+.detail-label{font-size:10px;color:var(--n400);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.detail-val{font-size:12px;color:var(--n700);font-family:'DM Mono',monospace}
+.vat-row,.financials-row{display:flex;gap:24px;padding:10px 14px;background:var(--card);border:1px solid var(--n100);border-radius:8px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:12px;}
+.vat-row span,.financials-row span{color:var(--n400)}
+.vat-row strong,.financials-row strong{color:var(--n800);margin-left:5px}
+.profit-pos{color:var(--tl-green-t)!important}
+.profit-neg{color:var(--tl-red-t)!important}
+.desc-box,.notes-box{background:var(--card);border:1px solid var(--n100);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--n500);margin-bottom:14px;min-height:30px;line-height:1.6}
+.conf-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.conf-bar-wrap{flex:1;height:5px;background:var(--n100);border-radius:99px;overflow:hidden}
+.conf-bar{height:100%;border-radius:99px;background:var(--tl-green)}
+.conf-bar.mid{background:var(--tl-yellow)}
+.conf-bar.low{background:var(--tl-red)}
+.conf-label{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace;min-width:30px}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.notes-input{flex:1;min-width:180px;background:var(--card);border:1px solid var(--n200);border-radius:8px;color:var(--n800);padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;resize:none;height:38px;outline:none;transition:border-color .15s;}
+.notes-input:focus{border-color:var(--covase)}
+.parse-err{background:var(--tl-red-l);border:1px solid var(--tl-red);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--tl-red-t);margin-bottom:13px}
+
+/* ─── HIRE CARD ─── */
+.hire-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.hire-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.hire-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.hire-header{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.h-customer{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.h-meta{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace;margin-top:2px}
+
+/* ─── INLINE ACTION PANELS ─── */
+.inline-panel{display:none;padding:12px 14px;border-radius:8px;margin-bottom:12px;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.inline-panel.open{display:flex}
+.inline-panel.yellow{background:var(--tl-yellow-l);border:1px solid var(--tl-yellow)}
+.inline-panel.blue{background:#e8f4fd;border:1px solid #7dbde8}
+.inline-panel label{font-size:11px;font-weight:600;display:block;margin-bottom:4px}
+.inline-panel.yellow label{color:var(--tl-yellow-t)}
+.inline-panel.blue label{color:#1a6dab}
+.inline-panel input{background:#fff;border:1px solid var(--n300);color:var(--n800);padding:7px 10px;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;outline:none;}
+.inline-panel.yellow input{border-color:var(--tl-yellow)}
+.inline-panel.blue input{border-color:#7dbde8}
+
+/* ─── CLIENT CARD ─── */
+.client-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.client-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.client-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.client-header{display:grid;grid-template-columns:3fr 1.5fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.c-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800)}
+.c-contact{font-size:11px;color:var(--n400);margin-top:2px}
+
+/* ─── BADGES ─── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em}
+.badge-pending{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.badge-sent,.badge-invoiced{background:var(--covase-l);color:#0a7a72}
+.badge-approved{background:var(--tl-green-l);color:var(--tl-green-t)}
+.badge-rejected{background:var(--tl-red-l);color:var(--tl-red-t)}
+.badge-flagged{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
+.badge-direct_debit{background:var(--purple-l);color:var(--purple)}
+.badge-BACS,.badge-bacs{background:#e8f4fd;color:#1a6dab}
+.badge-active{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.badge-closed{background:var(--n100);color:var(--n500)}
+.badge-recharged{background:var(--purple-l);color:var(--purple)}
+.badge-unknown{background:var(--n100);color:var(--n500)}
+.badge-sm{background:var(--n50);color:var(--n500);border:1px solid var(--n200);font-size:10px;padding:2px 7px}
+
+/* ─── ACTION BUTTONS ─── */
+.btn{padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.btn-approve{background:var(--tl-green-l);color:var(--tl-green-t);border:1px solid var(--tl-green)}
+.btn-approve:hover{background:var(--tl-green);color:#1a3a00}
+.btn-reject{background:var(--tl-red-l);color:var(--tl-red-t);border:1px solid var(--tl-red)}
+.btn-reject:hover{background:var(--tl-red);color:#fff}
+.btn-flag{background:var(--tl-yellow-l);color:var(--tl-yellow-t);border:1px solid var(--tl-yellow)}
+.btn-flag:hover{background:var(--tl-yellow);color:#4a3900}
+.btn-recharge{background:var(--purple-l);color:var(--purple);border:1px solid var(--purple)}
+.btn-recharge:hover{background:var(--purple);color:#fff}
+.btn-pdf{background:#e8f4fd;color:#1a6dab;border:1px solid #7dbde8}
+.btn-pdf:hover{background:#1a6dab;color:#fff}
+.btn-edit{background:var(--covase-l);color:#0a7a72;border:1px solid var(--covase)}
+.btn-edit:hover{background:var(--covase);color:var(--indigo)}
+.btn-close-hire{background:var(--tl-yellow-l);color:var(--tl-yellow-t);border:1px solid var(--tl-yellow)}
+.btn-close-hire:hover{background:var(--tl-yellow);color:#4a3900}
+.btn-paid{background:var(--tl-green-l);color:var(--tl-green-t);border:1px solid var(--tl-green)}
+.btn-paid:hover{background:var(--tl-green);color:#1a3a00}
+.btn-link{background:var(--n100);color:var(--n600);border:1px solid var(--n200)}
+.btn-link:hover{background:var(--n200);color:var(--n800)}
+.btn-danger{background:var(--tl-red-l);color:var(--tl-red-t);border:1px solid var(--tl-red)}
+.btn-danger:hover{background:var(--tl-red);color:#fff}
+
+/* ─── MODAL ─── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(36,34,84,.45);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(36,34,84,.22);}
+.modal-header{padding:20px 24px 14px;border-bottom:1px solid var(--n100);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--card);z-index:1;}
+.modal-title{font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:var(--n800)}
+.modal-close{background:var(--n100);border:none;color:var(--n500);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:var(--n200)}
+.modal-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:14px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--n100);display:flex;gap:8px;justify-content:flex-end;background:var(--n50);position:sticky;bottom:0;}
+.form-section-label{font-size:11px;color:var(--n400);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:9px;padding-top:12px;border-top:1px solid var(--n100)}
+.form-section-label:first-child{border-top:none;padding-top:0}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.form-row.trio{grid-template-columns:1fr 1fr 1fr}
+.form-field{display:flex;flex-direction:column;gap:5px}
+.form-field label{font-size:11px;color:var(--n500);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.form-field input,.form-field select,.form-field textarea{background:var(--n50);border:1px solid var(--n200);color:var(--n800);padding:8px 11px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s;width:100%}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--covase);background:#fff}
+.form-field textarea{min-height:56px;resize:vertical;line-height:1.5}
+.btn-primary-modal{background:var(--covase);color:var(--indigo);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-primary-modal:hover{filter:brightness(1.05)}
+.btn-secondary-modal{background:var(--n100);color:var(--n600);border:none;border-radius:8px;padding:9px 15px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-secondary-modal:hover{background:var(--n200)}
+
+/* ─── RECHARGE PICKER ─── */
+.rp-overlay{display:none;position:fixed;inset:0;background:rgba(36,34,84,.5);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.rp-overlay.open{display:flex}
+.rp-modal{background:var(--card);border-radius:16px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(36,34,84,.25);}
+.rp-header{padding:20px 22px 14px;border-bottom:1px solid var(--n100);display:flex;justify-content:space-between;align-items:flex-start;}
+.rp-title{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:var(--n800)}
+.rp-sub{font-size:12px;color:var(--n400);margin-top:2px}
+.rp-body{padding:16px 22px}
+.rp-hint{font-size:12px;color:var(--n500);margin-bottom:12px;padding:8px 11px;background:var(--n50);border-radius:7px;}
+.rp-line{display:flex;align-items:flex-start;gap:11px;padding:11px;border:1px solid var(--n200);border-radius:9px;margin-bottom:7px;cursor:pointer;transition:all .15s;}
+.rp-line:hover,.rp-line:has(input:checked){border-color:var(--covase);background:#fafffe}
+.rp-line input[type=checkbox]{accent-color:var(--covase);width:15px;height:15px;margin-top:2px;flex-shrink:0;cursor:pointer}
+.rp-line-info{flex:1}
+.rp-line-reg{font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:var(--indigo)}
+.rp-line-driver{font-size:11px;color:var(--n400);margin-bottom:2px}
+.rp-line-desc{font-size:12px;color:var(--n600);line-height:1.5;white-space:pre-wrap}
+.rp-line-amt{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--n800);white-space:nowrap}
+.rp-total{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--indigo);border-radius:8px;margin-top:4px;color:#fff}
+.rp-total-label{font-size:12px;opacity:.6}
+.rp-total-val{font-family:'Outfit',sans-serif;font-size:17px;font-weight:700}
+.rp-footer{padding:14px 22px;border-top:1px solid var(--n100);display:flex;gap:8px;justify-content:flex-end;background:var(--n50);}
+.rp-confirm{background:var(--purple);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.rp-confirm:hover{filter:brightness(1.1)}
+
+/* ─── EMPTY / LOADING / SETUP ─── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:56px 24px;color:var(--n400);text-align:center}
+.empty-icon{font-size:32px;opacity:.35}
+.empty-title{font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;color:var(--n500)}
+.empty-sub{font-size:13px;max-width:340px;line-height:1.7}
+.loading{text-align:center;padding:50px;color:var(--n400);font-size:13px}
+.setup-prompt{display:flex;align-items:center;justify-content:center;padding:60px 24px}
+.setup-card{background:var(--card);border:1px solid var(--n200);border-radius:var(--radius);padding:30px 34px;max-width:420px;width:100%;box-shadow:var(--shadow-lg);}
+.setup-card h2{font-family:'Outfit',sans-serif;font-size:19px;font-weight:700;margin-bottom:6px;color:var(--indigo)}
+.setup-card p{font-size:13px;color:var(--n500);margin-bottom:18px;line-height:1.7}
+.setup-card label{display:block;font-size:10px;color:var(--n400);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.setup-card input{width:100%;background:var(--n50);border:1px solid var(--n200);color:var(--n800);padding:9px 11px;border-radius:8px;font-size:13px;font-family:'DM Mono',monospace;outline:none;}
+.setup-card input:focus{border-color:var(--covase)}
+.setup-submit{margin-top:20px;width:100%;background:var(--covase);color:var(--indigo);border:none;padding:10px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;}
+
+/* ─── COMING SOON ─── */
+.coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:80px 24px;text-align:center}
+.cs-icon{font-size:40px;opacity:.3}
+.cs-title{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--n500)}
+.cs-sub{font-size:13px;color:var(--n400);max-width:360px;line-height:1.7}
+.cs-tag{display:inline-block;margin-top:6px;background:var(--n100);color:var(--n500);font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--n200);border-radius:var(--radius);padding:10px 17px;font-size:13px;font-weight:500;color:var(--n700);z-index:999;transform:translateY(80px);opacity:0;transition:all .25s;box-shadow:var(--shadow-lg);}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--tl-green);color:var(--tl-green-t)}
+.toast.error{border-color:var(--tl-red);color:var(--tl-red-t)}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.inv-card,.hire-card,.client-card{animation:fadeIn .2s ease both}
+</style>
+</head>
+<body>
+
+<!-- ─── SIDEBAR ─── -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-mark">O</div>
+    <div class="sb-logo-text">
+      <div class="name">ORBIS</div>
+      <div class="tag">COVASE · INTERNAL</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">
+      <div class="sb-section-label">Billing</div>
+      <div class="sb-item active" onclick="showView('received',this)">
+        <span class="icon">↓</span> Received invoices
+        <span class="sb-badge" id="badge-pending">—</span>
+      </div>
+      <div class="sb-item" onclick="showView('outgoing',this)">
+        <span class="icon">↑</span> Outgoing invoices
+      </div>
+    </div>
+    <button class="sb-new-btn" onclick="openGenerator()">+ New invoice</button>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Short Hires</div>
+      <div class="sb-item" onclick="showView('hires-active',this)">
+        <span class="icon">🚗</span> Active hires
+        <span class="sb-badge" id="badge-active-hires">—</span>
+      </div>
+      <div class="sb-item" onclick="showView('hires-all',this)">
+        <span class="icon">☰</span> All hires
+      </div>
+      <div class="sb-item" onclick="showView('hires-recharge',this)">
+        <span class="icon">↑</span> Pending recharge
+        <span class="sb-badge purple" id="badge-pending-recharge">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Clients</div>
+      <div class="sb-item" onclick="showView('clients',this)">
+        <span class="icon">◉</span> Directory
+        <span class="sb-badge" id="badge-clients">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Reports</div>
+      <div class="sb-item disabled" title="Coming soon">
+        <span class="icon">⟷</span> Reconciliation
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-section-label">Integrations</div>
+      <div class="sb-item disabled" title="Coming soon"><span class="icon">◎</span> Sage</div>
+      <div class="sb-item disabled" title="Coming soon"><span class="icon">◉</span> GoCardless</div>
+    </div>
+  </nav>
+  <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Supabase settings</div>
+  <div class="sb-config-panel" id="config-panel">
+    <label>Project URL</label>
+    <input type="text" id="sb-url" placeholder="https://xxx.supabase.co">
+    <label>Anon Key</label>
+    <input type="password" id="sb-key" placeholder="eyJ...">
+    <button class="save-btn" onclick="saveConfig()">Save & reload</button>
+  </div>
+</aside>
+
+<!-- ─── MAIN ─── -->
+<main class="main">
+
+  <!-- RECEIVED INVOICES -->
+  <div class="view active" id="view-received">
+    <div class="topbar">
+      <h1>Received invoices</h1>
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setInvFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setInvFilter('pending',this)">Pending</button>
+        <button class="filter-pill" onclick="setInvFilter('approved',this)">Approved</button>
+        <button class="filter-pill" onclick="setInvFilter('rejected',this)">Rejected</button>
+      </div>
+      <button class="topbar-btn" onclick="loadInvoices()">↻ Refresh</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-orange"><div class="stat-label">Pending review</div><div class="stat-val" id="si-pending">—</div><div class="stat-sub">awaiting action</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Total value</div><div class="stat-val" id="si-total">—</div><div class="stat-sub">all invoices</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Approved</div><div class="stat-val" id="si-approved">—</div><div class="stat-sub">this month</div></div>
+      <div class="stat-card stat-purple"><div class="stat-label">Parse errors</div><div class="stat-val" id="si-errors">—</div><div class="stat-sub">need manual check</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="invoice-list"><div class="loading">Loading invoices…</div></div></div>
+  </div>
+
+  <!-- OUTGOING INVOICES -->
+  <div class="view" id="view-outgoing">
+    <div class="topbar">
+      <h1>Outgoing invoices</h1>
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setOutFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setOutFilter('sent',this)">Sent</button>
+        <button class="filter-pill" onclick="setOutFilter('approved',this)">Paid</button>
+      </div>
+      <button class="topbar-btn" onclick="loadOutgoing()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openGenerator()">+ New Invoice</button>
+    </div>
+    <div class="content"><div class="card-list" id="outgoing-list"><div class="loading">Loading…</div></div></div>
+  </div>
+
+  <!-- HIRES ACTIVE -->
+  <div class="view" id="view-hires-active">
+    <div class="topbar">
+      <h1>Active hires</h1>
+      <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewHire()">+ New Hire</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-orange"><div class="stat-label">On hire now</div><div class="stat-val" id="sh-active">—</div><div class="stat-sub">vehicles out</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Exposure (cost)</div><div class="stat-val" id="sh-exposure">—</div><div class="stat-sub">cost to date, open hires</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Avg margin</div><div class="stat-val" id="sh-margin">—</div><div class="stat-sub">sell vs cost/day</div></div>
+      <div class="stat-card stat-purple"><div class="stat-label">Pending recharge</div><div class="stat-val" id="sh-recharge">—</div><div class="stat-sub">closed, not recharged</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="hires-active-list"><div class="loading">Loading hires…</div></div></div>
+  </div>
+
+  <!-- HIRES ALL -->
+  <div class="view" id="view-hires-all">
+    <div class="topbar">
+      <h1>All hires</h1>
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setHireFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setHireFilter('active',this)">Active</button>
+        <button class="filter-pill" onclick="setHireFilter('closed',this)">Closed</button>
+        <button class="filter-pill" onclick="setHireFilter('invoiced',this)">Invoiced</button>
+        <button class="filter-pill" onclick="setHireFilter('recharged',this)">Recharged</button>
+      </div>
+      <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewHire()">+ New Hire</button>
+    </div>
+    <div class="content"><div class="card-list" id="hires-all-list"><div class="loading">Loading…</div></div></div>
+  </div>
+
+  <!-- HIRES PENDING RECHARGE -->
+  <div class="view" id="view-hires-recharge">
+    <div class="topbar">
+      <h1>Pending recharge</h1>
+      <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
+    </div>
+    <div class="content"><div class="card-list" id="hires-recharge-list"><div class="loading">Loading…</div></div></div>
+  </div>
+
+  <!-- CLIENTS -->
+  <div class="view" id="view-clients">
+    <div class="topbar">
+      <h1>Client directory</h1>
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setClientFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setClientFilter('active',this)">Active</button>
+        <button class="filter-pill" onclick="setClientFilter('BACS',this)">BACS</button>
+        <button class="filter-pill" onclick="setClientFilter('Direct Debit',this)">Direct Debit</button>
+      </div>
+      <button class="topbar-btn" onclick="loadClients()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewClient()">+ New Client</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Total clients</div><div class="stat-val" id="sc-total">—</div><div class="stat-sub">in directory</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">BACS</div><div class="stat-val" id="sc-bacs">—</div><div class="stat-sub">bank transfer</div></div>
+      <div class="stat-card stat-purple"><div class="stat-label">Direct Debit</div><div class="stat-val" id="sc-dd">—</div><div class="stat-sub">auto-collect</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Active</div><div class="stat-val" id="sc-active">—</div><div class="stat-sub">currently billing</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="client-list"><div class="loading">Loading clients…</div></div></div>
+  </div>
+
+</main>
+
+<!-- ─── HIRE MODAL ─── -->
+<div class="modal-overlay" id="hire-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="hire-modal-title">New hire</div>
+      <button class="modal-close" onclick="closeHireModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-label">Client &amp; Driver</div>
+      <div class="form-row">
+        <div class="form-field"><label>Customer *</label><input id="hf-customer" placeholder="e.g. Woodland Trust" list="client-datalist"></div>
+        <div class="form-field"><label>Driver *</label><input id="hf-driver" placeholder="First Last"></div>
+      </div>
+      <datalist id="client-datalist"></datalist>
+      <div class="form-row">
+        <div class="form-field"><label>Reference</label><input id="hf-reference" placeholder="e.g. 80601024"></div>
+        <div class="form-field"><label>Status</label>
+          <select id="hf-status"><option value="active">Active</option><option value="closed">Closed</option><option value="invoiced">Invoiced</option><option value="recharged">Recharged</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Vehicle</div>
+      <div class="form-row">
+        <div class="form-field"><label>Registration *</label><input id="hf-reg" placeholder="AB12 CDE" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Make / Model</label><input id="hf-makemodel" placeholder="e.g. Ford Focus"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Category</label>
+          <select id="hf-category"><option value="">—</option><option>CAR2</option><option>CAR3</option><option>CAR3A</option><option>CAR3E</option><option>CAR4</option><option>CAR4A</option><option>CAR5</option><option>CAR5A</option><option>CAR5E</option><option>LCV1</option><option>LCV12</option><option>LCV2</option><option>LCV2A</option><option>LCV3</option><option>MPV2</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Fuel</label>
+          <select id="hf-fuel"><option value="">—</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>PHEV</option><option>Electric</option></select>
+        </div>
+        <div class="form-field"><label>Agreement Ref</label><input id="hf-agreement" placeholder="RA1L8…"></div>
+      </div>
+      <div class="form-section-label">Supplier</div>
+      <div class="form-row">
+        <div class="form-field"><label>Supplier *</label>
+          <select id="hf-supplier"><option value="">— select —</option><option>Fourways</option><option>Ogilvie</option><option>Arval</option><option>Lex</option><option>Ford rental</option><option>Enterprise</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Supplier Invoice Ref(s)</label><input id="hf-supplier-ref" placeholder="3318/3336…"></div>
+      </div>
+      <div class="form-section-label">Dates &amp; Rates</div>
+      <div class="form-row">
+        <div class="form-field"><label>Start date *</label><input type="date" id="hf-start"></div>
+        <div class="form-field"><label>End date (blank = ongoing)</label><input type="date" id="hf-end"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Cost/day (supplier)</label><input type="number" step="0.01" id="hf-cost" placeholder="0.00"></div>
+        <div class="form-field"><label>Sell/day (client)</label><input type="number" step="0.01" id="hf-sell" placeholder="0.00"></div>
+        <div class="form-field"><label>Supplementary charges</label><input type="number" step="0.01" id="hf-supp" placeholder="0.00"></div>
+      </div>
+      <div class="form-field"><label>Supplementary notes</label><input id="hf-supp-notes" placeholder="e.g. Excess mileage £45, missing fuel £20"></div>
+      <div class="form-section-label">Invoice links</div>
+      <div class="form-row">
+        <div class="form-field"><label>Incoming invoice ID</label><input id="hf-in-inv" placeholder="from Billing"></div>
+        <div class="form-field"><label>Outgoing invoice ID</label><input id="hf-out-inv" placeholder="recharge invoice"></div>
+      </div>
+      <div class="form-section-label">Notes</div>
+      <div class="form-field"><textarea id="hf-notes" placeholder="Any additional notes…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeHireModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveHire()">Save hire</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CLIENT MODAL ─── -->
+<div class="modal-overlay" id="client-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="client-modal-title">New client</div>
+      <button class="modal-close" onclick="closeClientModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-label">Company</div>
+      <div class="form-row">
+        <div class="form-field"><label>Company name *</label><input id="cf-company" placeholder="e.g. Woodland Trust"></div>
+        <div class="form-field"><label>Status</label>
+          <select id="cf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Primary contact</div>
+      <div class="form-row">
+        <div class="form-field"><label>Contact name</label><input id="cf-contact" placeholder="First Last"></div>
+        <div class="form-field"><label>Email</label><input type="email" id="cf-email" placeholder="accounts@company.com"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Phone</label><input id="cf-phone" placeholder="01234 567890"></div>
+        <div class="form-field"><label>Account manager</label>
+          <select id="cf-manager"><option>Simon Homer</option><option>Andy Jackson</option></select>
+        </div>
+      </div>
+      <div class="form-field"><label>Address</label><textarea id="cf-address" placeholder="115 New London Road&#10;Chelmsford&#10;Essex&#10;CM2 0QT"></textarea></div>
+      <div class="form-section-label">Billing preferences</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Payment method</label>
+          <select id="cf-pm"><option value="BACS">BACS</option><option value="Direct Debit">Direct Debit</option></select>
+        </div>
+        <div class="form-field"><label>Payment terms</label>
+          <select id="cf-terms"><option>7 days</option><option>14 days</option><option>28 days</option><option>30 days</option><option>45 days</option><option>60 days</option></select>
+        </div>
+        <div class="form-field"><label>Dynamics ID</label><input id="cf-dynamics" placeholder="for transition period"></div>
+      </div>
+      <div class="form-section-label">Notes</div>
+      <div class="form-field"><textarea id="cf-notes" placeholder="Any notes about this client…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeClientModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveClient()">Save client</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── RECHARGE LINE-ITEM PICKER ─── -->
+<div class="rp-overlay" id="rp-overlay">
+  <div class="rp-modal">
+    <div class="rp-header">
+      <div><div class="rp-title">Select lines to recharge</div><div class="rp-sub" id="rp-sub">Invoice</div></div>
+      <button class="modal-close" onclick="closeRechargePicker()">✕</button>
+    </div>
+    <div class="rp-body">
+      <div class="rp-hint">Tick the lines to include. Untick any that belong to a different client or billing period.</div>
+      <div id="rp-lines"></div>
+      <div class="rp-total"><span class="rp-total-label">Selected total (net)</span><span class="rp-total-val" id="rp-total">£0.00</span></div>
+    </div>
+    <div class="rp-footer">
+      <button class="btn-secondary-modal" onclick="closeRechargePicker()">Cancel</button>
+      <button class="rp-confirm" onclick="confirmRecharge()">↑ Recharge selected</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ───
+function getConfig() { return { url:localStorage.getItem('covase_sb_url')||'', key:localStorage.getItem('covase_sb_key')||'' }; }
+function saveConfig() {
+  const url=document.getElementById('sb-url').value.trim(), key=document.getElementById('sb-key').value.trim();
+  if(!url||!key){toast('Enter both URL and key','error');return;}
+  localStorage.setItem('covase_sb_url',url); localStorage.setItem('covase_sb_key',key);
+  document.getElementById('config-panel').classList.remove('open');
+  toast('Saved — reloading…','success'); setTimeout(()=>location.reload(),400);
+}
+function toggleConfig() {
+  const p=document.getElementById('config-panel'); p.classList.toggle('open');
+  const c=getConfig(); document.getElementById('sb-url').value=c.url; document.getElementById('sb-key').value=c.key;
+}
+
+// ─── SUPABASE ───
+async function sbReq(path,opts={}) {
+  const {url,key}=getConfig();
+  const r=await fetch(`${url}/rest/v1/${path}`,{
+    headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})},
+    method:opts.method||'GET', body:opts.body?JSON.stringify(opts.body):undefined
+  });
+  if(!r.ok) throw new Error(await r.text());
+  const t=await r.text(); return t?JSON.parse(t):[];
+}
+function needsSetup(el) {
+  const c=getConfig();
+  if(c.url&&c.key) return false;
+  el.innerHTML=`<div class="setup-prompt"><div class="setup-card"><h2>Connect Supabase</h2><p>Enter your project URL and anon key — same credentials as before.</p><label>Project URL</label><input id="su-url" placeholder="https://xxx.supabase.co"><label>Anon Key</label><input type="password" id="su-key" placeholder="eyJ…"><button class="setup-submit" onclick="quickSetup()">Connect</button></div></div>`;
+  return true;
+}
+function quickSetup() {
+  const url=document.getElementById('su-url')?.value.trim(), key=document.getElementById('su-key')?.value.trim();
+  if(!url||!key){toast('Fill in both fields','error');return;}
+  localStorage.setItem('covase_sb_url',url); localStorage.setItem('covase_sb_key',key);
+  loadCurrentView();
+}
+
+// ─── VIEW MANAGEMENT ───
+let currentViewId='received';
+function showView(id,el) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(n=>n.classList.remove('active'));
+  const v=document.getElementById('view-'+id); if(v) v.classList.add('active');
+  if(el) el.classList.add('active');
+  currentViewId=id;
+  loadCurrentView();
+}
+function loadCurrentView() {
+  const loaders={
+    'received':loadInvoices,'outgoing':loadOutgoing,
+    'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,
+    'clients':loadClients
+  };
+  if(loaders[currentViewId]) loaders[currentViewId]();
+}
+
+// ─── INVOICES ───
+let allInvoices=[],invFilter='all';
+async function loadInvoices() {
+  const el=document.getElementById('invoice-list');
+  if(needsSetup(el)) return;
+  el.innerHTML='<div class="loading">Fetching invoices…</div>';
+  try {
+    allInvoices=await sbReq(`covase_invoices?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);
+    updateInvStats(); renderInvoices(); updateBadges();
+  } catch(e){ el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Connection failed</div><div class="empty-sub">${esc(e.message)}</div></div>`; }
+}
+function updateInvStats() {
+  const pending=allInvoices.filter(i=>i.status==='pending');
+  const approved=allInvoices.filter(i=>i.status==='approved');
+  const total=allInvoices.reduce((s,i)=>s+(parseFloat(i.total)||0),0);
+  const errors=allInvoices.filter(i=>i.parse_error).length;
+  document.getElementById('si-pending').textContent=pending.length;
+  document.getElementById('si-approved').textContent=approved.length;
+  document.getElementById('si-errors').textContent=errors;
+  document.getElementById('si-total').textContent='£'+total.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function renderInvoices() {
+  const el=document.getElementById('invoice-list');
+  let inv=allInvoices;
+  if(invFilter!=='all') inv=inv.filter(i=>i.status===invFilter);
+  if(!inv.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-title">Nothing here</div><div class="empty-sub">No invoices with status "${invFilter}".</div></div>`;return;}
+  el.innerHTML=inv.map(i=>buildInvCard(i)).join('');
+}
+function setInvFilter(f,btn){invFilter=f;document.querySelectorAll('#view-received .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderInvoices();}
+function buildInvCard(inv) {
+  const conf=parseFloat(inv.confidence)||0, confPct=Math.round(conf*100);
+  const confClass=conf>=.85?'':conf>=.6?'mid':'low';
+  const amt=parseFloat(inv.total)||0, amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
+  const sub=parseFloat(inv.subtotal)||0, vat=parseFloat(inv.vat_amount)||0;
+  const pm=(inv.payment_method||'unknown').toLowerCase();
+  const pmClass=pm==='direct_debit'?'badge-direct_debit':pm==='bacs'?'badge-bacs':'badge-unknown';
+  const pmLabel=pm==='direct_debit'?'Direct Debit':pm==='bacs'?'BACS':pm;
+  const dateStr=inv.invoice_date?new Date(inv.invoice_date).toLocaleDateString('en-GB'):'—';
+  const dueStr=inv.due_date?new Date(inv.due_date).toLocaleDateString('en-GB'):'—';
+  const pdfBtn=inv.pdf_url?`<button class="btn btn-pdf" onclick="window.open('${esc(inv.pdf_url)}','_blank')">📄 PDF</button>`:'';
+  return `<div class="inv-card" id="ic-${inv.id}">
+    <div class="inv-header" onclick="toggleCard('ic-${inv.id}')">
+      <div><div class="inv-vendor-name">${esc(inv.vendor||inv.source_email||'Unknown')}${inv.pdf_url?' <span style="color:var(--covase);font-size:11px">📄</span>':''}</div><div class="inv-meta">${esc(inv.invoice_number||'—')} · ${esc(inv.email_subject||'')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Amount</div><div class="inv-amount">${amtFmt}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="badge badge-${inv.status||'pending'}">${inv.status||'pending'}</span><span class="badge ${pmClass}">${pmLabel}</span></div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      ${inv.parse_error?'<div class="parse-err">⚠ Could not fully parse — check fields before approving.</div>':''}
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Vendor</div><div class="detail-val">${esc(inv.vendor||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Invoice no.</div><div class="detail-val">${esc(inv.invoice_number||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Category</div><div class="detail-val">${esc(inv.category||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">VAT number</div><div class="detail-val">${esc(inv.vat_number||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Received</div><div class="detail-val">${inv.received_at?new Date(inv.received_at).toLocaleDateString('en-GB'):'—'}</div></div>
+        <div class="detail-field"><div class="detail-label">Currency</div><div class="detail-val">${esc(inv.currency||'GBP')}</div></div>
+      </div>
+      <div class="vat-row"><div><span>Subtotal</span><strong>£${sub.toFixed(2)}</strong></div><div><span>VAT</span><strong>£${vat.toFixed(2)}</strong></div><div><span>Total</span><strong>${amtFmt}</strong></div></div>
+      ${inv.description?`<div class="desc-box">${esc(inv.description)}</div>`:''}
+      <div class="conf-row"><span class="conf-label" style="font-size:11px">AI confidence</span><div class="conf-bar-wrap"><div class="conf-bar ${confClass}" style="width:${confPct}%"></div></div><span class="conf-label">${confPct}%</span></div>
+      <div class="action-row">
+        <textarea class="notes-input" id="n-${inv.id}" placeholder="Notes…">${esc(inv.notes||'')}</textarea>
+        ${pdfBtn}
+        <button class="btn btn-approve" onclick="setInvStatus('${inv.id}','approved')">✓ Approve</button>
+        <button class="btn btn-flag" onclick="setInvStatus('${inv.id}','flagged')">⚑ Flag</button>
+        <button class="btn btn-reject" onclick="setInvStatus('${inv.id}','rejected')">✗ Reject</button>
+        <button class="btn btn-recharge" onclick="rechargeInvoice('${inv.id}')">↑ Recharge</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function setInvStatus(id,status) {
+  const notes=document.getElementById(`n-${id}`)?.value||'';
+  try {
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status,notes},prefer:'return=minimal'});
+    const i=allInvoices.find(x=>x.id===id); if(i){i.status=status;i.notes=notes;}
+    renderInvoices();updateInvStats();updateBadges();toast(`Invoice ${status}`,'success');
+  } catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+// ─── OUTGOING ───
+let outInvoices=[],outFilter='all';
+async function loadOutgoing() {
+  const el=document.getElementById('outgoing-list');
+  if(needsSetup(el)) return;
+  el.innerHTML='<div class="loading">Loading…</div>';
+  try {
+    outInvoices=await sbReq(`covase_invoices?category=eq.outgoing&order=invoice_date.desc&limit=200`);
+    renderOutgoing();
+  } catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
+}
+function setOutFilter(f,btn){outFilter=f;document.querySelectorAll('#view-outgoing .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOutgoing();}
+function renderOutgoing() {
+  const el=document.getElementById('outgoing-list');
+  let inv=outInvoices; if(outFilter!=='all') inv=inv.filter(i=>i.status===outFilter);
+  if(!inv.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">↑</div><div class="empty-title">${outFilter==='all'?'No outgoing invoices yet':'Nothing with status "'+outFilter+'"'}</div><div class="empty-sub">Click "+ New Invoice" to create one.</div></div>`;return;}
+  el.innerHTML=inv.map(i=>buildOutCard(i)).join('');
+}
+function buildOutCard(inv) {
+  const amt=parseFloat(inv.total)||0, amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
+  const pm=(inv.payment_method||'unknown').toLowerCase();
+  const pmClass=pm==='direct_debit'?'badge-direct_debit':pm==='bacs'?'badge-bacs':'badge-unknown';
+  const pmLabel=pm==='direct_debit'?'Direct Debit':pm==='bacs'?'BACS':pm;
+  const dateStr=inv.invoice_date?new Date(inv.invoice_date).toLocaleDateString('en-GB'):'—';
+  const dueStr=inv.due_date?new Date(inv.due_date).toLocaleDateString('en-GB'):'—';
+  const clientName=inv.client_name||inv.description?.split(';')[0]||'—';
+  const pdfBtn=inv.pdf_url?`<button class="btn btn-pdf" onclick="window.open('${esc(inv.pdf_url)}','_blank')">📄 PDF</button>`:'';
+  return `<div class="inv-card" id="oc-${inv.id}">
+    <div class="inv-header" onclick="toggleCard('oc-${inv.id}')">
+      <div><div class="inv-vendor-name">${esc(clientName)}</div><div class="inv-meta">${esc(inv.invoice_number||'—')} · ${esc(inv.prepared_by||'')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Amount</div><div class="inv-amount">${amtFmt}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="badge badge-${inv.status||'sent'}">${inv.status||'sent'}</span><span class="badge ${pmClass}">${pmLabel}</span></div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Client</div><div class="detail-val">${esc(inv.client_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Invoice no.</div><div class="detail-val">${esc(inv.invoice_number||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Prepared by</div><div class="detail-val">${esc(inv.prepared_by||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Payment terms</div><div class="detail-val">${esc(inv.payment_terms||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Payment method</div><div class="detail-val">${pmLabel}</div></div>
+        <div class="detail-field"><div class="detail-label">Currency</div><div class="detail-val">${esc(inv.currency||'GBP')}</div></div>
+      </div>
+      <div class="vat-row"><div><span>Net</span><strong>£${(parseFloat(inv.subtotal)||0).toFixed(2)}</strong></div><div><span>VAT</span><strong>£${(parseFloat(inv.vat_amount)||0).toFixed(2)}</strong></div><div><span>Total</span><strong>${amtFmt}</strong></div></div>
+      ${inv.description?`<div class="desc-box">${esc(inv.description)}</div>`:''}
+      ${inv.client_address?`<div class="desc-box" style="font-size:11px;color:var(--n400)">📍 ${esc(inv.client_address).replace(/\n/g,', ')}</div>`:''}
+      <div class="action-row">
+        ${pdfBtn}
+        <button class="btn btn-edit" onclick="openGenerator('${esc(inv.id)}')">✎ Edit</button>
+        <button class="btn btn-paid" onclick="setOutStatus('${inv.id}','approved')">✓ Mark Paid</button>
+        <button class="btn btn-flag" onclick="setOutStatus('${inv.id}','flagged')">⚑ Flag</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function setOutStatus(id,status) {
+  try {
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status},prefer:'return=minimal'});
+    const i=outInvoices.find(x=>x.id===id); if(i) i.status=status;
+    renderOutgoing(); toast(`Invoice ${status}`,'success');
+  } catch(e){toast('Update failed: '+e.message,'error');}
+}
+function openGenerator(id) {
+  const base=localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html';
+  if(id) window.open(base+'?id='+encodeURIComponent(id),'_blank');
+  else window.open(base,'_blank');
+}
+
+// ─── RECHARGE PICKER ───
+let rpInv=null, rpItems=[];
+function rechargeInvoice(id) {
+  const inv=allInvoices.find(i=>i.id===id);
+  if(!inv){window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');return;}
+  let items=[];
+  if(inv.line_items){try{items=typeof inv.line_items==='string'?JSON.parse(inv.line_items):inv.line_items;}catch(e){}}
+  if(!Array.isArray(items)||!items.length) items=[{desc:inv.description||inv.vendor||'Recharged item',amt:String(inv.subtotal||inv.total||''),vatExempt:false}];
+  if(items.length<=1){
+    localStorage.setItem('recharge_selected_items',JSON.stringify(items));
+    localStorage.setItem('recharge_source_id',id);
+    window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');
+    return;
+  }
+  rpInv=inv; rpItems=items;
+  document.getElementById('rp-sub').textContent=(inv.vendor||'Invoice')+(inv.invoice_number?' · #'+inv.invoice_number:'');
+  document.getElementById('rp-lines').innerHTML=items.map((li,i)=>`
+    <label class="rp-line">
+      <input type="checkbox" id="rpli-${i}" checked onchange="updateRpTotal()">
+      <div class="rp-line-info">
+        ${li.reg?`<div class="rp-line-reg">${esc(li.reg)}</div>`:''}
+        ${li.driver?`<div class="rp-line-driver">${esc(li.driver)}</div>`:''}
+        <div class="rp-line-desc">${esc(li.desc||'')}</div>
+      </div>
+      <div class="rp-line-amt">£${parseFloat(li.amt||0).toFixed(2)}</div>
+    </label>`).join('');
+  updateRpTotal();
+  document.getElementById('rp-overlay').classList.add('open');
+}
+function updateRpTotal(){
+  const total=rpItems.reduce((s,li,i)=>{const cb=document.getElementById(`rpli-${i}`);return cb&&cb.checked?s+parseFloat(li.amt||0):s;},0);
+  document.getElementById('rp-total').textContent='£'+total.toFixed(2);
+}
+function closeRechargePicker(){document.getElementById('rp-overlay').classList.remove('open');}
+function confirmRecharge(){
+  const selected=rpItems.filter((_,i)=>document.getElementById(`rpli-${i}`)?.checked);
+  if(!selected.length){toast('Select at least one line','error');return;}
+  localStorage.setItem('recharge_selected_items',JSON.stringify(selected));
+  localStorage.setItem('recharge_source_id',rpInv.id);
+  closeRechargePicker();
+  window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(rpInv.id),'_blank');
+  toast(`Opening generator with ${selected.length} line${selected.length>1?'s':''}…`,'success');
+}
+
+// ─── HIRES ───
+let allHires=[],hiresLoaded=false,hireStatusFilter='all';
+function daysOn(h){if(!h.start_date)return null;const end=h.end_date?new Date(h.end_date):new Date();return Math.max(0,Math.round((end-new Date(h.start_date))/86400000));}
+function fmtMoney(n){if(n==null||isNaN(n))return'—';return'£'+parseFloat(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtD(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-GB');}
+
+async function loadHires() {
+  const el=document.getElementById('hires-active-list');
+  if(needsSetup(el)) return;
+  if(!hiresLoaded){
+    ['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML='<div class="loading">Loading…</div>';});
+  }
+  try {
+    allHires=await sbReq(`covase_hires?order=start_date.desc&limit=500`);
+    hiresLoaded=true;
+    updateHireStats();
+    renderHireView('hires-active','active-list',h=>h.status==='active');
+    renderHireView('hires-all','all-list',null);
+    renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
+    updateBadges();
+  } catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
+}
+function updateHireStats() {
+  const active=allHires.filter(h=>h.status==='active');
+  const pending=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
+  document.getElementById('sh-active').textContent=active.length;
+  document.getElementById('sh-recharge').textContent=pending.length;
+  const exposure=active.reduce((s,h)=>{const d=daysOn(h);return d&&h.cost_per_day?s+d*parseFloat(h.cost_per_day)+(parseFloat(h.supplementary_charges)||0):s;},0);
+  document.getElementById('sh-exposure').textContent=fmtMoney(exposure||null);
+  const mg=active.filter(h=>h.cost_per_day&&h.sell_per_day);
+  document.getElementById('sh-margin').textContent=mg.length?((mg.reduce((s,h)=>(parseFloat(h.sell_per_day)-parseFloat(h.cost_per_day))/parseFloat(h.cost_per_day)*100+s,0)/mg.length).toFixed(1)+'%'):'—';
+}
+function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#view-hires-all .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderHireView('hires-all','all-list',null);}
+function renderHireView(viewId,listSuffix,filterFn) {
+  const el=document.getElementById(`hires-${listSuffix}`); if(!el)return;
+  let hires=allHires;
+  if(filterFn) hires=hires.filter(filterFn);
+  if(viewId==='hires-all'&&hireStatusFilter!=='all') hires=hires.filter(h=>h.status===hireStatusFilter);
+  if(!hires.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-title">No hires here</div><div class="empty-sub">Click "+ New Hire" to log a hire.</div></div>`;return;}
+  el.innerHTML=hires.map(h=>buildHireCard(h)).join('');
+}
+function buildHireCard(h) {
+  const days=daysOn(h);
+  const cost=days&&h.cost_per_day?days*parseFloat(h.cost_per_day)+(parseFloat(h.supplementary_charges)||0):null;
+  const sell=days&&h.sell_per_day?days*parseFloat(h.sell_per_day)+(parseFloat(h.supplementary_charges)||0):null;
+  const profit=sell!=null&&cost!=null?sell-cost:null;
+  const statusLabels={active:'Active',closed:'Closed',invoiced:'Invoiced',recharged:'Recharged'};
+  const pClass=profit!=null?(profit>=0?'profit-pos':'profit-neg'):'';
+  const invLinked=h.incoming_invoice_id?` <span style="color:var(--covase);font-size:11px" title="Invoice linked">📄</span>`:'';
+  const rechBadge=h.outgoing_invoice_id?` <span style="color:var(--purple);font-size:11px">↑</span>`:'';
+  return `<div class="hire-card" id="hc-${h.id}">
+    <div class="hire-header" onclick="toggleCard('hc-${h.id}')">
+      <div><div class="h-customer">${esc(h.customer)}${invLinked}${rechBadge}</div><div class="h-meta">${esc(h.vehicle_reg||'—')} · ${esc(h.driver||'—')} · ${esc(h.supplier||'—')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Start</div><div class="inv-col-val">${fmtD(h.start_date)}</div></div>
+      <div class="inv-col"><div class="inv-col-label">End / Days</div><div class="inv-col-val">${h.end_date?fmtD(h.end_date):'<span style="color:var(--tl-orange);font-weight:600">Ongoing</span>'}${days!=null?' · '+days+'d':''}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Sell total</div><div class="inv-amount">${fmtMoney(sell)}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="badge badge-${h.status||'active'}">${statusLabels[h.status]||h.status}</span>${h.category?`<span class="badge badge-sm">${esc(h.category)}</span>`:''}</div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Customer</div><div class="detail-val">${esc(h.customer||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Reference</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(h.vehicle_reg||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Make / Model</div><div class="detail-val">${esc(h.make_model||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Agreement ref</div><div class="detail-val">${esc(h.agreement_ref||'—')}</div></div>
+      </div>
+      <div class="financials-row">
+        <div><span>Days</span><strong>${days??'—'}</strong></div>
+        <div><span>Cost/day</span><strong>${h.cost_per_day?'£'+parseFloat(h.cost_per_day).toFixed(2):'—'}</strong></div>
+        <div><span>Sell/day</span><strong>${h.sell_per_day?'£'+parseFloat(h.sell_per_day).toFixed(2):'—'}</strong></div>
+        <div><span>Total cost</span><strong>${fmtMoney(cost)}</strong></div>
+        <div><span>Total sell</span><strong>${fmtMoney(sell)}</strong></div>
+        <div><span>Margin</span><strong class="${pClass}">${fmtMoney(profit)}</strong></div>
+      </div>
+      ${h.supplementary_charges&&parseFloat(h.supplementary_charges)>0?`<div class="notes-box">📎 Supplementary: ${fmtMoney(parseFloat(h.supplementary_charges))}${h.supplementary_notes?' — '+esc(h.supplementary_notes):''}</div>`:''}
+      ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
+      ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Invoice: <span style="font-family:'DM Mono',monospace;color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
+      <!-- inline close-off -->
+      <div class="inline-panel yellow" id="hco-${h.id}">
+        <div><label>End date</label><input type="date" id="hco-d-${h.id}" value="${new Date().toISOString().split('T')[0]}"></div>
+        <button class="btn btn-close-hire" onclick="doCloseHire('${h.id}')">✓ Close off</button>
+        <button class="btn btn-link" onclick="togglePanel('hco-${h.id}',false)">Cancel</button>
+      </div>
+      <!-- inline link invoice -->
+      <div class="inline-panel blue" id="hli-${h.id}">
+        <div><label>Invoice ID (from Billing)</label><input id="hli-id-${h.id}" placeholder="inv-8901"></div>
+        <button class="btn btn-edit" onclick="doLinkInv('${h.id}')">✓ Link</button>
+        <button class="btn btn-link" onclick="togglePanel('hli-${h.id}',false)">Cancel</button>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-edit" onclick="openEditHire('${h.id}')">✎ Edit</button>
+        ${h.status==='active'?`<button class="btn btn-close-hire" onclick="togglePanel('hco-${h.id}',true)">⊠ Close off</button>`:''}
+        ${!h.incoming_invoice_id?`<button class="btn btn-link" onclick="togglePanel('hli-${h.id}',true)">📄 Link invoice</button>`:''}
+        ${['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id?`<button class="btn btn-recharge" onclick="rechargeHire('${h.id}')">↑ Recharge</button>`:''}
+        <button class="btn btn-danger" onclick="deleteHire('${h.id}')">✗</button>
+      </div>
+    </div>
+  </div>`;
+}
+function togglePanel(id,open){const el=document.getElementById(id);if(el)el.classList.toggle('open',open);}
+async function doCloseHire(id){
+  const d=document.getElementById(`hco-d-${id}`)?.value; if(!d){toast('Enter date','error');return;}
+  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,status:'closed'},prefer:'return=minimal'});
+    const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.status='closed';}
+    updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);renderHireView('hires-all','all-list',null);updateBadges();toast('Hire closed off','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+async function doLinkInv(id){
+  const invId=document.getElementById(`hli-id-${id}`)?.value?.trim();if(!invId){toast('Enter invoice ID','error');return;}
+  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{incoming_invoice_id:invId,status:'invoiced'},prefer:'return=minimal'});
+    const h=allHires.find(x=>x.id===id);if(h){h.incoming_invoice_id=invId;h.status='invoiced';}
+    updateHireStats();renderHireView('hires-all','all-list',null);toast('Invoice linked','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+function rechargeHire(id) {
+  const h=allHires.find(x=>x.id===id);if(!h)return;
+  const days=daysOn(h),sellRate=parseFloat(h.sell_per_day)||0,sellTotal=days?days*sellRate:0,supp=parseFloat(h.supplementary_charges)||0;
+  const reg=h.vehicle_reg||'',driver=h.driver||'';
+  const hireDesc=`${reg}${h.make_model?' ('+h.make_model+')':''}${driver?' — '+driver:''}\nVehicle hire ${fmtD(h.start_date)} to ${h.end_date?fmtD(h.end_date):'ongoing'}${days?' ('+days+' days @ £'+sellRate.toFixed(2)+'/day)':''}${h.agreement_ref?'\nAgreement '+h.agreement_ref:''}`;
+  const lineItems=[{desc:hireDesc,amt:sellTotal.toFixed(2),vatExempt:false}];
+  if(supp>0) lineItems.push({desc:h.supplementary_notes||'Supplementary charges',amt:supp.toFixed(2),vatExempt:false});
+  localStorage.setItem('recharge_selected_items',JSON.stringify(lineItems));
+  localStorage.setItem('recharge_source_hire',id);
+  localStorage.setItem('recharge_client_name',h.customer||'');
+  window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_hire='+encodeURIComponent(id),'_blank');
+  toast('Opening generator…','success');
+}
+
+// ─── HIRE MODAL ───
+let editHireId=null;
+function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];document.getElementById('hire-modal').classList.add('open');}
+function openEditHire(id){
+  const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
+  document.getElementById('hire-modal-title').textContent='Edit hire';
+  const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
+  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);
+  f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);
+  f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);
+  f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-supp',h.supplementary_charges);f('hf-supp-notes',h.supplementary_notes);
+  f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  document.getElementById('hire-modal').classList.add('open');
+}
+function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
+function clearHireForm(){['hf-customer','hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-sell','hf-supp','hf-supp-notes','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-status').value='active';}
+async function saveHire(){
+  const customer=document.getElementById('hf-customer').value.trim();if(!customer){toast('Customer required','error');return;}
+  const payload={customer,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,status:document.getElementById('hf-status').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,sell_per_day:parseFloat(document.getElementById('hf-sell').value)||null,supplementary_charges:parseFloat(document.getElementById('hf-supp').value)||0,supplementary_notes:document.getElementById('hf-supp-notes').value.trim()||null,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  try{
+    if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
+    else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
+    closeHireModal();hiresLoaded=false;loadHires();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+async function deleteHire(id){if(!confirm('Delete this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);updateBadges();toast('Hire deleted','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+
+// ─── CLIENTS ───
+let allClients=[],clientFilter='all';
+async function loadClients(){
+  const el=document.getElementById('client-list');if(needsSetup(el))return;
+  el.innerHTML='<div class="loading">Loading clients…</div>';
+  try{allClients=await sbReq('covase_clients?order=company_name.asc&limit=500');updateClientStats();renderClients();updateBadges();populateClientDatalist();}
+  catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
+}
+function updateClientStats(){
+  const active=allClients.filter(c=>c.status==='active');
+  const bacs=allClients.filter(c=>c.payment_method==='BACS');
+  const dd=allClients.filter(c=>c.payment_method==='Direct Debit');
+  document.getElementById('sc-total').textContent=allClients.length;
+  document.getElementById('sc-active').textContent=active.length;
+  document.getElementById('sc-bacs').textContent=bacs.length;
+  document.getElementById('sc-dd').textContent=dd.length;
+  document.getElementById('badge-clients').textContent=active.length||'0';
+}
+function setClientFilter(f,btn){clientFilter=f;document.querySelectorAll('#view-clients .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderClients();}
+function renderClients(){
+  const el=document.getElementById('client-list');
+  let clients=allClients;
+  if(clientFilter==='active') clients=clients.filter(c=>c.status==='active');
+  else if(clientFilter==='BACS') clients=clients.filter(c=>c.payment_method==='BACS');
+  else if(clientFilter==='Direct Debit') clients=clients.filter(c=>c.payment_method==='Direct Debit');
+  if(!clients.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">No clients yet</div><div class="empty-sub">Click "+ New Client" to add your first client to the directory.</div></div>`;return;}
+  el.innerHTML=clients.map(c=>buildClientCard(c)).join('');
+}
+function buildClientCard(c){
+  const pmClass=c.payment_method==='Direct Debit'?'badge-direct_debit':'badge-bacs';
+  const pmLabel=c.payment_method||'BACS';
+  const statusBadge=c.status==='active'?'<span class="badge" style="background:var(--tl-green-l);color:var(--tl-green-t)">Active</span>':'<span class="badge badge-closed">Inactive</span>';
+  return `<div class="client-card" id="cc-${c.id}">
+    <div class="client-header" onclick="toggleCard('cc-${c.id}')">
+      <div><div class="c-name">${esc(c.company_name)}</div><div class="c-contact">${esc(c.contact_name||'—')} ${c.contact_email?'· '+esc(c.contact_email):''}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Account mgr</div><div class="inv-col-val">${esc((c.account_manager||'').split(' ')[0])}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Terms</div><div class="inv-col-val">${esc(c.payment_terms||'—')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Method</div><div class="inv-amount" style="font-size:13px"><span class="badge ${pmClass}">${pmLabel}</span></div></div>
+      <div>${statusBadge}</div>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Company</div><div class="detail-val">${esc(c.company_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Contact</div><div class="detail-val">${esc(c.contact_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Email</div><div class="detail-val">${esc(c.contact_email||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-val">${esc(c.contact_phone||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Account manager</div><div class="detail-val">${esc(c.account_manager||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${esc(c.dynamics_id||'—')}</div></div>
+      </div>
+      ${c.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(c.address)}</div>`:''}
+      ${c.notes?`<div class="notes-box">${esc(c.notes)}</div>`:''}
+      <div class="action-row">
+        <button class="btn btn-edit" onclick="openEditClient('${c.id}')">✎ Edit</button>
+        <button class="btn btn-recharge" onclick="openGenerator();localStorage.setItem('prefill_client','${esc(c.company_name)}')">+ Invoice this client</button>
+        <button class="btn btn-danger" onclick="deleteClient('${c.id}')">✗</button>
+      </div>
+    </div>
+  </div>`;
+}
+function populateClientDatalist(){const dl=document.getElementById('client-datalist');if(dl)dl.innerHTML=allClients.map(c=>`<option value="${esc(c.company_name)}">`).join('');}
+
+// ─── CLIENT MODAL ───
+let editClientId=null;
+function openNewClient(){editClientId=null;document.getElementById('client-modal-title').textContent='New client';clearClientForm();document.getElementById('client-modal').classList.add('open');}
+function openEditClient(id){
+  const c=allClients.find(x=>x.id===id);if(!c)return;editClientId=id;
+  document.getElementById('client-modal-title').textContent='Edit client';
+  const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
+  f('cf-company',c.company_name);f('cf-status',c.status);f('cf-contact',c.contact_name);f('cf-email',c.contact_email);f('cf-phone',c.contact_phone);f('cf-manager',c.account_manager);f('cf-address',c.address);f('cf-pm',c.payment_method);f('cf-terms',c.payment_terms);f('cf-dynamics',c.dynamics_id);f('cf-notes',c.notes);
+  document.getElementById('client-modal').classList.add('open');
+}
+function closeClientModal(){document.getElementById('client-modal').classList.remove('open');}
+function clearClientForm(){['cf-company','cf-contact','cf-email','cf-phone','cf-address','cf-dynamics','cf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('cf-status').value='active';document.getElementById('cf-pm').value='BACS';document.getElementById('cf-terms').value='28 days';document.getElementById('cf-manager').value='Simon Homer';}
+async function saveClient(){
+  const company=document.getElementById('cf-company').value.trim();if(!company){toast('Company name required','error');return;}
+  const payload={company_name:company,status:document.getElementById('cf-status').value,contact_name:document.getElementById('cf-contact').value.trim()||null,contact_email:document.getElementById('cf-email').value.trim()||null,contact_phone:document.getElementById('cf-phone').value.trim()||null,account_manager:document.getElementById('cf-manager').value,address:document.getElementById('cf-address').value.trim()||null,payment_method:document.getElementById('cf-pm').value,payment_terms:document.getElementById('cf-terms').value,dynamics_id:document.getElementById('cf-dynamics').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  try{
+    if(editClientId){await sbReq(`covase_clients?id=eq.${encodeURIComponent(editClientId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allClients.findIndex(x=>x.id===editClientId);if(idx>=0)allClients[idx]={...allClients[idx],...payload};toast('Client updated','success');}
+    else{const res=await sbReq('covase_clients',{method:'POST',body:{...payload,id:'cl-'+Date.now()}});allClients.push(Array.isArray(res)?res[0]:res||{...payload,id:'cl-'+Date.now()});allClients.sort((a,b)=>a.company_name.localeCompare(b.company_name));toast('Client saved','success');}
+    closeClientModal();updateClientStats();renderClients();populateClientDatalist();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+async function deleteClient(id){if(!confirm('Remove this client? Cannot be undone.'))return;try{await sbReq(`covase_clients?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allClients=allClients.filter(x=>x.id!==id);updateClientStats();renderClients();populateClientDatalist();toast('Client removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+
+// ─── SHARED ───
+function toggleCard(id){document.getElementById(id)?.classList.toggle('expanded');}
+function updateBadges(){
+  document.getElementById('badge-pending').textContent=allInvoices.filter(i=>i.status==='pending').length||'0';
+  document.getElementById('badge-active-hires').textContent=allHires.filter(h=>h.status==='active').length||'0';
+  document.getElementById('badge-pending-recharge').textContent=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id).length||'0';
+}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
+
+// Close modals on backdrop click
+['hire-modal','client-modal','rp-overlay'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='hire-modal')closeHireModal();else if(id==='client-modal')closeClientModal();else closeRechargePicker();}});
+});
+
+// Boot
+loadInvoices();
+</script>
+</body>
+</html>
