@@ -1384,7 +1384,7 @@ let allContacts=[],contactFilter='all';
 async function loadContacts(){
   const el=document.getElementById('contact-list');if(needsSetup(el))return;
   el.innerHTML='<div class="loading">Loading contacts…</div>';
-  try{allContacts=await sbReq('covase_contacts?order=surname.asc,first_name.asc&limit=1000');updateContactStats();renderContacts();updateBadges();}
+  try{allContacts=await sbReq('covase_contacts?order=last_name.asc,first_name.asc&limit=1000');updateContactStats();renderContacts();updateBadges();}
   catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
 function updateContactStats(){
@@ -1401,7 +1401,7 @@ function renderContacts(){
   let contacts=allContacts;
   if(contactFilter==='leaver')contacts=contacts.filter(c=>c.employee_status==='leaver');
   else if(contactFilter!=='all')contacts=contacts.filter(c=>c.contact_type===contactFilter);
-  if(q)contacts=contacts.filter(c=>[(c.first_name||''),(c.surname||''),(c.preferred_name||''),(c.email||''),(c.employee_number||'')].join(' ').toLowerCase().includes(q));
+  if(q)contacts=contacts.filter(c=>[(c.first_name||''),(c.last_name||''),(c.preferred_name||''),(c.email||''),(c.employee_number||'')].join(' ').toLowerCase().includes(q));
   if(!contacts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No contacts found</div><div class="empty-sub">Click "+ New Contact" to add one.</div></div>`;return;}
   el.innerHTML=contacts.map(c=>buildContactCard(c)).join('');
 }
@@ -1478,7 +1478,7 @@ async function loadVehicles(){
   el.innerHTML='<div class="loading">Loading vehicles…</div>';
   // Load accounts + contacts first if not already loaded
   if(!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');populateAccountDatalist();}catch(e){}}
-  if(!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=surname.asc&limit=1000');}catch(e){}}
+  if(!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=1000');}catch(e){}}
   try{allVehicles=await sbReq('covase_vehicles?order=created_at.desc&limit=500');updateVehicleStats();renderVehicles();updateBadges();}
   catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚙</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
