@@ -4,63 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORBIS — Covase</title>
-<!--
-  ORBIS PLATFORM — Covase Ltd
-  ────────────────────────────
-  Supabase tables required (run once in SQL Editor):
-
-  -- Invoices (may already exist)
-  CREATE TABLE IF NOT EXISTS covase_invoices (
-    id text PRIMARY KEY,
-    status text DEFAULT 'pending',
-    source_email text,
-    email_subject text,
-    received_at timestamptz DEFAULT now(),
-    vendor text, invoice_number text,
-    invoice_date date, due_date date,
-    payment_terms text,
-    subtotal numeric(10,2), vat_amount numeric(10,2), total numeric(10,2),
-    currency text DEFAULT 'GBP', payment_method text,
-    description text, category text,
-    confidence numeric(3,2), notes text,
-    parse_error boolean DEFAULT false,
-    pdf_url text,
-    client_name text, client_address text, client_email text,
-    prepared_by text, line_items jsonb,
-    recharged_from text,
-    created_at timestamptz DEFAULT now()
-  );
-
-  -- Hires
-  CREATE TABLE IF NOT EXISTS covase_hires (
-    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    customer text NOT NULL, driver text, reference text,
-    vehicle_reg text, make_model text, category text, fuel_type text,
-    supplier text, agreement_ref text, supplier_ref text,
-    start_date date, end_date date,
-    cost_per_day numeric(10,2), sell_per_day numeric(10,2),
-    supplementary_charges numeric(10,2) DEFAULT 0,
-    supplementary_notes text, notes text,
-    status text DEFAULT 'active',
-    incoming_invoice_id text, outgoing_invoice_id text,
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
-  );
-
-  -- Clients (CRM foundation)
-  CREATE TABLE IF NOT EXISTS covase_clients (
-    id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    company_name text NOT NULL,
-    contact_name text, contact_email text, contact_phone text,
-    address text, payment_method text DEFAULT 'BACS',
-    payment_terms text DEFAULT '28 days',
-    account_manager text DEFAULT 'Simon Homer',
-    dynamics_id text, notes text,
-    status text DEFAULT 'active',
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
-  );
--->
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -125,6 +68,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .topbar-btn:hover{border-color:var(--n300);color:var(--n700)}
 .topbar-btn.primary{background:var(--covase);border-color:var(--covase);color:var(--indigo);font-weight:700;box-shadow:0 2px 8px rgba(3,211,198,.25);}
 .topbar-btn.primary:hover{box-shadow:0 4px 14px rgba(3,211,198,.35);transform:translateY(-1px)}
+.search-box{padding:7px 12px;border-radius:8px;border:1px solid var(--n200);background:var(--n50);color:var(--n800);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;width:220px;transition:border-color .15s;}
+.search-box:focus{border-color:var(--covase);background:#fff}
 
 /* ─── STATS ─── */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px 28px}
@@ -154,15 +99,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .inv-col-val{font-size:12px;color:var(--n700);font-family:'DM Mono',monospace}
 .inv-amount{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:var(--n800)}
 .expand-arrow{color:var(--n300);font-size:11px;transition:transform .2s;flex-shrink:0}
-.inv-card.expanded .expand-arrow,.hire-card.expanded .expand-arrow,.client-card.expanded .expand-arrow{transform:rotate(90deg);color:var(--covase)}
+.inv-card.expanded .expand-arrow,.hire-card.expanded .expand-arrow,.account-card.expanded .expand-arrow,.contact-card.expanded .expand-arrow,.vehicle-card.expanded .expand-arrow{transform:rotate(90deg);color:var(--covase)}
 
 /* ─── DETAIL PANEL ─── */
 .card-detail{display:none;border-top:1px solid var(--n100);padding:18px 20px;background:var(--n50)}
-.inv-card.expanded .card-detail,.hire-card.expanded .card-detail,.client-card.expanded .card-detail{display:block}
+.inv-card.expanded .card-detail,.hire-card.expanded .card-detail,.account-card.expanded .card-detail,.contact-card.expanded .card-detail,.vehicle-card.expanded .card-detail{display:block}
 .detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.detail-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
 .detail-field{display:flex;flex-direction:column;gap:3px}
 .detail-label{font-size:10px;color:var(--n400);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
 .detail-val{font-size:12px;color:var(--n700);font-family:'DM Mono',monospace}
+.detail-section-head{font-size:11px;font-weight:700;color:var(--n500);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;padding-top:14px;border-top:1px solid var(--n100)}
+.detail-section-head:first-child{border-top:none;padding-top:0;margin-top:0}
 .vat-row,.financials-row{display:flex;gap:24px;padding:10px 14px;background:var(--card);border:1px solid var(--n100);border-radius:8px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:12px;}
 .vat-row span,.financials-row span{color:var(--n400)}
 .vat-row strong,.financials-row strong{color:var(--n800);margin-left:5px}
@@ -200,13 +148,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .inline-panel.yellow input{border-color:var(--tl-yellow)}
 .inline-panel.blue input{border-color:#7dbde8}
 
-/* ─── CLIENT CARD ─── */
-.client-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
-.client-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
-.client-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
-.client-header{display:grid;grid-template-columns:3fr 1.5fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
-.c-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800)}
-.c-contact{font-size:11px;color:var(--n400);margin-top:2px}
+/* ─── ACCOUNT CARD ─── */
+.account-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.account-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.account-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.account-header{display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.ac-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800)}
+.ac-meta{font-size:11px;color:var(--n400);margin-top:2px}
+
+/* ─── CONTACT CARD ─── */
+.contact-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.contact-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.contact-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.contact-header{display:grid;grid-template-columns:2.5fr 1.5fr 1fr 1.2fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.ct-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;color:var(--n800)}
+.ct-meta{font-size:11px;color:var(--n400);font-family:'DM Mono',monospace;margin-top:2px}
+
+/* ─── VEHICLE CARD ─── */
+.vehicle-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);overflow:hidden;transition:all .15s;box-shadow:var(--shadow);}
+.vehicle-card:hover{border-color:var(--n200);box-shadow:var(--shadow-lg)}
+.vehicle-card.expanded{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase),var(--shadow-lg)}
+.vehicle-header{display:grid;grid-template-columns:2.5fr 1.5fr 1fr 1fr 1fr auto;align-items:center;gap:12px;padding:13px 18px;cursor:pointer;user-select:none;}
+.vh-reg{font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--indigo);letter-spacing:.5px}
+.vh-model{font-size:12px;color:var(--n500);margin-top:2px}
 
 /* ─── BADGES ─── */
 .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em}
@@ -217,11 +181,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .badge-flagged{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
 .badge-direct_debit{background:var(--purple-l);color:var(--purple)}
 .badge-BACS,.badge-bacs{background:#e8f4fd;color:#1a6dab}
-.badge-active{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.badge-active{background:var(--tl-green-l);color:var(--tl-green-t)}
 .badge-closed{background:var(--n100);color:var(--n500)}
 .badge-recharged{background:var(--purple-l);color:var(--purple)}
 .badge-unknown{background:var(--n100);color:var(--n500)}
 .badge-sm{background:var(--n50);color:var(--n500);border:1px solid var(--n200);font-size:10px;padding:2px 7px}
+.badge-ordered{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
+.badge-de-hired{background:var(--n100);color:var(--n500)}
+.badge-cancelled{background:var(--tl-red-l);color:var(--tl-red-t)}
+.badge-employed{background:var(--tl-green-l);color:var(--tl-green-t)}
+.badge-leaver{background:var(--tl-red-l);color:var(--tl-red-t)}
+.badge-contractor{background:var(--purple-l);color:var(--purple)}
+.badge-client{background:var(--covase-l);color:#0a7a72}
+.badge-funder{background:#e8f4fd;color:#1a6dab}
+.badge-supplier{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.badge-dealer{background:var(--purple-l);color:var(--purple)}
 
 /* ─── ACTION BUTTONS ─── */
 .btn{padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .15s;}
@@ -249,7 +223,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 /* ─── MODAL ─── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(36,34,84,.45);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
 .modal-overlay.open{display:flex}
-.modal{background:var(--card);border-radius:16px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(36,34,84,.22);}
+.modal{background:var(--card);border-radius:16px;width:720px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(36,34,84,.22);}
+.modal.wide{width:860px}
 .modal-header{padding:20px 24px 14px;border-bottom:1px solid var(--n100);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--card);z-index:1;}
 .modal-title{font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;color:var(--n800)}
 .modal-close{background:var(--n100);border:none;color:var(--n500);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
@@ -260,6 +235,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .form-section-label:first-child{border-top:none;padding-top:0}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .form-row.trio{grid-template-columns:1fr 1fr 1fr}
+.form-row.quad{grid-template-columns:1fr 1fr 1fr 1fr}
 .form-field{display:flex;flex-direction:column;gap:5px}
 .form-field label{font-size:11px;color:var(--n500);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .form-field input,.form-field select,.form-field textarea{background:var(--n50);border:1px solid var(--n200);color:var(--n800);padding:8px 11px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s;width:100%}
@@ -269,6 +245,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .btn-primary-modal:hover{filter:brightness(1.05)}
 .btn-secondary-modal{background:var(--n100);color:var(--n600);border:none;border-radius:8px;padding:9px 15px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .btn-secondary-modal:hover{background:var(--n200)}
+
+/* ─── MODAL TABS ─── */
+.modal-tabs{display:flex;gap:0;border-bottom:1px solid var(--n100);padding:0 24px;background:var(--n50);position:sticky;top:61px;z-index:1;}
+.modal-tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--n400);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:'DM Sans',sans-serif;}
+.modal-tab:hover{color:var(--n700)}
+.modal-tab.active{color:var(--indigo);border-bottom-color:var(--covase)}
+.tab-pane{display:none;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.tab-pane{display:none}
+.tab-pane.active{display:flex;flex-direction:column;gap:14px}
 
 /* ─── RECHARGE PICKER ─── */
 .rp-overlay{display:none;position:fixed;inset:0;background:rgba(36,34,84,.5);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
@@ -309,13 +294,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .setup-card input:focus{border-color:var(--covase)}
 .setup-submit{margin-top:20px;width:100%;background:var(--covase);color:var(--indigo);border:none;padding:10px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;}
 
-/* ─── COMING SOON ─── */
-.coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:80px 24px;text-align:center}
-.cs-icon{font-size:40px;opacity:.3}
-.cs-title{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--n500)}
-.cs-sub{font-size:13px;color:var(--n400);max-width:360px;line-height:1.7}
-.cs-tag{display:inline-block;margin-top:6px;background:var(--n100);color:var(--n500);font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px}
-
 /* Toast */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--n200);border-radius:var(--radius);padding:10px 17px;font-size:13px;font-weight:500;color:var(--n700);z-index:999;transform:translateY(80px);opacity:0;transition:all .25s;box-shadow:var(--shadow-lg);}
 .toast.show{transform:translateY(0);opacity:1}
@@ -323,7 +301,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .toast.error{border-color:var(--tl-red);color:var(--tl-red-t)}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-.inv-card,.hire-card,.client-card{animation:fadeIn .2s ease both}
+.inv-card,.hire-card,.account-card,.contact-card,.vehicle-card{animation:fadeIn .2s ease both}
 </style>
 </head>
 <body>
@@ -366,10 +344,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
-      <div class="sb-section-label">Clients</div>
-      <div class="sb-item" onclick="showView('clients',this)">
-        <span class="icon">◉</span> Directory
-        <span class="sb-badge" id="badge-clients">—</span>
+      <div class="sb-section-label">CRM</div>
+      <div class="sb-item" onclick="showView('accounts',this)">
+        <span class="icon">◉</span> Accounts
+        <span class="sb-badge" id="badge-accounts">—</span>
+      </div>
+      <div class="sb-item" onclick="showView('contacts',this)">
+        <span class="icon">👤</span> Contacts
+        <span class="sb-badge" id="badge-contacts">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Fleet</div>
+      <div class="sb-item" onclick="showView('vehicles',this)">
+        <span class="icon">🚙</span> Vehicles
+        <span class="sb-badge" id="badge-vehicles">—</span>
       </div>
     </div>
     <div class="sb-divider"></div>
@@ -476,26 +466,74 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="content"><div class="card-list" id="hires-recharge-list"><div class="loading">Loading…</div></div></div>
   </div>
 
-  <!-- CLIENTS -->
-  <div class="view" id="view-clients">
+  <!-- ACCOUNTS -->
+  <div class="view" id="view-accounts">
     <div class="topbar">
-      <h1>Client directory</h1>
+      <h1>Accounts</h1>
+      <input class="search-box" type="text" id="account-search" placeholder="Search accounts…" oninput="renderAccounts()">
       <div style="display:flex;gap:6px">
-        <button class="filter-pill active" onclick="setClientFilter('all',this)">All</button>
-        <button class="filter-pill" onclick="setClientFilter('active',this)">Active</button>
-        <button class="filter-pill" onclick="setClientFilter('BACS',this)">BACS</button>
-        <button class="filter-pill" onclick="setClientFilter('Direct Debit',this)">Direct Debit</button>
+        <button class="filter-pill active" onclick="setAccountFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setAccountFilter('client',this)">Clients</button>
+        <button class="filter-pill" onclick="setAccountFilter('funder',this)">Funders</button>
+        <button class="filter-pill" onclick="setAccountFilter('supplier',this)">Suppliers</button>
+        <button class="filter-pill" onclick="setAccountFilter('dealer',this)">Dealers</button>
       </div>
-      <button class="topbar-btn" onclick="loadClients()">↻ Refresh</button>
-      <button class="topbar-btn primary" onclick="openNewClient()">+ New Client</button>
+      <button class="topbar-btn" onclick="loadAccounts()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewAccount()">+ New Account</button>
     </div>
     <div class="stats-row">
-      <div class="stat-card stat-covase"><div class="stat-label">Total clients</div><div class="stat-val" id="sc-total">—</div><div class="stat-sub">in directory</div></div>
-      <div class="stat-card stat-indigo"><div class="stat-label">BACS</div><div class="stat-val" id="sc-bacs">—</div><div class="stat-sub">bank transfer</div></div>
-      <div class="stat-card stat-purple"><div class="stat-label">Direct Debit</div><div class="stat-val" id="sc-dd">—</div><div class="stat-sub">auto-collect</div></div>
-      <div class="stat-card stat-green"><div class="stat-label">Active</div><div class="stat-val" id="sc-active">—</div><div class="stat-sub">currently billing</div></div>
+      <div class="stat-card stat-covase"><div class="stat-label">Total accounts</div><div class="stat-val" id="sac-total">—</div><div class="stat-sub">all types</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Clients</div><div class="stat-val" id="sac-clients">—</div><div class="stat-sub">active fleet clients</div></div>
+      <div class="stat-card stat-purple"><div class="stat-label">Funders</div><div class="stat-val" id="sac-funders">—</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Suppliers / Dealers</div><div class="stat-val" id="sac-other">—</div></div>
     </div>
-    <div class="content"><div class="card-list" id="client-list"><div class="loading">Loading clients…</div></div></div>
+    <div class="content"><div class="card-list" id="account-list"><div class="loading">Loading accounts…</div></div></div>
+  </div>
+
+  <!-- CONTACTS -->
+  <div class="view" id="view-contacts">
+    <div class="topbar">
+      <h1>Contacts</h1>
+      <input class="search-box" type="text" id="contact-search" placeholder="Search contacts…" oninput="renderContacts()">
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setContactFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setContactFilter('driver',this)">Drivers</button>
+        <button class="filter-pill" onclick="setContactFilter('fleet manager',this)">Fleet Mgrs</button>
+        <button class="filter-pill" onclick="setContactFilter('leaver',this)">Leavers</button>
+      </div>
+      <button class="topbar-btn" onclick="loadContacts()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewContact()">+ New Contact</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Total contacts</div><div class="stat-val" id="sct-total">—</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Drivers</div><div class="stat-val" id="sct-drivers">—</div></div>
+      <div class="stat-card stat-orange"><div class="stat-label">Leavers</div><div class="stat-val" id="sct-leavers">—</div><div class="stat-sub">employee status: leaver</div></div>
+      <div class="stat-card stat-purple"><div class="stat-label">Fleet managers</div><div class="stat-val" id="sct-fms">—</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="contact-list"><div class="loading">Loading contacts…</div></div></div>
+  </div>
+
+  <!-- VEHICLES -->
+  <div class="view" id="view-vehicles">
+    <div class="topbar">
+      <h1>Vehicles</h1>
+      <input class="search-box" type="text" id="vehicle-search" placeholder="Search reg, make, model…" oninput="renderVehicles()">
+      <div style="display:flex;gap:6px">
+        <button class="filter-pill active" onclick="setVehicleFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setVehicleFilter('active',this)">Active</button>
+        <button class="filter-pill" onclick="setVehicleFilter('ordered',this)">Ordered</button>
+        <button class="filter-pill" onclick="setVehicleFilter('de-hired',this)">De-hired</button>
+      </div>
+      <button class="topbar-btn" onclick="loadVehicles()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewVehicle()">+ New Vehicle</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Active fleet</div><div class="stat-val" id="svh-active">—</div></div>
+      <div class="stat-card stat-orange"><div class="stat-label">Renewals ≤90 days</div><div class="stat-val" id="svh-renewals">—</div><div class="stat-sub">renewal date approaching</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Contract hire</div><div class="stat-val" id="svh-ch">—</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Electric / PHEV</div><div class="stat-val" id="svh-ev">—</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="vehicle-list"><div class="loading">Loading vehicles…</div></div></div>
   </div>
 
 </main>
@@ -510,10 +548,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-body">
       <div class="form-section-label">Client &amp; Driver</div>
       <div class="form-row">
-        <div class="form-field"><label>Customer *</label><input id="hf-customer" placeholder="e.g. Woodland Trust" list="client-datalist"></div>
+        <div class="form-field"><label>Customer *</label><input id="hf-customer" placeholder="e.g. Woodland Trust" list="account-datalist"></div>
         <div class="form-field"><label>Driver *</label><input id="hf-driver" placeholder="First Last"></div>
       </div>
-      <datalist id="client-datalist"></datalist>
+      <datalist id="account-datalist"></datalist>
       <div class="form-row">
         <div class="form-field"><label>Reference</label><input id="hf-reference" placeholder="e.g. 80601024"></div>
         <div class="form-field"><label>Status</label>
@@ -567,54 +605,323 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   </div>
 </div>
 
-<!-- ─── CLIENT MODAL ─── -->
-<div class="modal-overlay" id="client-modal">
+<!-- ─── ACCOUNT MODAL ─── -->
+<div class="modal-overlay" id="account-modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="client-modal-title">New client</div>
-      <button class="modal-close" onclick="closeClientModal()">✕</button>
+      <div class="modal-title" id="account-modal-title">New account</div>
+      <button class="modal-close" onclick="closeAccountModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-section-label">Company</div>
+      <div class="form-row trio">
+        <div class="form-field" style="grid-column:1/3"><label>Company name *</label><input id="acf-company" placeholder="e.g. Woodland Trust"></div>
+        <div class="form-field"><label>Account type *</label>
+          <select id="acf-type"><option value="client">Client</option><option value="funder">Funder</option><option value="supplier">Supplier</option><option value="dealer">Dealer</option></select>
+        </div>
+      </div>
       <div class="form-row">
-        <div class="form-field"><label>Company name *</label><input id="cf-company" placeholder="e.g. Woodland Trust"></div>
         <div class="form-field"><label>Status</label>
-          <select id="cf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+          <select id="acf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
         </div>
+        <div class="form-field"><label>MHA reference</label><input id="acf-mha" placeholder="MHA ref if applicable"></div>
       </div>
-      <div class="form-section-label">Primary contact</div>
+      <div class="form-section-label">Primary contact (legacy)</div>
       <div class="form-row">
-        <div class="form-field"><label>Contact name</label><input id="cf-contact" placeholder="First Last"></div>
-        <div class="form-field"><label>Email</label><input type="email" id="cf-email" placeholder="accounts@company.com"></div>
+        <div class="form-field"><label>Contact name</label><input id="acf-contact" placeholder="First Last"></div>
+        <div class="form-field"><label>Email</label><input type="email" id="acf-email" placeholder="accounts@company.com"></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Phone</label><input id="cf-phone" placeholder="01234 567890"></div>
+        <div class="form-field"><label>Phone</label><input id="acf-phone" placeholder="01234 567890"></div>
         <div class="form-field"><label>Account manager</label>
-          <select id="cf-manager"><option>Simon Homer</option><option>Andy Jackson</option></select>
+          <select id="acf-manager"><option>Simon Homer</option><option>Andy Jackson</option></select>
         </div>
       </div>
-      <div class="form-field"><label>Address</label><textarea id="cf-address" placeholder="115 New London Road&#10;Chelmsford&#10;Essex&#10;CM2 0QT"></textarea></div>
+      <div class="form-field"><label>Address</label><textarea id="acf-address" placeholder="115 New London Road&#10;Chelmsford&#10;Essex&#10;CM2 0QT"></textarea></div>
       <div class="form-section-label">Billing preferences</div>
       <div class="form-row trio">
         <div class="form-field"><label>Payment method</label>
-          <select id="cf-pm"><option value="BACS">BACS</option><option value="Direct Debit">Direct Debit</option></select>
+          <select id="acf-pm"><option value="BACS">BACS</option><option value="Direct Debit">Direct Debit</option></select>
         </div>
         <div class="form-field"><label>Payment terms</label>
-          <select id="cf-terms"><option>7 days</option><option>14 days</option><option>28 days</option><option>30 days</option><option>45 days</option><option>60 days</option></select>
+          <select id="acf-terms"><option>7 days</option><option>14 days</option><option>28 days</option><option>30 days</option><option>45 days</option><option>60 days</option></select>
         </div>
-        <div class="form-field"><label>Dynamics ID</label><input id="cf-dynamics" placeholder="for transition period"></div>
+        <div class="form-field"><label>Dynamics ID</label><input id="acf-dynamics" placeholder="transition ref"></div>
       </div>
       <div class="form-section-label">Notes</div>
-      <div class="form-field"><textarea id="cf-notes" placeholder="Any notes about this client…"></textarea></div>
+      <div class="form-field"><textarea id="acf-notes" placeholder="Any notes about this account…"></textarea></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary-modal" onclick="closeClientModal()">Cancel</button>
-      <button class="btn-primary-modal" onclick="saveClient()">Save client</button>
+      <button class="btn-secondary-modal" onclick="closeAccountModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveAccount()">Save account</button>
     </div>
   </div>
 </div>
 
-<!-- ─── RECHARGE LINE-ITEM PICKER ─── -->
+<!-- ─── CONTACT MODAL ─── -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="contact-modal-title">New contact</div>
+      <button class="modal-close" onclick="closeContactModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-label">Identity</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>First name *</label><input id="ctf-first" placeholder="e.g. Catherine"></div>
+        <div class="form-field"><label>Surname *</label><input id="ctf-surname" placeholder="e.g. Green"></div>
+        <div class="form-field"><label>Preferred name</label><input id="ctf-preferred" placeholder="if different"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Account</label>
+          <select id="ctf-account"><option value="">— no account —</option></select>
+        </div>
+        <div class="form-field"><label>Employee number</label><input id="ctf-empno" placeholder="e.g. EMP00123"></div>
+      </div>
+      <div class="form-section-label">Contact details</div>
+      <div class="form-row">
+        <div class="form-field"><label>Email</label><input type="email" id="ctf-email" placeholder="name@company.com"></div>
+        <div class="form-field"><label>Mobile</label><input id="ctf-mobile" placeholder="07700 900000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field" style="grid-column:1/2"><label>Address</label><textarea id="ctf-address" placeholder="Home address"></textarea></div>
+        <div class="form-field"><label>Address type</label>
+          <select id="ctf-addr-type"><option value="home">Home</option><option value="work">Work</option><option value="correspondence">Correspondence</option><option value="other">Other</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Role &amp; status</div>
+      <div class="form-row">
+        <div class="form-field"><label>Contact type</label>
+          <select id="ctf-type"><option value="driver">Driver</option><option value="fleet manager">Fleet Manager</option><option value="finance">Finance</option><option value="director">Director</option><option value="other">Other</option></select>
+        </div>
+        <div class="form-field"><label>Employee status</label>
+          <select id="ctf-status"><option value="employed">Employed</option><option value="leaver">Leaver</option><option value="contractor">Contractor</option><option value="unknown">Unknown</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Job description</label><input id="ctf-job" placeholder="e.g. Fleet Manager"></div>
+        <div class="form-field"><label>Driver grade</label><input id="ctf-grade" placeholder="e.g. Grade A / Band 3"></div>
+      </div>
+      <div class="form-section-label">Notes</div>
+      <div class="form-field"><textarea id="ctf-notes" placeholder="Any notes about this contact…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeContactModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveContact()">Save contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── VEHICLE MODAL (TABBED) ─── -->
+<div class="modal-overlay" id="vehicle-modal">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title" id="vehicle-modal-title">New vehicle</div>
+      <button class="modal-close" onclick="closeVehicleModal()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <div class="modal-tab active" onclick="switchVehicleTab('overview',this)">Overview</div>
+      <div class="modal-tab" onclick="switchVehicleTab('spec',this)">Spec</div>
+      <div class="modal-tab" onclick="switchVehicleTab('contract',this)">Contract</div>
+      <div class="modal-tab" onclick="switchVehicleTab('financials',this)">Financials</div>
+      <div class="modal-tab" onclick="switchVehicleTab('dates',this)">Dates</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-pane active" id="vtab-overview">
+      <div class="form-section-label">Identity</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Registration</label><input id="vf-reg" placeholder="AB12 CDE" style="text-transform:uppercase"></div>
+        <div class="form-field" style="grid-column:2/4"><label>Name / label</label><input id="vf-name" placeholder="e.g. Kia Sportage (Renewing DF69FMU)"></div>
+      </div>
+      <div class="form-field"><label>Description / notes line</label><input id="vf-desc" placeholder="Free text description"></div>
+      <div class="form-section-label">Relationships</div>
+      <div class="form-row">
+        <div class="form-field"><label>Client account</label><select id="vf-account"><option value="">— select —</option></select></div>
+        <div class="form-field"><label>Driver</label><select id="vf-driver"><option value="">— select —</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Funder</label><select id="vf-funder"><option value="">— select —</option></select></div>
+        <div class="form-field"><label>Supplying dealer</label><select id="vf-dealer"><option value="">— select —</option></select></div>
+      </div>
+      <div class="form-section-label">Reference numbers</div>
+      <div class="form-row">
+        <div class="form-field"><label>Funder's quote no.</label><input id="vf-fqno" placeholder="e.g. 111588790"></div>
+        <div class="form-field"><label>Covase PO number</label><input id="vf-cpo" placeholder="e.g. PO 13621"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Legacy PO number</label><input id="vf-lpo" placeholder=""></div>
+        <div class="form-field"><label>Lex 900 number</label><input id="vf-lex" placeholder="e.g. 900672882"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Source</label>
+          <select id="vf-source"><option value="">—</option><option>New business</option><option>Existing renewal</option><option>Transfer</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Status</label>
+          <select id="vf-status"><option value="active">Active</option><option value="ordered">Ordered</option><option value="de-hired">De-hired</option><option value="cancelled">Cancelled</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Notes</div>
+      <div class="form-field"><textarea id="vf-notes" placeholder="Any notes…"></textarea></div>
+      <div class="form-field"><label>Dynamics ID</label><input id="vf-dynamics" placeholder="transition ref"></div>
+    </div>
+
+    <!-- SPEC TAB -->
+    <div class="tab-pane" id="vtab-spec">
+      <div class="form-section-label">Classification</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Vehicle type</label>
+          <select id="vf-vtype"><option value="">—</option><option>Car</option><option>Van</option><option>LCV</option><option>Minibus</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Body style</label>
+          <select id="vf-body"><option value="">—</option><option>Saloon</option><option>Hatchback</option><option>Estate</option><option>SUV</option><option>Coupe</option><option>Convertible</option><option>MPV</option><option>Van</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>No. of doors</label>
+          <select id="vf-doors"><option value="">—</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Make &amp; model</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Manufacturer</label><input id="vf-make" placeholder="e.g. Kia"></div>
+        <div class="form-field"><label>Model</label><input id="vf-model" placeholder="e.g. Sportage"></div>
+        <div class="form-field"><label>Derivative</label><input id="vf-deriv" placeholder="e.g. GT-Line"></div>
+        <div class="form-field"><label>Engine size</label><input id="vf-engsize" placeholder="e.g. 1.6T GDi PHEV"></div>
+      </div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Engine CC</label><input type="number" id="vf-engcc" placeholder="e.g. 1598"></div>
+        <div class="form-field"><label>Fuel type</label>
+          <select id="vf-fuel"><option value="">—</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option value="Plugin Hybrid (Petrol)">PHEV (Petrol)</option><option value="Plugin Hybrid (Diesel)">PHEV (Diesel)</option><option>Electric</option></select>
+        </div>
+        <div class="form-field"><label>Transmission</label>
+          <select id="vf-trans"><option value="">—</option><option>Manual</option><option>Automatic</option></select>
+        </div>
+        <div class="form-field"><label>EV range (miles)</label><input type="number" step="0.1" id="vf-evrange" placeholder="e.g. 43"></div>
+      </div>
+      <div class="form-section-label">Appearance &amp; identity</div>
+      <div class="form-row">
+        <div class="form-field"><label>Exterior colour</label><input id="vf-extcol" placeholder="e.g. Metallic - Blue Flame"></div>
+        <div class="form-field"><label>Interior trim</label><input id="vf-intrim" placeholder="e.g. Suede leather - Black with quilt design"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Chassis number</label><input id="vf-chassis" placeholder="VIN / chassis no."></div>
+        <div class="form-field"><label>Key number</label><input id="vf-key" placeholder=""></div>
+        <div class="form-field"><label>P11D value (£)</label><input type="number" step="0.01" id="vf-p11d" placeholder="0.00"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>CO₂ (g/km)</label><input type="number" id="vf-co2" placeholder="e.g. 25"></div>
+        <div class="form-field"><label>Fuel consumption (mpg)</label><input type="number" id="vf-mpg" placeholder="e.g. 252"></div>
+        <div class="form-field"><label>MOT held?</label>
+          <select id="vf-motheld"><option value="false">No</option><option value="true">Yes</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Options</div>
+      <div class="form-row">
+        <div class="form-field"><label>Standard items</label><textarea id="vf-std" placeholder="Factory standard specification…"></textarea></div>
+        <div class="form-field"><label>Optional extras</label><textarea id="vf-opts" placeholder="Additional options ordered…"></textarea></div>
+      </div>
+    </div>
+
+    <!-- CONTRACT TAB -->
+    <div class="tab-pane" id="vtab-contract">
+      <div class="form-section-label">Contract terms</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Term (months)</label><input type="number" id="vf-term" placeholder="e.g. 36"></div>
+        <div class="form-field"><label>Annual mileage</label><input type="number" id="vf-miles" placeholder="e.g. 15000"></div>
+        <div class="form-field"><label>Payment profile</label><input id="vf-profile" placeholder="e.g. 1+35"></div>
+        <div class="form-field"><label>VAT type</label>
+          <select id="vf-vattype"><option value="">—</option><option value="excluding VAT">Excluding VAT</option><option value="including VAT">Including VAT</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Funding method</label>
+          <select id="vf-fundmethod"><option value="">—</option><option>Contract Hire</option><option>Finance Lease</option><option>PCP</option><option>HP</option><option>Outright Purchase</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Contract type</label>
+          <select id="vf-conttype"><option value="">—</option><option>Full Maintenance</option><option>Finance Only</option><option>Other</option></select>
+        </div>
+      </div>
+      <div class="form-section-label">Rentals</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Finance rental (£/mo)</label><input type="number" step="0.01" id="vf-finrent" placeholder="0.00"></div>
+        <div class="form-field"><label>Service rental (£/mo)</label><input type="number" step="0.01" id="vf-svcrent" placeholder="0.00"></div>
+        <div class="form-field"><label>Excess mileage (ppm)</label><input type="number" step="0.0001" id="vf-xsmile" placeholder="0.0000"></div>
+        <div class="form-field"><label>OTR (£)</label><input type="number" step="0.01" id="vf-otr" placeholder="0.00"></div>
+      </div>
+      <div class="form-section-label">Payments</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Initial payment (£)</label><input type="number" step="0.01" id="vf-initpay" placeholder="0.00"></div>
+        <div class="form-field"><label>Final payment (£)</label><input type="number" step="0.01" id="vf-finalpay" placeholder="0.00"></div>
+        <div class="form-field"><label>Driver contribution (£)</label><input type="number" step="0.01" id="vf-drivercon" placeholder="0.00"></div>
+      </div>
+    </div>
+
+    <!-- FINANCIALS TAB -->
+    <div class="tab-pane" id="vtab-financials">
+      <div class="form-section-label">Deal economics (per vehicle)</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Commissions (£)</label><input type="number" step="0.01" id="vf-commissions" placeholder="0.00"></div>
+        <div class="form-field"><label>Set up fee (£)</label><input type="number" step="0.01" id="vf-setupfee" placeholder="0.00"></div>
+        <div class="form-field"><label>Management fee (£/mo)</label><input type="number" step="0.01" id="vf-mgmtfee" placeholder="0.00"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Other revenue (£)</label><input type="number" step="0.01" id="vf-otherrev" placeholder="0.00"></div>
+        <div class="form-field"><label>Costs (£)</label><input type="number" step="0.01" id="vf-costs" placeholder="0.00"></div>
+      </div>
+      <div style="background:var(--indigo);border-radius:10px;padding:14px 18px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:rgba(255,255,255,.6);font-size:12px">Calculated total profit</span>
+        <span style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--covase)" id="vf-profit-preview">£—</span>
+      </div>
+      <p style="font-size:11px;color:var(--n400);margin-top:6px">Commissions + Setup fee + (Management fee × Term) + Other revenue − Costs</p>
+    </div>
+
+    <!-- DATES TAB -->
+    <div class="tab-pane" id="vtab-dates">
+      <div class="form-section-label">Order &amp; delivery</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Order received</label><input type="date" id="vf-d-ordered"></div>
+        <div class="form-field"><label>Proposal sent</label><input type="date" id="vf-d-proposal"></div>
+        <div class="form-field"><label>Order to dealer</label><input type="date" id="vf-d-todealer"></div>
+        <div class="form-field"><label>Order confirmed</label><input type="date" id="vf-d-confirmed"></div>
+      </div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Build confirmed</label><input type="date" id="vf-d-build"></div>
+        <div class="form-field"><label>Expected delivery</label><input type="date" id="vf-d-expdeliv"></div>
+        <div class="form-field"><label>Delivery date</label><input type="date" id="vf-d-delivered"></div>
+        <div class="form-field"><label>Date of registration</label><input type="date" id="vf-d-registered"></div>
+      </div>
+      <div class="form-section-label">Contracts &amp; finance</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Contracts sent</label><input type="date" id="vf-d-ctsent"></div>
+        <div class="form-field"><label>Contracts signed</label><input type="date" id="vf-d-ctsigned"></div>
+        <div class="form-field"><label>Sent for payment</label><input type="date" id="vf-d-sentpay"></div>
+        <div class="form-field"><label>Paid out</label><input type="date" id="vf-d-paidout"></div>
+      </div>
+      <div class="form-section-label">Renewal &amp; end of contract</div>
+      <div class="form-row">
+        <div class="form-field"><label>Renewal date</label><input type="date" id="vf-d-renewal"></div>
+        <div class="form-field"><label>De-hire date</label><input type="date" id="vf-d-dehire"></div>
+      </div>
+      <div class="form-section-label">MOT</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>1st MOT due</label><input type="date" id="vf-d-mot1"></div>
+        <div class="form-field"><label>2nd MOT due</label><input type="date" id="vf-d-mot2"></div>
+        <div class="form-field"><label>MOT expiry</label><input type="date" id="vf-d-motexp"></div>
+      </div>
+      <div class="form-section-label">Driver card &amp; VRF</div>
+      <div class="form-row">
+        <div class="form-field"><label>Driver card &amp; VRF sent</label><input type="date" id="vf-d-dcsent"></div>
+        <div class="form-field"><label>Driver card &amp; VRF received</label><input type="date" id="vf-d-dcrecd"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeVehicleModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveVehicle()">Save vehicle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── RECHARGE PICKER ─── -->
 <div class="rp-overlay" id="rp-overlay">
   <div class="rp-modal">
     <div class="rp-header">
@@ -637,73 +944,65 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 
 <script>
 // ─── CONFIG ───
-function getConfig() { return { url:localStorage.getItem('covase_sb_url')||'', key:localStorage.getItem('covase_sb_key')||'' }; }
-function saveConfig() {
-  const url=document.getElementById('sb-url').value.trim(), key=document.getElementById('sb-key').value.trim();
+function getConfig(){return{url:localStorage.getItem('covase_sb_url')||'',key:localStorage.getItem('covase_sb_key')||''};}
+function saveConfig(){
+  const url=document.getElementById('sb-url').value.trim(),key=document.getElementById('sb-key').value.trim();
   if(!url||!key){toast('Enter both URL and key','error');return;}
-  localStorage.setItem('covase_sb_url',url); localStorage.setItem('covase_sb_key',key);
+  localStorage.setItem('covase_sb_url',url);localStorage.setItem('covase_sb_key',key);
   document.getElementById('config-panel').classList.remove('open');
-  toast('Saved — reloading…','success'); setTimeout(()=>location.reload(),400);
+  toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
-function toggleConfig() {
-  const p=document.getElementById('config-panel'); p.classList.toggle('open');
-  const c=getConfig(); document.getElementById('sb-url').value=c.url; document.getElementById('sb-key').value=c.key;
+function toggleConfig(){
+  const p=document.getElementById('config-panel');p.classList.toggle('open');
+  const c=getConfig();document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
 }
 
 // ─── SUPABASE ───
-async function sbReq(path,opts={}) {
-  const {url,key}=getConfig();
+async function sbReq(path,opts={}){
+  const{url,key}=getConfig();
   const r=await fetch(`${url}/rest/v1/${path}`,{
     headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})},
-    method:opts.method||'GET', body:opts.body?JSON.stringify(opts.body):undefined
+    method:opts.method||'GET',body:opts.body?JSON.stringify(opts.body):undefined
   });
-  if(!r.ok) throw new Error(await r.text());
-  const t=await r.text(); return t?JSON.parse(t):[];
+  if(!r.ok)throw new Error(await r.text());
+  const t=await r.text();return t?JSON.parse(t):[];
 }
-function needsSetup(el) {
+function needsSetup(el){
   const c=getConfig();
-  if(c.url&&c.key) return false;
-  el.innerHTML=`<div class="setup-prompt"><div class="setup-card"><h2>Connect Supabase</h2><p>Enter your project URL and anon key — same credentials as before.</p><label>Project URL</label><input id="su-url" placeholder="https://xxx.supabase.co"><label>Anon Key</label><input type="password" id="su-key" placeholder="eyJ…"><button class="setup-submit" onclick="quickSetup()">Connect</button></div></div>`;
+  if(c.url&&c.key)return false;
+  el.innerHTML=`<div class="setup-prompt"><div class="setup-card"><h2>Connect Supabase</h2><p>Enter your project URL and anon key.</p><label>Project URL</label><input id="su-url" placeholder="https://xxx.supabase.co"><label>Anon Key</label><input type="password" id="su-key" placeholder="eyJ…"><button class="setup-submit" onclick="quickSetup()">Connect</button></div></div>`;
   return true;
 }
-function quickSetup() {
-  const url=document.getElementById('su-url')?.value.trim(), key=document.getElementById('su-key')?.value.trim();
+function quickSetup(){
+  const url=document.getElementById('su-url')?.value.trim(),key=document.getElementById('su-key')?.value.trim();
   if(!url||!key){toast('Fill in both fields','error');return;}
-  localStorage.setItem('covase_sb_url',url); localStorage.setItem('covase_sb_key',key);
+  localStorage.setItem('covase_sb_url',url);localStorage.setItem('covase_sb_key',key);
   loadCurrentView();
 }
 
 // ─── VIEW MANAGEMENT ───
 let currentViewId='received';
-function showView(id,el) {
+function showView(id,el){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(n=>n.classList.remove('active'));
-  const v=document.getElementById('view-'+id); if(v) v.classList.add('active');
-  if(el) el.classList.add('active');
-  currentViewId=id;
-  loadCurrentView();
+  const v=document.getElementById('view-'+id);if(v)v.classList.add('active');
+  if(el)el.classList.add('active');
+  currentViewId=id;loadCurrentView();
 }
-function loadCurrentView() {
-  const loaders={
-    'received':loadInvoices,'outgoing':loadOutgoing,
-    'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,
-    'clients':loadClients
-  };
-  if(loaders[currentViewId]) loaders[currentViewId]();
+function loadCurrentView(){
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  if(loaders[currentViewId])loaders[currentViewId]();
 }
 
 // ─── INVOICES ───
 let allInvoices=[],invFilter='all';
-async function loadInvoices() {
-  const el=document.getElementById('invoice-list');
-  if(needsSetup(el)) return;
+async function loadInvoices(){
+  const el=document.getElementById('invoice-list');if(needsSetup(el))return;
   el.innerHTML='<div class="loading">Fetching invoices…</div>';
-  try {
-    allInvoices=await sbReq(`covase_invoices?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);
-    updateInvStats(); renderInvoices(); updateBadges();
-  } catch(e){ el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Connection failed</div><div class="empty-sub">${esc(e.message)}</div></div>`; }
+  try{allInvoices=await sbReq(`covase_invoices?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);updateInvStats();renderInvoices();updateBadges();}
+  catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Connection failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
-function updateInvStats() {
+function updateInvStats(){
   const pending=allInvoices.filter(i=>i.status==='pending');
   const approved=allInvoices.filter(i=>i.status==='approved');
   const total=allInvoices.reduce((s,i)=>s+(parseFloat(i.total)||0),0);
@@ -713,19 +1012,18 @@ function updateInvStats() {
   document.getElementById('si-errors').textContent=errors;
   document.getElementById('si-total').textContent='£'+total.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-function renderInvoices() {
+function renderInvoices(){
   const el=document.getElementById('invoice-list');
-  let inv=allInvoices;
-  if(invFilter!=='all') inv=inv.filter(i=>i.status===invFilter);
+  let inv=allInvoices;if(invFilter!=='all')inv=inv.filter(i=>i.status===invFilter);
   if(!inv.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-title">Nothing here</div><div class="empty-sub">No invoices with status "${invFilter}".</div></div>`;return;}
   el.innerHTML=inv.map(i=>buildInvCard(i)).join('');
 }
 function setInvFilter(f,btn){invFilter=f;document.querySelectorAll('#view-received .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderInvoices();}
-function buildInvCard(inv) {
-  const conf=parseFloat(inv.confidence)||0, confPct=Math.round(conf*100);
+function buildInvCard(inv){
+  const conf=parseFloat(inv.confidence)||0,confPct=Math.round(conf*100);
   const confClass=conf>=.85?'':conf>=.6?'mid':'low';
-  const amt=parseFloat(inv.total)||0, amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
-  const sub=parseFloat(inv.subtotal)||0, vat=parseFloat(inv.vat_amount)||0;
+  const amt=parseFloat(inv.total)||0,amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
+  const sub=parseFloat(inv.subtotal)||0,vat=parseFloat(inv.vat_amount)||0;
   const pm=(inv.payment_method||'unknown').toLowerCase();
   const pmClass=pm==='direct_debit'?'badge-direct_debit':pm==='bacs'?'badge-bacs':'badge-unknown';
   const pmLabel=pm==='direct_debit'?'Direct Debit':pm==='bacs'?'BACS':pm;
@@ -765,35 +1063,29 @@ function buildInvCard(inv) {
     </div>
   </div>`;
 }
-async function setInvStatus(id,status) {
+async function setInvStatus(id,status){
   const notes=document.getElementById(`n-${id}`)?.value||'';
-  try {
-    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status,notes},prefer:'return=minimal'});
-    const i=allInvoices.find(x=>x.id===id); if(i){i.status=status;i.notes=notes;}
-    renderInvoices();updateInvStats();updateBadges();toast(`Invoice ${status}`,'success');
-  } catch(e){toast('Update failed: '+e.message,'error');}
+  try{await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status,notes},prefer:'return=minimal'});const i=allInvoices.find(x=>x.id===id);if(i){i.status=status;i.notes=notes;}renderInvoices();updateInvStats();updateBadges();toast(`Invoice ${status}`,'success');}
+  catch(e){toast('Update failed: '+e.message,'error');}
 }
 
 // ─── OUTGOING ───
 let outInvoices=[],outFilter='all';
-async function loadOutgoing() {
-  const el=document.getElementById('outgoing-list');
-  if(needsSetup(el)) return;
+async function loadOutgoing(){
+  const el=document.getElementById('outgoing-list');if(needsSetup(el))return;
   el.innerHTML='<div class="loading">Loading…</div>';
-  try {
-    outInvoices=await sbReq(`covase_invoices?category=eq.outgoing&order=invoice_date.desc&limit=200`);
-    renderOutgoing();
-  } catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
+  try{outInvoices=await sbReq(`covase_invoices?category=eq.outgoing&order=invoice_date.desc&limit=200`);renderOutgoing();}
+  catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
 function setOutFilter(f,btn){outFilter=f;document.querySelectorAll('#view-outgoing .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOutgoing();}
-function renderOutgoing() {
+function renderOutgoing(){
   const el=document.getElementById('outgoing-list');
-  let inv=outInvoices; if(outFilter!=='all') inv=inv.filter(i=>i.status===outFilter);
+  let inv=outInvoices;if(outFilter!=='all')inv=inv.filter(i=>i.status===outFilter);
   if(!inv.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">↑</div><div class="empty-title">${outFilter==='all'?'No outgoing invoices yet':'Nothing with status "'+outFilter+'"'}</div><div class="empty-sub">Click "+ New Invoice" to create one.</div></div>`;return;}
   el.innerHTML=inv.map(i=>buildOutCard(i)).join('');
 }
-function buildOutCard(inv) {
-  const amt=parseFloat(inv.total)||0, amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
+function buildOutCard(inv){
+  const amt=parseFloat(inv.total)||0,amtFmt='£'+amt.toLocaleString('en-GB',{minimumFractionDigits:2});
   const pm=(inv.payment_method||'unknown').toLowerCase();
   const pmClass=pm==='direct_debit'?'badge-direct_debit':pm==='bacs'?'badge-bacs':'badge-unknown';
   const pmLabel=pm==='direct_debit'?'Direct Debit':pm==='bacs'?'BACS':pm;
@@ -822,69 +1114,45 @@ function buildOutCard(inv) {
       <div class="vat-row"><div><span>Net</span><strong>£${(parseFloat(inv.subtotal)||0).toFixed(2)}</strong></div><div><span>VAT</span><strong>£${(parseFloat(inv.vat_amount)||0).toFixed(2)}</strong></div><div><span>Total</span><strong>${amtFmt}</strong></div></div>
       ${inv.description?`<div class="desc-box">${esc(inv.description)}</div>`:''}
       ${inv.client_address?`<div class="desc-box" style="font-size:11px;color:var(--n400)">📍 ${esc(inv.client_address).replace(/\n/g,', ')}</div>`:''}
-      <div class="action-row">
-        ${pdfBtn}
-        <button class="btn btn-edit" onclick="openGenerator('${esc(inv.id)}')">✎ Edit</button>
-        <button class="btn btn-paid" onclick="setOutStatus('${inv.id}','approved')">✓ Mark Paid</button>
-        <button class="btn btn-flag" onclick="setOutStatus('${inv.id}','flagged')">⚑ Flag</button>
-      </div>
+      <div class="action-row">${pdfBtn}<button class="btn btn-edit" onclick="openGenerator('${esc(inv.id)}')">✎ Edit</button><button class="btn btn-paid" onclick="setOutStatus('${inv.id}','approved')">✓ Mark Paid</button><button class="btn btn-flag" onclick="setOutStatus('${inv.id}','flagged')">⚑ Flag</button></div>
     </div>
   </div>`;
 }
-async function setOutStatus(id,status) {
-  try {
-    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status},prefer:'return=minimal'});
-    const i=outInvoices.find(x=>x.id===id); if(i) i.status=status;
-    renderOutgoing(); toast(`Invoice ${status}`,'success');
-  } catch(e){toast('Update failed: '+e.message,'error');}
+async function setOutStatus(id,status){
+  try{await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status},prefer:'return=minimal'});const i=outInvoices.find(x=>x.id===id);if(i)i.status=status;renderOutgoing();toast(`Invoice ${status}`,'success');}
+  catch(e){toast('Update failed: '+e.message,'error');}
 }
-function openGenerator(id) {
+function openGenerator(id){
   const base=localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html';
-  if(id) window.open(base+'?id='+encodeURIComponent(id),'_blank');
+  if(id)window.open(base+'?id='+encodeURIComponent(id),'_blank');
   else window.open(base,'_blank');
 }
 
 // ─── RECHARGE PICKER ───
-let rpInv=null, rpItems=[];
-function rechargeInvoice(id) {
+let rpInv=null,rpItems=[];
+function rechargeInvoice(id){
   const inv=allInvoices.find(i=>i.id===id);
   if(!inv){window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');return;}
   let items=[];
   if(inv.line_items){try{items=typeof inv.line_items==='string'?JSON.parse(inv.line_items):inv.line_items;}catch(e){}}
-  if(!Array.isArray(items)||!items.length) items=[{desc:inv.description||inv.vendor||'Recharged item',amt:String(inv.subtotal||inv.total||''),vatExempt:false}];
-  if(items.length<=1){
-    localStorage.setItem('recharge_selected_items',JSON.stringify(items));
-    localStorage.setItem('recharge_source_id',id);
-    window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');
-    return;
-  }
-  rpInv=inv; rpItems=items;
+  if(!Array.isArray(items)||!items.length)items=[{desc:inv.description||inv.vendor||'Recharged item',amt:String(inv.subtotal||inv.total||''),vatExempt:false}];
+  if(items.length<=1){localStorage.setItem('recharge_selected_items',JSON.stringify(items));localStorage.setItem('recharge_source_id',id);window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');return;}
+  rpInv=inv;rpItems=items;
   document.getElementById('rp-sub').textContent=(inv.vendor||'Invoice')+(inv.invoice_number?' · #'+inv.invoice_number:'');
   document.getElementById('rp-lines').innerHTML=items.map((li,i)=>`
-    <label class="rp-line">
-      <input type="checkbox" id="rpli-${i}" checked onchange="updateRpTotal()">
-      <div class="rp-line-info">
-        ${li.reg?`<div class="rp-line-reg">${esc(li.reg)}</div>`:''}
-        ${li.driver?`<div class="rp-line-driver">${esc(li.driver)}</div>`:''}
-        <div class="rp-line-desc">${esc(li.desc||'')}</div>
-      </div>
+    <label class="rp-line"><input type="checkbox" id="rpli-${i}" checked onchange="updateRpTotal()">
+      <div class="rp-line-info">${li.reg?`<div class="rp-line-reg">${esc(li.reg)}</div>`:''} ${li.driver?`<div class="rp-line-driver">${esc(li.driver)}</div>`:''}<div class="rp-line-desc">${esc(li.desc||'')}</div></div>
       <div class="rp-line-amt">£${parseFloat(li.amt||0).toFixed(2)}</div>
     </label>`).join('');
-  updateRpTotal();
-  document.getElementById('rp-overlay').classList.add('open');
+  updateRpTotal();document.getElementById('rp-overlay').classList.add('open');
 }
-function updateRpTotal(){
-  const total=rpItems.reduce((s,li,i)=>{const cb=document.getElementById(`rpli-${i}`);return cb&&cb.checked?s+parseFloat(li.amt||0):s;},0);
-  document.getElementById('rp-total').textContent='£'+total.toFixed(2);
-}
+function updateRpTotal(){const total=rpItems.reduce((s,li,i)=>{const cb=document.getElementById(`rpli-${i}`);return cb&&cb.checked?s+parseFloat(li.amt||0):s;},0);document.getElementById('rp-total').textContent='£'+total.toFixed(2);}
 function closeRechargePicker(){document.getElementById('rp-overlay').classList.remove('open');}
 function confirmRecharge(){
   const selected=rpItems.filter((_,i)=>document.getElementById(`rpli-${i}`)?.checked);
   if(!selected.length){toast('Select at least one line','error');return;}
-  localStorage.setItem('recharge_selected_items',JSON.stringify(selected));
-  localStorage.setItem('recharge_source_id',rpInv.id);
-  closeRechargePicker();
-  window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(rpInv.id),'_blank');
+  localStorage.setItem('recharge_selected_items',JSON.stringify(selected));localStorage.setItem('recharge_source_id',rpInv.id);
+  closeRechargePicker();window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(rpInv.id),'_blank');
   toast(`Opening generator with ${selected.length} line${selected.length>1?'s':''}…`,'success');
 }
 
@@ -893,24 +1161,13 @@ let allHires=[],hiresLoaded=false,hireStatusFilter='all';
 function daysOn(h){if(!h.start_date)return null;const end=h.end_date?new Date(h.end_date):new Date();return Math.max(0,Math.round((end-new Date(h.start_date))/86400000));}
 function fmtMoney(n){if(n==null||isNaN(n))return'—';return'£'+parseFloat(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtD(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-GB');}
-
-async function loadHires() {
-  const el=document.getElementById('hires-active-list');
-  if(needsSetup(el)) return;
-  if(!hiresLoaded){
-    ['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML='<div class="loading">Loading…</div>';});
-  }
-  try {
-    allHires=await sbReq(`covase_hires?order=start_date.desc&limit=500`);
-    hiresLoaded=true;
-    updateHireStats();
-    renderHireView('hires-active','active-list',h=>h.status==='active');
-    renderHireView('hires-all','all-list',null);
-    renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
-    updateBadges();
-  } catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
+async function loadHires(){
+  const el=document.getElementById('hires-active-list');if(needsSetup(el))return;
+  if(!hiresLoaded)['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML='<div class="loading">Loading…</div>';});
+  try{allHires=await sbReq(`covase_hires?order=start_date.desc&limit=500`);hiresLoaded=true;updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);updateBadges();}
+  catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
 }
-function updateHireStats() {
+function updateHireStats(){
   const active=allHires.filter(h=>h.status==='active');
   const pending=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
   document.getElementById('sh-active').textContent=active.length;
@@ -921,15 +1178,14 @@ function updateHireStats() {
   document.getElementById('sh-margin').textContent=mg.length?((mg.reduce((s,h)=>(parseFloat(h.sell_per_day)-parseFloat(h.cost_per_day))/parseFloat(h.cost_per_day)*100+s,0)/mg.length).toFixed(1)+'%'):'—';
 }
 function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#view-hires-all .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderHireView('hires-all','all-list',null);}
-function renderHireView(viewId,listSuffix,filterFn) {
-  const el=document.getElementById(`hires-${listSuffix}`); if(!el)return;
-  let hires=allHires;
-  if(filterFn) hires=hires.filter(filterFn);
-  if(viewId==='hires-all'&&hireStatusFilter!=='all') hires=hires.filter(h=>h.status===hireStatusFilter);
+function renderHireView(viewId,listSuffix,filterFn){
+  const el=document.getElementById(`hires-${listSuffix}`);if(!el)return;
+  let hires=allHires;if(filterFn)hires=hires.filter(filterFn);
+  if(viewId==='hires-all'&&hireStatusFilter!=='all')hires=hires.filter(h=>h.status===hireStatusFilter);
   if(!hires.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-title">No hires here</div><div class="empty-sub">Click "+ New Hire" to log a hire.</div></div>`;return;}
   el.innerHTML=hires.map(h=>buildHireCard(h)).join('');
 }
-function buildHireCard(h) {
+function buildHireCard(h){
   const days=daysOn(h);
   const cost=days&&h.cost_per_day?days*parseFloat(h.cost_per_day)+(parseFloat(h.supplementary_charges)||0):null;
   const sell=days&&h.sell_per_day?days*parseFloat(h.sell_per_day)+(parseFloat(h.supplementary_charges)||0):null;
@@ -967,13 +1223,11 @@ function buildHireCard(h) {
       ${h.supplementary_charges&&parseFloat(h.supplementary_charges)>0?`<div class="notes-box">📎 Supplementary: ${fmtMoney(parseFloat(h.supplementary_charges))}${h.supplementary_notes?' — '+esc(h.supplementary_notes):''}</div>`:''}
       ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
       ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Invoice: <span style="font-family:'DM Mono',monospace;color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
-      <!-- inline close-off -->
       <div class="inline-panel yellow" id="hco-${h.id}">
         <div><label>End date</label><input type="date" id="hco-d-${h.id}" value="${new Date().toISOString().split('T')[0]}"></div>
         <button class="btn btn-close-hire" onclick="doCloseHire('${h.id}')">✓ Close off</button>
         <button class="btn btn-link" onclick="togglePanel('hco-${h.id}',false)">Cancel</button>
       </div>
-      <!-- inline link invoice -->
       <div class="inline-panel blue" id="hli-${h.id}">
         <div><label>Invoice ID (from Billing)</label><input id="hli-id-${h.id}" placeholder="inv-8901"></div>
         <button class="btn btn-edit" onclick="doLinkInv('${h.id}')">✓ Link</button>
@@ -991,45 +1245,33 @@ function buildHireCard(h) {
 }
 function togglePanel(id,open){const el=document.getElementById(id);if(el)el.classList.toggle('open',open);}
 async function doCloseHire(id){
-  const d=document.getElementById(`hco-d-${id}`)?.value; if(!d){toast('Enter date','error');return;}
-  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,status:'closed'},prefer:'return=minimal'});
-    const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.status='closed';}
-    updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);renderHireView('hires-all','all-list',null);updateBadges();toast('Hire closed off','success');
-  }catch(e){toast('Failed: '+e.message,'error');}
+  const d=document.getElementById(`hco-d-${id}`)?.value;if(!d){toast('Enter date','error');return;}
+  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,status:'closed'},prefer:'return=minimal'});const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.status='closed';}updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);renderHireView('hires-all','all-list',null);updateBadges();toast('Hire closed off','success');}
+  catch(e){toast('Failed: '+e.message,'error');}
 }
 async function doLinkInv(id){
   const invId=document.getElementById(`hli-id-${id}`)?.value?.trim();if(!invId){toast('Enter invoice ID','error');return;}
-  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{incoming_invoice_id:invId,status:'invoiced'},prefer:'return=minimal'});
-    const h=allHires.find(x=>x.id===id);if(h){h.incoming_invoice_id=invId;h.status='invoiced';}
-    updateHireStats();renderHireView('hires-all','all-list',null);toast('Invoice linked','success');
-  }catch(e){toast('Failed: '+e.message,'error');}
+  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{incoming_invoice_id:invId,status:'invoiced'},prefer:'return=minimal'});const h=allHires.find(x=>x.id===id);if(h){h.incoming_invoice_id=invId;h.status='invoiced';}updateHireStats();renderHireView('hires-all','all-list',null);toast('Invoice linked','success');}
+  catch(e){toast('Failed: '+e.message,'error');}
 }
-function rechargeHire(id) {
+function rechargeHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;
   const days=daysOn(h),sellRate=parseFloat(h.sell_per_day)||0,sellTotal=days?days*sellRate:0,supp=parseFloat(h.supplementary_charges)||0;
   const reg=h.vehicle_reg||'',driver=h.driver||'';
   const hireDesc=`${reg}${h.make_model?' ('+h.make_model+')':''}${driver?' — '+driver:''}\nVehicle hire ${fmtD(h.start_date)} to ${h.end_date?fmtD(h.end_date):'ongoing'}${days?' ('+days+' days @ £'+sellRate.toFixed(2)+'/day)':''}${h.agreement_ref?'\nAgreement '+h.agreement_ref:''}`;
   const lineItems=[{desc:hireDesc,amt:sellTotal.toFixed(2),vatExempt:false}];
-  if(supp>0) lineItems.push({desc:h.supplementary_notes||'Supplementary charges',amt:supp.toFixed(2),vatExempt:false});
-  localStorage.setItem('recharge_selected_items',JSON.stringify(lineItems));
-  localStorage.setItem('recharge_source_hire',id);
-  localStorage.setItem('recharge_client_name',h.customer||'');
+  if(supp>0)lineItems.push({desc:h.supplementary_notes||'Supplementary charges',amt:supp.toFixed(2),vatExempt:false});
+  localStorage.setItem('recharge_selected_items',JSON.stringify(lineItems));localStorage.setItem('recharge_source_hire',id);localStorage.setItem('recharge_client_name',h.customer||'');
   window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_hire='+encodeURIComponent(id),'_blank');
   toast('Opening generator…','success');
 }
-
-// ─── HIRE MODAL ───
 let editHireId=null;
 function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];document.getElementById('hire-modal').classList.add('open');}
 function openEditHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
   document.getElementById('hire-modal-title').textContent='Edit hire';
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);
-  f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);
-  f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);
-  f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-supp',h.supplementary_charges);f('hf-supp-notes',h.supplementary_notes);
-  f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-supp',h.supplementary_charges);f('hf-supp-notes',h.supplementary_notes);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   document.getElementById('hire-modal').classList.add('open');
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
@@ -1045,90 +1287,380 @@ async function saveHire(){
 }
 async function deleteHire(id){if(!confirm('Delete this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);updateBadges();toast('Hire deleted','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
 
-// ─── CLIENTS ───
-let allClients=[],clientFilter='all';
-async function loadClients(){
-  const el=document.getElementById('client-list');if(needsSetup(el))return;
-  el.innerHTML='<div class="loading">Loading clients…</div>';
-  try{allClients=await sbReq('covase_clients?order=company_name.asc&limit=500');updateClientStats();renderClients();updateBadges();populateClientDatalist();}
+// ─── ACCOUNTS ───
+let allAccounts=[],accountFilter='all';
+async function loadAccounts(){
+  const el=document.getElementById('account-list');if(needsSetup(el))return;
+  el.innerHTML='<div class="loading">Loading accounts…</div>';
+  try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');updateAccountStats();renderAccounts();updateBadges();populateAccountDatalist();}
   catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
-function updateClientStats(){
-  const active=allClients.filter(c=>c.status==='active');
-  const bacs=allClients.filter(c=>c.payment_method==='BACS');
-  const dd=allClients.filter(c=>c.payment_method==='Direct Debit');
-  document.getElementById('sc-total').textContent=allClients.length;
-  document.getElementById('sc-active').textContent=active.length;
-  document.getElementById('sc-bacs').textContent=bacs.length;
-  document.getElementById('sc-dd').textContent=dd.length;
-  document.getElementById('badge-clients').textContent=active.length||'0';
+function updateAccountStats(){
+  const clients=allAccounts.filter(a=>a.type==='client'||!a.type);
+  const funders=allAccounts.filter(a=>a.type==='funder');
+  const other=allAccounts.filter(a=>a.type==='supplier'||a.type==='dealer');
+  document.getElementById('sac-total').textContent=allAccounts.length;
+  document.getElementById('sac-clients').textContent=clients.length;
+  document.getElementById('sac-funders').textContent=funders.length;
+  document.getElementById('sac-other').textContent=other.length;
+  document.getElementById('badge-accounts').textContent=clients.filter(c=>c.status==='active').length||'0';
 }
-function setClientFilter(f,btn){clientFilter=f;document.querySelectorAll('#view-clients .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderClients();}
-function renderClients(){
-  const el=document.getElementById('client-list');
-  let clients=allClients;
-  if(clientFilter==='active') clients=clients.filter(c=>c.status==='active');
-  else if(clientFilter==='BACS') clients=clients.filter(c=>c.payment_method==='BACS');
-  else if(clientFilter==='Direct Debit') clients=clients.filter(c=>c.payment_method==='Direct Debit');
-  if(!clients.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">No clients yet</div><div class="empty-sub">Click "+ New Client" to add your first client to the directory.</div></div>`;return;}
-  el.innerHTML=clients.map(c=>buildClientCard(c)).join('');
+function setAccountFilter(f,btn){accountFilter=f;document.querySelectorAll('#view-accounts .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderAccounts();}
+function renderAccounts(){
+  const el=document.getElementById('account-list');
+  const q=(document.getElementById('account-search')?.value||'').toLowerCase();
+  let accounts=allAccounts;
+  if(accountFilter!=='all')accounts=accounts.filter(a=>a.type===accountFilter);
+  if(q)accounts=accounts.filter(a=>(a.company_name||'').toLowerCase().includes(q)||(a.contact_name||'').toLowerCase().includes(q));
+  if(!accounts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">No accounts found</div><div class="empty-sub">Click "+ New Account" to add your first account.</div></div>`;return;}
+  el.innerHTML=accounts.map(a=>buildAccountCard(a)).join('');
 }
-function buildClientCard(c){
-  const pmClass=c.payment_method==='Direct Debit'?'badge-direct_debit':'badge-bacs';
-  const pmLabel=c.payment_method||'BACS';
-  const statusBadge=c.status==='active'?'<span class="badge" style="background:var(--tl-green-l);color:var(--tl-green-t)">Active</span>':'<span class="badge badge-closed">Inactive</span>';
-  return `<div class="client-card" id="cc-${c.id}">
-    <div class="client-header" onclick="toggleCard('cc-${c.id}')">
-      <div><div class="c-name">${esc(c.company_name)}</div><div class="c-contact">${esc(c.contact_name||'—')} ${c.contact_email?'· '+esc(c.contact_email):''}</div></div>
-      <div class="inv-col"><div class="inv-col-label">Account mgr</div><div class="inv-col-val">${esc((c.account_manager||'').split(' ')[0])}</div></div>
-      <div class="inv-col"><div class="inv-col-label">Terms</div><div class="inv-col-val">${esc(c.payment_terms||'—')}</div></div>
-      <div class="inv-col"><div class="inv-col-label">Method</div><div class="inv-amount" style="font-size:13px"><span class="badge ${pmClass}">${pmLabel}</span></div></div>
-      <div>${statusBadge}</div>
+function buildAccountCard(a){
+  const type=a.type||'client';
+  const pmClass=a.payment_method==='Direct Debit'?'badge-direct_debit':'badge-bacs';
+  const pmLabel=a.payment_method||'BACS';
+  const statusBadge=a.status==='active'?'<span class="badge badge-active">Active</span>':'<span class="badge badge-closed">Inactive</span>';
+  return `<div class="account-card" id="acc-${a.id}">
+    <div class="account-header" onclick="toggleCard('acc-${a.id}')">
+      <div><div class="ac-name">${esc(a.company_name)}</div><div class="ac-meta">${esc(a.contact_name||'—')} ${a.contact_email?'· '+esc(a.contact_email):''}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Type</div><div class="inv-col-val"><span class="badge badge-${type}">${type}</span></div></div>
+      <div class="inv-col"><div class="inv-col-label">Acct mgr</div><div class="inv-col-val">${esc((a.account_manager||'').split(' ')[0])}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Terms</div><div class="inv-col-val">${esc(a.payment_terms||'—')}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px">${statusBadge}<span class="badge ${pmClass}">${pmLabel}</span></div>
       <div class="expand-arrow">▶</div>
     </div>
     <div class="card-detail">
       <div class="detail-grid">
-        <div class="detail-field"><div class="detail-label">Company</div><div class="detail-val">${esc(c.company_name||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Contact</div><div class="detail-val">${esc(c.contact_name||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Email</div><div class="detail-val">${esc(c.contact_email||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-val">${esc(c.contact_phone||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Account manager</div><div class="detail-val">${esc(c.account_manager||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${esc(c.dynamics_id||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Company</div><div class="detail-val">${esc(a.company_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Type</div><div class="detail-val">${esc(type)}</div></div>
+        <div class="detail-field"><div class="detail-label">MHA ref</div><div class="detail-val">${esc(a.mha||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Contact</div><div class="detail-val">${esc(a.contact_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Email</div><div class="detail-val">${esc(a.contact_email||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-val">${esc(a.contact_phone||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Account manager</div><div class="detail-val">${esc(a.account_manager||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Payment method</div><div class="detail-val">${pmLabel}</div></div>
+        <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${esc(a.dynamics_id||'—')}</div></div>
       </div>
-      ${c.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(c.address)}</div>`:''}
-      ${c.notes?`<div class="notes-box">${esc(c.notes)}</div>`:''}
+      ${a.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(a.address)}</div>`:''}
+      ${a.notes?`<div class="notes-box">${esc(a.notes)}</div>`:''}
       <div class="action-row">
-        <button class="btn btn-edit" onclick="openEditClient('${c.id}')">✎ Edit</button>
-        <button class="btn btn-recharge" onclick="openGenerator();localStorage.setItem('prefill_client','${esc(c.company_name)}')">+ Invoice this client</button>
-        <button class="btn btn-danger" onclick="deleteClient('${c.id}')">✗</button>
+        <button class="btn btn-edit" onclick="openEditAccount('${a.id}')">✎ Edit</button>
+        <button class="btn btn-recharge" onclick="openGenerator();localStorage.setItem('prefill_client','${esc(a.company_name)}')">+ Invoice this account</button>
+        <button class="btn btn-danger" onclick="deleteAccount('${a.id}')">✗</button>
       </div>
     </div>
   </div>`;
 }
-function populateClientDatalist(){const dl=document.getElementById('client-datalist');if(dl)dl.innerHTML=allClients.map(c=>`<option value="${esc(c.company_name)}">`).join('');}
-
-// ─── CLIENT MODAL ───
-let editClientId=null;
-function openNewClient(){editClientId=null;document.getElementById('client-modal-title').textContent='New client';clearClientForm();document.getElementById('client-modal').classList.add('open');}
-function openEditClient(id){
-  const c=allClients.find(x=>x.id===id);if(!c)return;editClientId=id;
-  document.getElementById('client-modal-title').textContent='Edit client';
-  const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('cf-company',c.company_name);f('cf-status',c.status);f('cf-contact',c.contact_name);f('cf-email',c.contact_email);f('cf-phone',c.contact_phone);f('cf-manager',c.account_manager);f('cf-address',c.address);f('cf-pm',c.payment_method);f('cf-terms',c.payment_terms);f('cf-dynamics',c.dynamics_id);f('cf-notes',c.notes);
-  document.getElementById('client-modal').classList.add('open');
+function populateAccountDatalist(){
+  const dl=document.getElementById('account-datalist');if(dl)dl.innerHTML=allAccounts.map(a=>`<option value="${esc(a.company_name)}">`).join('');
+  // also populate vehicle account/funder/dealer selects if open
+  populateVehicleRelationSelects();
 }
-function closeClientModal(){document.getElementById('client-modal').classList.remove('open');}
-function clearClientForm(){['cf-company','cf-contact','cf-email','cf-phone','cf-address','cf-dynamics','cf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('cf-status').value='active';document.getElementById('cf-pm').value='BACS';document.getElementById('cf-terms').value='28 days';document.getElementById('cf-manager').value='Simon Homer';}
-async function saveClient(){
-  const company=document.getElementById('cf-company').value.trim();if(!company){toast('Company name required','error');return;}
-  const payload={company_name:company,status:document.getElementById('cf-status').value,contact_name:document.getElementById('cf-contact').value.trim()||null,contact_email:document.getElementById('cf-email').value.trim()||null,contact_phone:document.getElementById('cf-phone').value.trim()||null,account_manager:document.getElementById('cf-manager').value,address:document.getElementById('cf-address').value.trim()||null,payment_method:document.getElementById('cf-pm').value,payment_terms:document.getElementById('cf-terms').value,dynamics_id:document.getElementById('cf-dynamics').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+// ─── ACCOUNT MODAL ───
+let editAccountId=null;
+function openNewAccount(){editAccountId=null;document.getElementById('account-modal-title').textContent='New account';clearAccountForm();document.getElementById('account-modal').classList.add('open');}
+function openEditAccount(id){
+  const a=allAccounts.find(x=>x.id===id);if(!a)return;editAccountId=id;
+  document.getElementById('account-modal-title').textContent='Edit account';
+  const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
+  f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);f('acf-address',a.address);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);
+  document.getElementById('account-modal').classList.add('open');
+}
+function closeAccountModal(){document.getElementById('account-modal').classList.remove('open');}
+function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';}
+async function saveAccount(){
+  const company=document.getElementById('acf-company').value.trim();if(!company){toast('Company name required','error');return;}
+  const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
-    if(editClientId){await sbReq(`covase_clients?id=eq.${encodeURIComponent(editClientId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allClients.findIndex(x=>x.id===editClientId);if(idx>=0)allClients[idx]={...allClients[idx],...payload};toast('Client updated','success');}
-    else{const res=await sbReq('covase_clients',{method:'POST',body:{...payload,id:'cl-'+Date.now()}});allClients.push(Array.isArray(res)?res[0]:res||{...payload,id:'cl-'+Date.now()});allClients.sort((a,b)=>a.company_name.localeCompare(b.company_name));toast('Client saved','success');}
-    closeClientModal();updateClientStats();renderClients();populateClientDatalist();
+    if(editAccountId){await sbReq(`covase_accounts?id=eq.${encodeURIComponent(editAccountId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allAccounts.findIndex(x=>x.id===editAccountId);if(idx>=0)allAccounts[idx]={...allAccounts[idx],...payload};toast('Account updated','success');}
+    else{const res=await sbReq('covase_accounts',{method:'POST',body:{...payload,id:'acc-'+Date.now()}});allAccounts.push(Array.isArray(res)?res[0]:res||{...payload,id:'acc-'+Date.now()});allAccounts.sort((a,b)=>a.company_name.localeCompare(b.company_name));toast('Account saved','success');}
+    closeAccountModal();updateAccountStats();renderAccounts();populateAccountDatalist();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
-async function deleteClient(id){if(!confirm('Remove this client? Cannot be undone.'))return;try{await sbReq(`covase_clients?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allClients=allClients.filter(x=>x.id!==id);updateClientStats();renderClients();populateClientDatalist();toast('Client removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+async function deleteAccount(id){if(!confirm('Remove this account? Cannot be undone.'))return;try{await sbReq(`covase_accounts?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allAccounts=allAccounts.filter(x=>x.id!==id);updateAccountStats();renderAccounts();populateAccountDatalist();toast('Account removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+
+// ─── CONTACTS ───
+let allContacts=[],contactFilter='all';
+async function loadContacts(){
+  const el=document.getElementById('contact-list');if(needsSetup(el))return;
+  el.innerHTML='<div class="loading">Loading contacts…</div>';
+  try{allContacts=await sbReq('covase_contacts?order=surname.asc,first_name.asc&limit=1000');updateContactStats();renderContacts();updateBadges();}
+  catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
+}
+function updateContactStats(){
+  document.getElementById('sct-total').textContent=allContacts.length;
+  document.getElementById('sct-drivers').textContent=allContacts.filter(c=>c.contact_type==='driver').length;
+  document.getElementById('sct-leavers').textContent=allContacts.filter(c=>c.employee_status==='leaver').length;
+  document.getElementById('sct-fms').textContent=allContacts.filter(c=>c.contact_type==='fleet manager').length;
+  document.getElementById('badge-contacts').textContent=allContacts.filter(c=>c.employee_status==='employed').length||'0';
+}
+function setContactFilter(f,btn){contactFilter=f;document.querySelectorAll('#view-contacts .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderContacts();}
+function renderContacts(){
+  const el=document.getElementById('contact-list');
+  const q=(document.getElementById('contact-search')?.value||'').toLowerCase();
+  let contacts=allContacts;
+  if(contactFilter==='leaver')contacts=contacts.filter(c=>c.employee_status==='leaver');
+  else if(contactFilter!=='all')contacts=contacts.filter(c=>c.contact_type===contactFilter);
+  if(q)contacts=contacts.filter(c=>[(c.first_name||''),(c.surname||''),(c.preferred_name||''),(c.email||''),(c.employee_number||'')].join(' ').toLowerCase().includes(q));
+  if(!contacts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No contacts found</div><div class="empty-sub">Click "+ New Contact" to add one.</div></div>`;return;}
+  el.innerHTML=contacts.map(c=>buildContactCard(c)).join('');
+}
+function contactDisplayName(c){return c.preferred_name||(c.first_name+' '+c.surname);}
+function contactAccountName(c){const a=allAccounts.find(x=>x.id===c.account_id);return a?a.company_name:'—';}
+function buildContactCard(c){
+  const name=contactDisplayName(c);
+  const acctName=contactAccountName(c);
+  const statusClass='badge-'+(c.employee_status||'unknown');
+  const statusLabel=c.employee_status||'unknown';
+  return `<div class="contact-card" id="ctc-${c.id}">
+    <div class="contact-header" onclick="toggleCard('ctc-${c.id}')">
+      <div><div class="ct-name">${esc(name)}</div><div class="ct-meta">${c.employee_number?'#'+esc(c.employee_number)+' · ':''}${esc(acctName)}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Type</div><div class="inv-col-val">${esc(c.contact_type||'—')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Grade</div><div class="inv-col-val">${esc(c.driver_grade||'—')}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Email</div><div class="inv-col-val" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.email||'—')}</div></div>
+      <span class="badge ${statusClass}">${statusLabel}</span>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">First name</div><div class="detail-val">${esc(c.first_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Surname</div><div class="detail-val">${esc(c.surname||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Preferred name</div><div class="detail-val">${esc(c.preferred_name||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Email</div><div class="detail-val">${esc(c.email||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Mobile</div><div class="detail-val">${esc(c.mobile||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Employee no.</div><div class="detail-val">${esc(c.employee_number||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Job description</div><div class="detail-val">${esc(c.job_description||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Driver grade</div><div class="detail-val">${esc(c.driver_grade||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Account</div><div class="detail-val">${esc(acctName)}</div></div>
+      </div>
+      ${c.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(c.address)} <span style="color:var(--n400);font-size:11px">(${esc(c.address_type||'home')})</span></div>`:''}
+      ${c.notes?`<div class="notes-box">${esc(c.notes)}</div>`:''}
+      <div class="action-row">
+        <button class="btn btn-edit" onclick="openEditContact('${c.id}')">✎ Edit</button>
+        <button class="btn btn-danger" onclick="deleteContact('${c.id}')">✗</button>
+      </div>
+    </div>
+  </div>`;
+}
+// ─── CONTACT MODAL ───
+let editContactId=null;
+function openNewContact(){editContactId=null;document.getElementById('contact-modal-title').textContent='New contact';clearContactForm();populateContactAccountSelect();document.getElementById('contact-modal').classList.add('open');}
+function openEditContact(id){
+  const c=allContacts.find(x=>x.id===id);if(!c)return;editContactId=id;
+  document.getElementById('contact-modal-title').textContent='Edit contact';
+  populateContactAccountSelect(c.account_id);
+  const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
+  f('ctf-first',c.first_name);f('ctf-surname',c.surname);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);
+  document.getElementById('contact-modal').classList.add('open');
+}
+function closeContactModal(){document.getElementById('contact-modal').classList.remove('open');}
+function clearContactForm(){['ctf-first','ctf-surname','ctf-preferred','ctf-empno','ctf-email','ctf-mobile','ctf-address','ctf-job','ctf-grade','ctf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('ctf-addr-type').value='home';document.getElementById('ctf-type').value='driver';document.getElementById('ctf-status').value='employed';}
+function populateContactAccountSelect(selectedId=''){
+  const sel=document.getElementById('ctf-account');if(!sel)return;
+  sel.innerHTML='<option value="">— no account —</option>'+allAccounts.sort((a,b)=>a.company_name.localeCompare(b.company_name)).map(a=>`<option value="${a.id}"${a.id===selectedId?' selected':''}>${esc(a.company_name)}</option>`).join('');
+}
+async function saveContact(){
+  const first=document.getElementById('ctf-first').value.trim(),surname=document.getElementById('ctf-surname').value.trim();
+  if(!first||!surname){toast('First name and surname required','error');return;}
+  const payload={first_name:first,surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  try{
+    if(editContactId){await sbReq(`covase_contacts?id=eq.${encodeURIComponent(editContactId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allContacts.findIndex(x=>x.id===editContactId);if(idx>=0)allContacts[idx]={...allContacts[idx],...payload};toast('Contact updated','success');}
+    else{const res=await sbReq('covase_contacts',{method:'POST',body:{...payload,id:'ct-'+Date.now()}});allContacts.push(Array.isArray(res)?res[0]:res||{...payload,id:'ct-'+Date.now()});allContacts.sort((a,b)=>a.surname.localeCompare(b.surname));toast('Contact saved','success');}
+    closeContactModal();updateContactStats();renderContacts();populateVehicleDriverSelect();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+async function deleteContact(id){if(!confirm('Remove this contact? Cannot be undone.'))return;try{await sbReq(`covase_contacts?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allContacts=allContacts.filter(x=>x.id!==id);updateContactStats();renderContacts();toast('Contact removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+
+// ─── VEHICLES ───
+let allVehicles=[],vehicleFilter='all';
+async function loadVehicles(){
+  const el=document.getElementById('vehicle-list');if(needsSetup(el))return;
+  el.innerHTML='<div class="loading">Loading vehicles…</div>';
+  // Load accounts + contacts first if not already loaded
+  if(!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');populateAccountDatalist();}catch(e){}}
+  if(!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=surname.asc&limit=1000');}catch(e){}}
+  try{allVehicles=await sbReq('covase_vehicles?order=created_at.desc&limit=500');updateVehicleStats();renderVehicles();updateBadges();}
+  catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚙</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
+}
+function vehicleAccountName(v,field){const a=allAccounts.find(x=>x.id===v[field]);return a?a.company_name:'—';}
+function vehicleDriverName(v){const c=allContacts.find(x=>x.id===v.driver_id);return c?contactDisplayName(c):'—';}
+function updateVehicleStats(){
+  const active=allVehicles.filter(v=>v.status==='active');
+  const now=new Date(),soon=new Date(now.getTime()+90*86400000);
+  const renewals=active.filter(v=>{if(!v.renewal_date)return false;const r=new Date(v.renewal_date);return r>=now&&r<=soon;});
+  const ch=allVehicles.filter(v=>v.funding_method==='Contract Hire');
+  const ev=allVehicles.filter(v=>v.fuel_type&&(v.fuel_type.toLowerCase().includes('electric')||v.fuel_type.toLowerCase().includes('phev')));
+  document.getElementById('svh-active').textContent=active.length;
+  document.getElementById('svh-renewals').textContent=renewals.length;
+  document.getElementById('svh-ch').textContent=ch.length;
+  document.getElementById('svh-ev').textContent=ev.length;
+  document.getElementById('badge-vehicles').textContent=active.length||'0';
+}
+function setVehicleFilter(f,btn){vehicleFilter=f;document.querySelectorAll('#view-vehicles .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderVehicles();}
+function renderVehicles(){
+  const el=document.getElementById('vehicle-list');
+  const q=(document.getElementById('vehicle-search')?.value||'').toLowerCase();
+  let vehicles=allVehicles;
+  if(vehicleFilter!=='all')vehicles=vehicles.filter(v=>v.status===vehicleFilter);
+  if(q)vehicles=vehicles.filter(v=>[(v.reg||''),(v.manufacturer||''),(v.model||''),(v.derivative||''),(v.name||'')].join(' ').toLowerCase().includes(q));
+  if(!vehicles.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚙</div><div class="empty-title">No vehicles found</div><div class="empty-sub">Click "+ New Vehicle" to add one.</div></div>`;return;}
+  el.innerHTML=vehicles.map(v=>buildVehicleCard(v)).join('');
+}
+function buildVehicleCard(v){
+  const accountName=vehicleAccountName(v,'account_id');
+  const driverName=vehicleDriverName(v);
+  const funderName=vehicleAccountName(v,'funder_id');
+  const renewalStr=v.renewal_date?fmtD(v.renewal_date):'—';
+  // Highlight if renewal soon
+  const now=new Date(),renewDate=v.renewal_date?new Date(v.renewal_date):null;
+  const renewSoon=renewDate&&renewDate>=now&&renewDate<new Date(now.getTime()+90*86400000);
+  const totalRent=(parseFloat(v.finance_rental)||0)+(parseFloat(v.service_rental)||0);
+  const profit=(parseFloat(v.commissions)||0)+(parseFloat(v.setup_fee)||0)+((parseFloat(v.management_fee)||0)*(parseInt(v.term_months)||0))+(parseFloat(v.other_revenue)||0)-(parseFloat(v.costs)||0);
+  return `<div class="vehicle-card" id="vhc-${v.id}">
+    <div class="vehicle-header" onclick="toggleCard('vhc-${v.id}')">
+      <div>
+        <div class="vh-reg">${esc(v.reg||'—')}</div>
+        <div class="vh-model">${[v.manufacturer,v.model,v.derivative].filter(Boolean).map(esc).join(' ')||esc(v.name||'—')}</div>
+      </div>
+      <div class="inv-col"><div class="inv-col-label">Account</div><div class="inv-col-val">${esc(accountName)}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Driver</div><div class="inv-col-val">${esc(driverName)}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Funder</div><div class="inv-col-val">${esc(funderName)}</div></div>
+      <div class="inv-col"><div class="inv-col-label">Renewal</div><div class="inv-col-val" style="${renewSoon?'color:var(--tl-orange);font-weight:600':''}"}>${renewalStr}</div></div>
+      <span class="badge badge-${v.status||'active'}">${v.status||'active'}</span>
+      <div class="expand-arrow">▶</div>
+    </div>
+    <div class="card-detail">
+      <div class="detail-section-head">Vehicle</div>
+      <div class="detail-grid-4">
+        <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(v.reg||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Make</div><div class="detail-val">${esc(v.manufacturer||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Model</div><div class="detail-val">${esc(v.model||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Derivative</div><div class="detail-val">${esc(v.derivative||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Fuel</div><div class="detail-val">${esc(v.fuel_type||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Transmission</div><div class="detail-val">${esc(v.transmission||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">P11D</div><div class="detail-val">${v.p11d_value?'£'+parseFloat(v.p11d_value).toLocaleString('en-GB'):'—'}</div></div>
+        <div class="detail-field"><div class="detail-label">CO₂ g/km</div><div class="detail-val">${v.co2_emissions||'—'}</div></div>
+      </div>
+      <div class="detail-section-head">Contract</div>
+      <div class="detail-grid-4">
+        <div class="detail-field"><div class="detail-label">Funding</div><div class="detail-val">${esc(v.funding_method||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Term</div><div class="detail-val">${v.term_months?v.term_months+' mo':'—'}</div></div>
+        <div class="detail-field"><div class="detail-label">Ann. mileage</div><div class="detail-val">${v.annual_mileage?v.annual_mileage.toLocaleString('en-GB'):'—'}</div></div>
+        <div class="detail-field"><div class="detail-label">Total rental</div><div class="detail-val">${totalRent?'£'+totalRent.toFixed(2)+'/mo':'—'}</div></div>
+      </div>
+      <div class="detail-section-head">Deal economics</div>
+      <div class="financials-row">
+        <div><span>Commissions</span><strong>${v.commissions?'£'+parseFloat(v.commissions).toFixed(2):'—'}</strong></div>
+        <div><span>Setup fee</span><strong>${v.setup_fee?'£'+parseFloat(v.setup_fee).toFixed(2):'—'}</strong></div>
+        <div><span>Mgmt fee</span><strong>${v.management_fee?'£'+parseFloat(v.management_fee).toFixed(2)+'/mo':'—'}</strong></div>
+        <div><span>Other rev</span><strong>${v.other_revenue?'£'+parseFloat(v.other_revenue).toFixed(2):'—'}</strong></div>
+        <div><span>Total profit</span><strong class="${profit>0?'profit-pos':profit<0?'profit-neg':''}">${profit?'£'+profit.toFixed(2):'—'}</strong></div>
+      </div>
+      ${v.notes?`<div class="notes-box">${esc(v.notes)}</div>`:''}
+      <div class="action-row">
+        <button class="btn btn-edit" onclick="openEditVehicle('${v.id}')">✎ Edit</button>
+        <button class="btn btn-danger" onclick="deleteVehicle('${v.id}')">✗</button>
+      </div>
+    </div>
+  </div>`;
+}
+// ─── VEHICLE MODAL ───
+let editVehicleId=null;
+function switchVehicleTab(tab,el){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('vtab-'+tab)?.classList.add('active');
+  if(el)el.classList.add('active');
+}
+function populateVehicleRelationSelects(v={}){
+  const clients=allAccounts.filter(a=>a.type==='client'||!a.type);
+  const funders=allAccounts.filter(a=>a.type==='funder');
+  const dealers=allAccounts.filter(a=>a.type==='dealer');
+  const sel=(id,arr,selected,labelField='company_name')=>{const e=document.getElementById(id);if(!e)return;e.innerHTML='<option value="">— select —</option>'+arr.map(x=>`<option value="${x.id}"${x.id===selected?' selected':''}>${esc(x[labelField])}</option>`).join('');};
+  sel('vf-account',allAccounts,v.account_id);
+  sel('vf-funder',allAccounts.filter(a=>a.type==='funder'||a.type==='client'||!a.type),v.funder_id);
+  sel('vf-dealer',allAccounts,v.dealer_id);
+  const driverSel=document.getElementById('vf-driver');
+  if(driverSel)driverSel.innerHTML='<option value="">— select —</option>'+allContacts.map(c=>`<option value="${c.id}"${c.id===v.driver_id?' selected':''}>${esc(contactDisplayName(c))}${c.employee_number?' (#'+esc(c.employee_number)+')':''}</option>`).join('');
+}
+function populateVehicleDriverSelect(){
+  const driverSel=document.getElementById('vf-driver');if(!driverSel)return;
+  const currentVal=driverSel.value;
+  driverSel.innerHTML='<option value="">— select —</option>'+allContacts.map(c=>`<option value="${c.id}"${c.id===currentVal?' selected':''}>${esc(contactDisplayName(c))}${c.employee_number?' (#'+esc(c.employee_number)+')':''}</option>`).join('');
+}
+function openNewVehicle(){
+  editVehicleId=null;
+  document.getElementById('vehicle-modal-title').textContent='New vehicle';
+  clearVehicleForm();
+  if(!allAccounts.length)loadAccounts().then(()=>populateVehicleRelationSelects());
+  else populateVehicleRelationSelects();
+  if(!allContacts.length)loadContacts();
+  switchVehicleTab('overview',document.querySelector('.modal-tab'));
+  document.getElementById('vehicle-modal').classList.add('open');
+  updateVehicleProfitPreview();
+}
+function openEditVehicle(id){
+  const v=allVehicles.find(x=>x.id===id);if(!v)return;editVehicleId=id;
+  document.getElementById('vehicle-modal-title').textContent='Edit vehicle — '+esc(v.reg||v.name||'');
+  populateVehicleRelationSelects(v);
+  const f=(fid,val)=>{const e=document.getElementById(fid);if(e)e.value=val??''};
+  // Overview
+  f('vf-reg',v.reg);f('vf-name',v.name);f('vf-desc',v.description);f('vf-fqno',v.funders_quote_no);f('vf-cpo',v.covase_po_number);f('vf-lpo',v.legacy_po_number);f('vf-lex',v.lex_900_number);f('vf-source',v.source);f('vf-status',v.status||'active');f('vf-notes',v.notes);f('vf-dynamics',v.dynamics_id);
+  // Spec
+  f('vf-vtype',v.vehicle_type);f('vf-body',v.body_style);f('vf-doors',v.num_doors);f('vf-make',v.manufacturer);f('vf-model',v.model);f('vf-deriv',v.derivative);f('vf-engsize',v.engine_size);f('vf-engcc',v.engine_cc);f('vf-fuel',v.fuel_type);f('vf-trans',v.transmission);f('vf-evrange',v.ev_range);f('vf-extcol',v.exterior_colour);f('vf-intrim',v.interior_trim);f('vf-chassis',v.chassis_number);f('vf-key',v.key_number);f('vf-p11d',v.p11d_value);f('vf-co2',v.co2_emissions);f('vf-mpg',v.fuel_consumption);f('vf-motheld',String(v.mot_held||false));f('vf-std',v.standard_items);f('vf-opts',v.optional_extras);
+  // Contract
+  f('vf-term',v.term_months);f('vf-miles',v.annual_mileage);f('vf-profile',v.payment_profile);f('vf-vattype',v.vat_type);f('vf-fundmethod',v.funding_method);f('vf-conttype',v.contract_type);f('vf-finrent',v.finance_rental);f('vf-svcrent',v.service_rental);f('vf-xsmile',v.excess_mileage_ppm);f('vf-otr',v.otr);f('vf-initpay',v.initial_payment);f('vf-finalpay',v.final_payment);f('vf-drivercon',v.driver_contribution);
+  // Financials
+  f('vf-commissions',v.commissions);f('vf-setupfee',v.setup_fee);f('vf-mgmtfee',v.management_fee);f('vf-otherrev',v.other_revenue);f('vf-costs',v.costs);
+  // Dates
+  f('vf-d-ordered',v.order_received_date);f('vf-d-proposal',v.proposal_sent_date);f('vf-d-todealer',v.order_to_dealer_date);f('vf-d-confirmed',v.order_confirmed_date);f('vf-d-build',v.build_date_confirmed);f('vf-d-expdeliv',v.expected_delivery_date);f('vf-d-delivered',v.delivery_date);f('vf-d-registered',v.registration_date);f('vf-d-ctsent',v.contracts_sent_date);f('vf-d-ctsigned',v.contracts_signed_date);f('vf-d-sentpay',v.sent_for_payment_date);f('vf-d-paidout',v.paid_out_date);f('vf-d-renewal',v.renewal_date);f('vf-d-dehire',v.de_hire_date);f('vf-d-mot1',v.mot_1_due);f('vf-d-mot2',v.mot_2_due);f('vf-d-motexp',v.mot_expiry);f('vf-d-dcsent',v.driver_card_sent_date);f('vf-d-dcrecd',v.driver_card_received_date);
+  switchVehicleTab('overview',document.querySelector('.modal-tab'));
+  updateVehicleProfitPreview();
+  document.getElementById('vehicle-modal').classList.add('open');
+}
+function closeVehicleModal(){document.getElementById('vehicle-modal').classList.remove('open');}
+function clearVehicleForm(){
+  ['vf-reg','vf-name','vf-desc','vf-fqno','vf-cpo','vf-lpo','vf-lex','vf-notes','vf-dynamics','vf-make','vf-model','vf-deriv','vf-engsize','vf-engcc','vf-evrange','vf-extcol','vf-intrim','vf-chassis','vf-key','vf-p11d','vf-co2','vf-mpg','vf-std','vf-opts','vf-term','vf-miles','vf-profile','vf-finrent','vf-svcrent','vf-xsmile','vf-otr','vf-initpay','vf-finalpay','vf-drivercon','vf-commissions','vf-setupfee','vf-mgmtfee','vf-otherrev','vf-costs','vf-d-ordered','vf-d-proposal','vf-d-todealer','vf-d-confirmed','vf-d-build','vf-d-expdeliv','vf-d-delivered','vf-d-registered','vf-d-ctsent','vf-d-ctsigned','vf-d-sentpay','vf-d-paidout','vf-d-renewal','vf-d-dehire','vf-d-mot1','vf-d-mot2','vf-d-motexp','vf-d-dcsent','vf-d-dcrecd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('vf-status').value='active';document.getElementById('vf-motheld').value='false';
+}
+function updateVehicleProfitPreview(){
+  const comm=parseFloat(document.getElementById('vf-commissions')?.value)||0;
+  const setup=parseFloat(document.getElementById('vf-setupfee')?.value)||0;
+  const mgmt=parseFloat(document.getElementById('vf-mgmtfee')?.value)||0;
+  const term=parseInt(document.getElementById('vf-term')?.value)||0;
+  const other=parseFloat(document.getElementById('vf-otherrev')?.value)||0;
+  const costs=parseFloat(document.getElementById('vf-costs')?.value)||0;
+  const profit=comm+setup+(mgmt*term)+other-costs;
+  const el=document.getElementById('vf-profit-preview');
+  if(el){el.textContent=profit?'£'+profit.toFixed(2):'£—';el.style.color=profit>0?'var(--tl-green)':profit<0?'var(--tl-orange)':'var(--covase)';}
+}
+// Wire up profit preview inputs
+['vf-commissions','vf-setupfee','vf-mgmtfee','vf-term','vf-otherrev','vf-costs'].forEach(id=>{
+  document.addEventListener('input',e=>{if(e.target.id===id)updateVehicleProfitPreview();});
+});
+function getVehiclePayload(){
+  const nd=(id)=>{const e=document.getElementById(id);return e?.value||null};
+  const nf=(id)=>{const e=document.getElementById(id);return e?.value?parseFloat(e.value):null};
+  const ni=(id)=>{const e=document.getElementById(id);return e?.value?parseInt(e.value):null};
+  return{
+    account_id:nd('vf-account'),driver_id:nd('vf-driver'),funder_id:nd('vf-funder'),dealer_id:nd('vf-dealer'),
+    reg:(document.getElementById('vf-reg')?.value||'').trim().toUpperCase()||null,name:nd('vf-name'),description:nd('vf-desc'),source:nd('vf-source'),funders_quote_no:nd('vf-fqno'),covase_po_number:nd('vf-cpo'),legacy_po_number:nd('vf-lpo'),lex_900_number:nd('vf-lex'),status:nd('vf-status')||'active',notes:nd('vf-notes'),dynamics_id:nd('vf-dynamics'),
+    vehicle_type:nd('vf-vtype'),body_style:nd('vf-body'),num_doors:ni('vf-doors'),manufacturer:nd('vf-make'),model:nd('vf-model'),derivative:nd('vf-deriv'),engine_size:nd('vf-engsize'),engine_cc:ni('vf-engcc'),fuel_type:nd('vf-fuel'),transmission:nd('vf-trans'),ev_range:nf('vf-evrange'),exterior_colour:nd('vf-extcol'),interior_trim:nd('vf-intrim'),chassis_number:nd('vf-chassis'),key_number:nd('vf-key'),p11d_value:nf('vf-p11d'),co2_emissions:ni('vf-co2'),fuel_consumption:ni('vf-mpg'),mot_held:document.getElementById('vf-motheld')?.value==='true',standard_items:nd('vf-std'),optional_extras:nd('vf-opts'),
+    term_months:ni('vf-term'),annual_mileage:ni('vf-miles'),payment_profile:nd('vf-profile'),vat_type:nd('vf-vattype'),funding_method:nd('vf-fundmethod'),contract_type:nd('vf-conttype'),finance_rental:nf('vf-finrent'),service_rental:nf('vf-svcrent'),excess_mileage_ppm:nf('vf-xsmile'),otr:nf('vf-otr'),initial_payment:nf('vf-initpay'),final_payment:nf('vf-finalpay'),driver_contribution:nf('vf-drivercon'),
+    commissions:nf('vf-commissions'),setup_fee:nf('vf-setupfee'),management_fee:nf('vf-mgmtfee'),other_revenue:nf('vf-otherrev'),costs:nf('vf-costs'),
+    order_received_date:nd('vf-d-ordered'),proposal_sent_date:nd('vf-d-proposal'),order_to_dealer_date:nd('vf-d-todealer'),order_confirmed_date:nd('vf-d-confirmed'),build_date_confirmed:nd('vf-d-build'),expected_delivery_date:nd('vf-d-expdeliv'),delivery_date:nd('vf-d-delivered'),registration_date:nd('vf-d-registered'),contracts_sent_date:nd('vf-d-ctsent'),contracts_signed_date:nd('vf-d-ctsigned'),sent_for_payment_date:nd('vf-d-sentpay'),paid_out_date:nd('vf-d-paidout'),renewal_date:nd('vf-d-renewal'),de_hire_date:nd('vf-d-dehire'),mot_1_due:nd('vf-d-mot1'),mot_2_due:nd('vf-d-mot2'),mot_expiry:nd('vf-d-motexp'),driver_card_sent_date:nd('vf-d-dcsent'),driver_card_received_date:nd('vf-d-dcrecd'),
+    updated_at:new Date().toISOString()
+  };
+}
+async function saveVehicle(){
+  const payload=getVehiclePayload();
+  try{
+    if(editVehicleId){await sbReq(`covase_vehicles?id=eq.${encodeURIComponent(editVehicleId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allVehicles.findIndex(x=>x.id===editVehicleId);if(idx>=0)allVehicles[idx]={...allVehicles[idx],...payload};toast('Vehicle updated','success');}
+    else{const res=await sbReq('covase_vehicles',{method:'POST',body:{...payload,id:'veh-'+Date.now()}});allVehicles.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'veh-'+Date.now()});toast('Vehicle saved','success');}
+    closeVehicleModal();updateVehicleStats();renderVehicles();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+async function deleteVehicle(id){if(!confirm('Remove this vehicle? Cannot be undone.'))return;try{await sbReq(`covase_vehicles?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allVehicles=allVehicles.filter(x=>x.id!==id);updateVehicleStats();renderVehicles();toast('Vehicle removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
 
 // ─── SHARED ───
 function toggleCard(id){document.getElementById(id)?.classList.toggle('expanded');}
@@ -1141,8 +1673,16 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','client-modal','rp-overlay'].forEach(id=>{
-  document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='hire-modal')closeHireModal();else if(id==='client-modal')closeClientModal();else closeRechargePicker();}});
+['hire-modal','account-modal','contact-modal','vehicle-modal','rp-overlay'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',e=>{
+    if(e.target===e.currentTarget){
+      if(id==='hire-modal')closeHireModal();
+      else if(id==='account-modal')closeAccountModal();
+      else if(id==='contact-modal')closeContactModal();
+      else if(id==='vehicle-modal')closeVehicleModal();
+      else closeRechargePicker();
+    }
+  });
 });
 
 // Boot
