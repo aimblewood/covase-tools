@@ -1405,7 +1405,7 @@ function renderContacts(){
   if(!contacts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No contacts found</div><div class="empty-sub">Click "+ New Contact" to add one.</div></div>`;return;}
   el.innerHTML=contacts.map(c=>buildContactCard(c)).join('');
 }
-function contactDisplayName(c){return c.preferred_name||(c.first_name+' '+c.surname);}
+function contactDisplayName(c){return c.preferred_name||(c.first_name+' '+c.last_name);}
 function contactAccountName(c){const a=allAccounts.find(x=>x.id===c.account_id);return a?a.company_name:'—';}
 function buildContactCard(c){
   const name=contactDisplayName(c);
@@ -1424,7 +1424,7 @@ function buildContactCard(c){
     <div class="card-detail">
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">First name</div><div class="detail-val">${esc(c.first_name||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Surname</div><div class="detail-val">${esc(c.surname||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Surname</div><div class="detail-val">${esc(c.last_name||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Preferred name</div><div class="detail-val">${esc(c.preferred_name||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Email</div><div class="detail-val">${esc(c.email||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Mobile</div><div class="detail-val">${esc(c.mobile||'—')}</div></div>
@@ -1450,7 +1450,7 @@ function openEditContact(id){
   document.getElementById('contact-modal-title').textContent='Edit contact';
   populateContactAccountSelect(c.account_id);
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('ctf-first',c.first_name);f('ctf-surname',c.surname);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);
+  f('ctf-first',c.first_name);f('ctf-surname',c.last_name);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);
   document.getElementById('contact-modal').classList.add('open');
 }
 function closeContactModal(){document.getElementById('contact-modal').classList.remove('open');}
@@ -1462,10 +1462,10 @@ function populateContactAccountSelect(selectedId=''){
 async function saveContact(){
   const first=document.getElementById('ctf-first').value.trim(),surname=document.getElementById('ctf-surname').value.trim();
   if(!first||!surname){toast('First name and surname required','error');return;}
-  const payload={first_name:first,surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={first_name:first,last_name:surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editContactId){await sbReq(`covase_contacts?id=eq.${encodeURIComponent(editContactId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allContacts.findIndex(x=>x.id===editContactId);if(idx>=0)allContacts[idx]={...allContacts[idx],...payload};toast('Contact updated','success');}
-    else{const res=await sbReq('covase_contacts',{method:'POST',body:{...payload,id:'ct-'+Date.now()}});allContacts.push(Array.isArray(res)?res[0]:res||{...payload,id:'ct-'+Date.now()});allContacts.sort((a,b)=>a.surname.localeCompare(b.surname));toast('Contact saved','success');}
+    else{const res=await sbReq('covase_contacts',{method:'POST',body:{...payload,id:'ct-'+Date.now()}});allContacts.push(Array.isArray(res)?res[0]:res||{...payload,id:'ct-'+Date.now()});allContacts.sort((a,b)=>a.last_name.localeCompare(b.last_name));toast('Contact saved','success');}
     closeContactModal();updateContactStats();renderContacts();populateVehicleDriverSelect();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
