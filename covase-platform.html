@@ -587,9 +587,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-row trio">
         <div class="form-field"><label>Cost/day (supplier)</label><input type="number" step="0.01" id="hf-cost" placeholder="0.00"></div>
         <div class="form-field"><label>Sell/day (client)</label><input type="number" step="0.01" id="hf-sell" placeholder="0.00"></div>
-        <div class="form-field"><label>Supplementary charges</label><input type="number" step="0.01" id="hf-supp" placeholder="0.00"></div>
+        <div class="form-field"><label>Hire VAT status</label>
+          <select id="hf-vat-status"><option value="full">Full</option><option value="outside_of_scope">Outside of scope</option></select>
+        </div>
       </div>
-      <div class="form-field"><label>Supplementary notes</label><input id="hf-supp-notes" placeholder="e.g. Excess mileage £45, missing fuel £20"></div>
+      <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Supplementary charges</span>
+        <button type="button" class="btn btn-secondary" onclick="addSupp()" style="font-size:11px;padding:4px 10px">+ Add supplementary</button>
+      </div>
+      <div id="hf-supps"></div>
       <div class="form-section-label">Invoice links</div>
       <div class="form-row">
         <div class="form-field"><label>Incoming invoice ID</label><input id="hf-in-inv" placeholder="from Billing"></div>
@@ -1172,10 +1178,15 @@ function updateHireStats(){
   const pending=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
   document.getElementById('sh-active').textContent=active.length;
   document.getElementById('sh-recharge').textContent=pending.length;
-  const exposure=active.reduce((s,h)=>{const d=daysOn(h);return d&&h.cost_per_day?s+d*parseFloat(h.cost_per_day)+(parseFloat(h.supplementary_charges)||0):s;},0);
+  const exposure=active.reduce((s,h)=>{const d=daysOn(h);return d&&h.cost_per_day?s+d*parseFloat(h.cost_per_day)+suppTotal(h):s;},0);
   document.getElementById('sh-exposure').textContent=fmtMoney(exposure||null);
   const mg=active.filter(h=>h.cost_per_day&&h.sell_per_day);
   document.getElementById('sh-margin').textContent=mg.length?((mg.reduce((s,h)=>(parseFloat(h.sell_per_day)-parseFloat(h.cost_per_day))/parseFloat(h.cost_per_day)*100+s,0)/mg.length).toFixed(1)+'%'):'—';
+}
+// Sum of supplementary amounts on a hire
+function suppTotal(h){
+  if(!Array.isArray(h.supplementaries))return 0;
+  return h.supplementaries.reduce((s,x)=>s+(parseFloat(x.amount)||0),0);
 }
 function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#view-hires-all .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderHireView('hires-all','all-list',null);}
 function renderHireView(viewId,listSuffix,filterFn){
@@ -1187,8 +1198,9 @@ function renderHireView(viewId,listSuffix,filterFn){
 }
 function buildHireCard(h){
   const days=daysOn(h);
-  const cost=days&&h.cost_per_day?days*parseFloat(h.cost_per_day)+(parseFloat(h.supplementary_charges)||0):null;
-  const sell=days&&h.sell_per_day?days*parseFloat(h.sell_per_day)+(parseFloat(h.supplementary_charges)||0):null;
+  const supp=suppTotal(h);
+  const cost=days&&h.cost_per_day?days*parseFloat(h.cost_per_day)+supp:null;
+  const sell=days&&h.sell_per_day?days*parseFloat(h.sell_per_day)+supp:null;
   const profit=sell!=null&&cost!=null?sell-cost:null;
   const statusLabels={active:'Active',closed:'Closed',invoiced:'Invoiced',recharged:'Recharged'};
   const pClass=profit!=null?(profit>=0?'profit-pos':'profit-neg'):'';
@@ -1220,7 +1232,7 @@ function buildHireCard(h){
         <div><span>Total sell</span><strong>${fmtMoney(sell)}</strong></div>
         <div><span>Margin</span><strong class="${pClass}">${fmtMoney(profit)}</strong></div>
       </div>
-      ${h.supplementary_charges&&parseFloat(h.supplementary_charges)>0?`<div class="notes-box">📎 Supplementary: ${fmtMoney(parseFloat(h.supplementary_charges))}${h.supplementary_notes?' — '+esc(h.supplementary_notes):''}</div>`:''}
+      ${Array.isArray(h.supplementaries)&&h.supplementaries.length?`<div class="notes-box">📎 Supplementary: ${fmtMoney(supp)} — ${h.supplementaries.map(s=>esc(s.type)+' '+fmtMoney(s.amount)+(s.vat_status==='outside_of_scope'?' (OoS)':'')).join(', ')}</div>`:''}
       ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
       ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Invoice: <span style="color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
       <div class="inline-panel yellow" id="hco-${h.id}">
@@ -1256,11 +1268,20 @@ async function doLinkInv(id){
 }
 function rechargeHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;
-  const days=daysOn(h),sellRate=parseFloat(h.sell_per_day)||0,sellTotal=days?days*sellRate:0,supp=parseFloat(h.supplementary_charges)||0;
+  const days=daysOn(h),sellRate=parseFloat(h.sell_per_day)||0,sellTotal=days?days*sellRate:0;
   const reg=h.vehicle_reg||'',driver=h.driver||'';
-  const hireDesc=`${reg}${h.make_model?' ('+h.make_model+')':''}${driver?' — '+driver:''}\nVehicle hire ${fmtD(h.start_date)} to ${h.end_date?fmtD(h.end_date):'ongoing'}${days?' ('+days+' days @ £'+sellRate.toFixed(2)+'/day)':''}${h.agreement_ref?'\nAgreement '+h.agreement_ref:''}`;
-  const lineItems=[{desc:hireDesc,amt:sellTotal.toFixed(2),vatExempt:false}];
-  if(supp>0)lineItems.push({desc:h.supplementary_notes||'Supplementary charges',amt:supp.toFixed(2),vatExempt:false});
+  // Main hire line — Woodland Trust format
+  const hireDesc=`${reg} for ${driver}${sellRate?' @ £'+sellRate.toFixed(2)+' per day':''}${days?'\n('+days+' Days – '+fmtD(h.start_date)+' – '+fmtD(h.end_date||'')+')':''}`;
+  const vatExempt=(h.vat_status==='outside_of_scope');
+  const lineItems=[{desc:hireDesc,amt:sellTotal.toFixed(2),vatExempt}];
+  // One line per supplementary
+  if(Array.isArray(h.supplementaries)){
+    h.supplementaries.forEach(s=>{
+      const amt=parseFloat(s.amount);if(!amt)return;
+      const desc=`${reg}${driver?' — '+driver:''} — ${s.type}${s.notes?' ('+s.notes+')':''}`;
+      lineItems.push({desc,amt:amt.toFixed(2),vatExempt:(s.vat_status==='outside_of_scope')});
+    });
+  }
   localStorage.setItem('recharge_selected_items',JSON.stringify(lineItems));localStorage.setItem('recharge_source_hire',id);localStorage.setItem('recharge_client_name',h.customer||'');
   window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_hire='+encodeURIComponent(id),'_blank');
   toast('Opening generator…','success');
@@ -1271,14 +1292,55 @@ function openEditHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
   document.getElementById('hire-modal-title').textContent='Edit hire';
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-supp',h.supplementary_charges);f('hf-supp-notes',h.supplementary_notes);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  supps=Array.isArray(h.supplementaries)?h.supplementaries.map(s=>({...s})):[];renderSupps();
   document.getElementById('hire-modal').classList.add('open');
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-customer','hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-sell','hf-supp','hf-supp-notes','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-status').value='active';}
+function clearHireForm(){['hf-customer','hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-sell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-status').value='active';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();}
+
+// ─── Supplementary charges repeater ───
+let supps=[];
+const SUPP_TYPES=['Fuel','Fine','Admin fee for fine/penalty','Admin fee for damage','One way charge','Comp for Damage','Other'];
+function addSupp(){supps.push({type:'Fuel',amount:null,vat_status:'full',notes:''});renderSupps();}
+function removeSupp(i){supps.splice(i,1);renderSupps();}
+function updateSupp(i,field,val){if(!supps[i])return;supps[i][field]=field==='amount'?(val===''?null:parseFloat(val)):val;}
+function renderSupps(){
+  const wrap=document.getElementById('hf-supps');if(!wrap)return;
+  if(!supps.length){wrap.innerHTML='<div style="font-size:11px;color:#9ca3af;padding:6px 0">No supplementary charges. Click "+ Add supplementary" above.</div>';return;}
+  wrap.innerHTML=supps.map((s,i)=>`
+    <div class="form-row" style="align-items:end;gap:8px;margin-bottom:6px">
+      <div class="form-field" style="flex:0 0 180px">
+        <label>Type</label>
+        <select onchange="updateSupp(${i},'type',this.value)">
+          ${SUPP_TYPES.map(t=>`<option value="${esc(t)}"${s.type===t?' selected':''}>${esc(t)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field" style="flex:0 0 110px">
+        <label>Amount</label>
+        <input type="number" step="0.01" value="${s.amount??''}" placeholder="0.00" onchange="updateSupp(${i},'amount',this.value)">
+      </div>
+      <div class="form-field" style="flex:0 0 150px">
+        <label>VAT status</label>
+        <select onchange="updateSupp(${i},'vat_status',this.value)">
+          <option value="full"${s.vat_status==='full'?' selected':''}>Full</option>
+          <option value="outside_of_scope"${s.vat_status==='outside_of_scope'?' selected':''}>Outside of scope</option>
+        </select>
+      </div>
+      <div class="form-field" style="flex:1">
+        <label>Notes</label>
+        <input value="${esc(s.notes||'')}" placeholder="e.g. Shell fuel 12/03" onchange="updateSupp(${i},'notes',this.value)">
+      </div>
+      <button type="button" class="btn btn-delete" onclick="removeSupp(${i})" style="flex:0 0 auto;margin-bottom:2px">✕</button>
+    </div>
+  `).join('');
+}
+
 async function saveHire(){
   const customer=document.getElementById('hf-customer').value.trim();if(!customer){toast('Customer required','error');return;}
-  const payload={customer,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,status:document.getElementById('hf-status').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,sell_per_day:parseFloat(document.getElementById('hf-sell').value)||null,supplementary_charges:parseFloat(document.getElementById('hf-supp').value)||0,supplementary_notes:document.getElementById('hf-supp-notes').value.trim()||null,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  // Clean supplementaries: drop rows with no amount
+  const cleanSupps=supps.filter(s=>s.amount!=null&&!isNaN(s.amount)&&s.amount!==0).map(s=>({type:s.type||'Other',amount:Number(s.amount),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
+  const payload={customer,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,status:document.getElementById('hf-status').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,sell_per_day:parseFloat(document.getElementById('hf-sell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
