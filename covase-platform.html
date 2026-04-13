@@ -302,6 +302,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 .inv-card,.hire-card,.account-card,.contact-card,.vehicle-card{animation:fadeIn .2s ease both}
+
+/* Short-hire extracted review */
+.badge-shorthire{background:rgba(139,92,246,.12);color:#7c3aed;border:1px solid rgba(139,92,246,.3);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px;}
+.hires-review{margin-top:14px;border:1px solid rgba(139,92,246,.25);border-radius:var(--radius);background:rgba(139,92,246,.04);padding:12px 14px;}
+.hires-review-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font-size:12px;color:var(--n700);}
+.hires-review-header strong{font-size:13px;color:#5b21b6;}
+.hires-review-header span{font-size:11px;color:var(--n500);}
+.hire-row{background:var(--card);border:1px solid var(--n100);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.hire-row:last-child{margin-bottom:0;}
+.hire-row.committed{background:rgba(34,197,94,.05);border-color:rgba(34,197,94,.25);color:var(--n600);font-size:12px;}
+.hire-row-title{font-weight:600;font-size:13px;color:var(--n800);margin-bottom:3px;}
+.hire-row-meta{font-size:11px;color:var(--n500);margin-bottom:4px;}
+.hire-row-supps{font-size:11px;color:#7c3aed;margin-bottom:6px;}
+.hire-row-form{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding-top:8px;border-top:1px dashed var(--n100);}
+.hire-row-form .form-field{flex:1 1 160px;}
+.hire-row-form .form-field label{display:block;font-size:10px;color:var(--n500);margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px;}
+.hire-row-form .form-field select,.hire-row-form .form-field input{width:100%;padding:6px 8px;border:1px solid var(--n200);border-radius:6px;font-size:12px;background:#fff;}
+.hire-row-form button{flex:0 0 auto;}
 </style>
 </head>
 <body>
@@ -1005,7 +1023,18 @@ let allInvoices=[],invFilter='all';
 async function loadInvoices(){
   const el=document.getElementById('invoice-list');if(needsSetup(el))return;
   el.innerHTML='<div class="loading">Fetching invoices…</div>';
-  try{allInvoices=await sbReq(`covase_invoices?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);updateInvStats();renderInvoices();updateBadges();}
+  try{
+    allInvoices=await sbReq(`covase_invoices?or=(category.is.null,category.neq.outgoing)&order=received_at.desc&limit=200`);
+    // If any short-hire invoices present, pre-load accounts + hires so review panel can render immediately
+    const needsSupport=allInvoices.some(i=>i.is_short_hire);
+    if(needsSupport){
+      const jobs=[];
+      if(!Array.isArray(allAccounts)||!allAccounts.length)jobs.push(sbReq('covase_accounts?order=company_name.asc&limit=500').then(r=>{allAccounts=r||[];}).catch(()=>{}));
+      if(!hiresLoaded)jobs.push(sbReq('covase_hires?order=start_date.desc&limit=500').then(r=>{allHires=r||[];hiresLoaded=true;}).catch(()=>{}));
+      if(jobs.length)await Promise.all(jobs);
+    }
+    updateInvStats();renderInvoices();updateBadges();
+  }
   catch(e){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Connection failed</div><div class="empty-sub">${esc(e.message)}</div></div>`;}
 }
 function updateInvStats(){
@@ -1036,9 +1065,12 @@ function buildInvCard(inv){
   const dateStr=inv.invoice_date?new Date(inv.invoice_date).toLocaleDateString('en-GB'):'—';
   const dueStr=inv.due_date?new Date(inv.due_date).toLocaleDateString('en-GB'):'—';
   const pdfBtn=inv.pdf_url?`<button class="btn btn-pdf" onclick="window.open('${esc(inv.pdf_url)}','_blank')">📄 PDF</button>`:'';
+  const extracted=Array.isArray(inv.extracted_hires)?inv.extracted_hires:[];
+  const pendingHires=extracted.filter(h=>!h.committed).length;
+  const shBadge=inv.is_short_hire?`<span class="badge-shorthire">${pendingHires?pendingHires+' hire'+(pendingHires>1?'s':'')+' to review':'hires committed ✓'}</span>`:'';
   return `<div class="inv-card" id="ic-${inv.id}">
     <div class="inv-header" onclick="toggleCard('ic-${inv.id}')">
-      <div><div class="inv-vendor-name">${esc(inv.vendor||inv.source_email||'Unknown')}${inv.pdf_url?' <span style="color:var(--covase);font-size:11px">📄</span>':''}</div><div class="inv-meta">${esc(inv.invoice_number||'—')} · ${esc(inv.email_subject||'')}</div></div>
+      <div><div class="inv-vendor-name">${esc(inv.vendor||inv.source_email||'Unknown')}${inv.pdf_url?' <span style="color:var(--covase);font-size:11px">📄</span>':''} ${shBadge}</div><div class="inv-meta">${esc(inv.invoice_number||'—')} · ${esc(inv.email_subject||'')}</div></div>
       <div class="inv-col"><div class="inv-col-label">Date</div><div class="inv-col-val">${dateStr}</div></div>
       <div class="inv-col"><div class="inv-col-label">Due</div><div class="inv-col-val">${dueStr}</div></div>
       <div class="inv-col"><div class="inv-col-label">Amount</div><div class="inv-amount">${amtFmt}</div></div>
@@ -1057,6 +1089,7 @@ function buildInvCard(inv){
       </div>
       <div class="vat-row"><div><span>Subtotal</span><strong>£${sub.toFixed(2)}</strong></div><div><span>VAT</span><strong>£${vat.toFixed(2)}</strong></div><div><span>Total</span><strong>${amtFmt}</strong></div></div>
       ${inv.description?`<div class="desc-box">${esc(inv.description)}</div>`:''}
+      ${hireReviewSection(inv)}
       <div class="conf-row"><span class="conf-label" style="font-size:11px">AI confidence</span><div class="conf-bar-wrap"><div class="conf-bar ${confClass}" style="width:${confPct}%"></div></div><span class="conf-label">${confPct}%</span></div>
       <div class="action-row">
         <textarea class="notes-input" id="n-${inv.id}" placeholder="Notes…">${esc(inv.notes||'')}</textarea>
@@ -1073,6 +1106,114 @@ async function setInvStatus(id,status){
   const notes=document.getElementById(`n-${id}`)?.value||'';
   try{await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status,notes},prefer:'return=minimal'});const i=allInvoices.find(x=>x.id===id);if(i){i.status=status;i.notes=notes;}renderInvoices();updateInvStats();updateBadges();toast(`Invoice ${status}`,'success');}
   catch(e){toast('Update failed: '+e.message,'error');}
+}
+
+// ─── Extracted short-hire review ───
+function hireReviewSection(inv){
+  if(!inv.is_short_hire||!Array.isArray(inv.extracted_hires)||!inv.extracted_hires.length)return '';
+  const hires=inv.extracted_hires;
+  const pending=hires.filter(h=>!h.committed).length;
+  const committed=hires.length-pending;
+  return `<div class="hires-review">
+    <div class="hires-review-header">
+      <strong>Extracted hires</strong>
+      <span>${pending?pending+' to commit':'all committed'}${committed?' · '+committed+' committed':''}</span>
+    </div>
+    ${hires.map((h,i)=>hireReviewRow(inv.id,h,i)).join('')}
+  </div>`;
+}
+function hireReviewRow(invId,h,idx){
+  if(h.committed){
+    return `<div class="hire-row committed">✓ ${esc(h.registration||'—')} · ${esc(h.driver||'')} · £${(parseFloat(h.netAmount)||0).toFixed(2)} — committed as <code>${esc(h.committed_hire_id||'')}</code></div>`;
+  }
+  const days=h.days||'',rate=h.ratePerDay||'',net=parseFloat(h.netAmount)||0;
+  const supps=Array.isArray(h.supplementaries)?h.supplementaries:[];
+  const guessId=guessAccountId(h);
+  const clientAccounts=(allAccounts||[]).filter(a=>(a.type||'client')==='client').slice().sort((a,b)=>(a.company_name||'').localeCompare(b.company_name||''));
+  const accountOpts=clientAccounts.map(a=>`<option value="${esc(a.id)}"${guessId===a.id?' selected':''}>${esc(a.company_name)}</option>`).join('');
+  return `<div class="hire-row" id="hrw-${invId}-${idx}">
+    <div class="hire-row-title">${esc(h.registration||'—')} · ${esc(h.driver||'—')}${h.vehicleDescription?' · '+esc(h.vehicleDescription):''}</div>
+    <div class="hire-row-meta">${h.startDate?fmtD(h.startDate):'—'} – ${h.endDate?fmtD(h.endDate):'—'} · ${days} days${rate?' @ £'+parseFloat(rate).toFixed(2)+'/day':''} · Net £${net.toFixed(2)}${h.bookingReference?' · Booking '+esc(h.bookingReference):''}${h.customerPO?' · PO '+esc(h.customerPO):''}</div>
+    ${supps.length?`<div class="hire-row-supps">${supps.map(s=>'+ '+esc(s.type||'Other')+' £'+(parseFloat(s.amount)||0).toFixed(2)+(s.notes?' ('+esc(s.notes)+')':'')).join(' · ')}</div>`:''}
+    <div class="hire-row-form">
+      <div class="form-field" style="flex:2 1 220px"><label>Customer account</label><select id="hrv-cust-${invId}-${idx}"><option value="">— select —</option>${accountOpts}</select></div>
+      <div class="form-field" style="flex:0 0 110px"><label>Sell/day £</label><input type="number" step="0.01" id="hrv-sell-${invId}-${idx}" placeholder="0.00"></div>
+      <button class="btn btn-approve" onclick="commitExtractedHire('${invId}',${idx})">Commit hire</button>
+    </div>
+  </div>`;
+}
+function guessAccountId(h){
+  if(!Array.isArray(allAccounts))return '';
+  const lc=s=>(s||'').toLowerCase().trim();
+  if(h.customerPO){
+    const po=lc(h.customerPO);
+    const exact=allAccounts.find(a=>lc(a.company_name)===po);if(exact)return exact.id;
+    const partial=allAccounts.find(a=>a.company_name&&(lc(a.company_name).includes(po)||po.includes(lc(a.company_name))));if(partial)return partial.id;
+  }
+  if(h.bookingReference&&Array.isArray(allHires)){
+    const prev=allHires.find(x=>x.reference===h.bookingReference||x.agreement_ref===h.bookingReference);
+    if(prev&&prev.customer){
+      const m=allAccounts.find(a=>lc(a.company_name)===lc(prev.customer));if(m)return m.id;
+    }
+  }
+  return '';
+}
+function detectSupplier(vendor){
+  const v=(vendor||'').toLowerCase();
+  if(v.includes('fourways'))return 'Fourways';
+  if(v.includes('ogilvie'))return 'Ogilvie';
+  if(v.includes('arval'))return 'Arval';
+  if(v.includes('lex'))return 'Lex';
+  if(v.includes('ford rental')||v.includes('ford motor'))return 'Ford rental';
+  if(v.includes('enterprise'))return 'Enterprise';
+  return 'Other';
+}
+async function commitExtractedHire(invId,idx){
+  const inv=allInvoices.find(x=>x.id===invId);if(!inv)return;
+  const hires=Array.isArray(inv.extracted_hires)?inv.extracted_hires.slice():[];
+  const h=hires[idx];if(!h||h.committed)return;
+  const accountId=document.getElementById(`hrv-cust-${invId}-${idx}`)?.value;
+  const sellRateRaw=document.getElementById(`hrv-sell-${invId}-${idx}`)?.value;
+  const sellRate=parseFloat(sellRateRaw);
+  if(!accountId){toast('Pick a customer account','error');return;}
+  if(isNaN(sellRate)||sellRate<=0){toast('Enter a sell/day rate','error');return;}
+  const account=allAccounts.find(a=>a.id===accountId);if(!account){toast('Account not found','error');return;}
+  const hireId='hire-'+Date.now();
+  const supps=(h.supplementaries||[]).map(s=>({type:s.type||'Other',amount:parseFloat(s.amount)||0,vat_status:s.vatStatus||'full',notes:s.notes||null}));
+  const supplier=detectSupplier(inv.vendor||'');
+  const hirePayload={
+    id:hireId,
+    customer:account.company_name,
+    client_account_id:accountId,
+    driver:h.driver||null,
+    reference:h.bookingReference||null,
+    agreement_ref:h.bookingReference||null,
+    status:'invoiced',
+    vehicle_reg:h.registration||null,
+    make_model:h.vehicleDescription||null,
+    supplier,
+    supplier_ref:inv.invoice_number||null,
+    start_date:h.startDate||null,
+    end_date:h.endDate||null,
+    cost_per_day:parseFloat(h.ratePerDay)||null,
+    sell_per_day:sellRate,
+    vat_status:h.vatStatus||'full',
+    supplementaries:supps,
+    incoming_invoice_id:invId,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    await sbReq('covase_hires',{method:'POST',body:hirePayload,prefer:'return=minimal'});
+    hires[idx]={...h,committed:true,committed_hire_id:hireId,committed_account_id:accountId,committed_at:new Date().toISOString()};
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(invId)}`,{method:'PATCH',body:{extracted_hires:hires,updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    inv.extracted_hires=hires;
+    hiresLoaded=false;
+    // Keep card expanded after re-render
+    const wasExpanded=document.getElementById('ic-'+invId)?.classList.contains('expanded');
+    renderInvoices();
+    if(wasExpanded)document.getElementById('ic-'+invId)?.classList.add('expanded');
+    toast(`Hire committed (${hireId})`,'success');
+  }catch(e){toast('Commit failed: '+e.message,'error');}
 }
 
 // ─── OUTGOING ───
