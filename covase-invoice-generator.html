@@ -1212,7 +1212,7 @@ function dtCopy() {
   });
 }
 
-let dtMin = false;
+let dtMin = true;
 function dtToggle() {
   dtMin = !dtMin;
   document.getElementById('design-tool-body').style.display = dtMin ? 'none' : 'flex';
@@ -1223,6 +1223,9 @@ function dtToggle() {
 document.addEventListener('DOMContentLoaded', function() {
   // Apply all slider defaults to the invoice on load
   dtApply();
+  // Start collapsed
+  document.getElementById('design-tool-body').style.display = 'none';
+  const mb = document.getElementById('dt-minimise'); if (mb) mb.textContent = '+';
 
   // Make design tool draggable
   const el = document.getElementById('design-tool');

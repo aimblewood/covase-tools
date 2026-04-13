@@ -182,8 +182,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .badge-direct_debit{background:var(--purple-l);color:var(--purple)}
 .badge-BACS,.badge-bacs{background:#e8f4fd;color:#1a6dab}
 .badge-active{background:var(--tl-green-l);color:var(--tl-green-t)}
+.badge-booked{background:var(--covase-l);color:#0a7a72}
+.badge-requested{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
+.badge-offhired{background:var(--n100);color:var(--n500)}
 .badge-closed{background:var(--n100);color:var(--n500)}
 .badge-recharged{background:var(--purple-l);color:var(--purple)}
+.badge-paid{background:var(--tl-green-l);color:var(--tl-green-t)}
 .badge-unknown{background:var(--n100);color:var(--n500)}
 .badge-sm{background:var(--n50);color:var(--n500);border:1px solid var(--n200);font-size:10px;padding:2px 7px}
 .badge-ordered{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
@@ -320,6 +324,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .hire-row-form .form-field label{display:block;font-size:10px;color:var(--n500);margin-bottom:2px;text-transform:uppercase;letter-spacing:.4px;}
 .hire-row-form .form-field select,.hire-row-form .form-field input{width:100%;padding:6px 8px;border:1px solid var(--n200);border-radius:6px;font-size:12px;background:#fff;}
 .hire-row-form button{flex:0 0 auto;}
+/* Matched row reconcile grid */
+.hire-row.matched{background:rgba(34,197,94,.04);border-color:rgba(34,197,94,.3);}
+.reconcile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;}
+.reconcile-col{background:var(--n50);border:1px solid var(--n100);border-radius:6px;padding:8px 10px;}
+.reconcile-col-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n500);margin-bottom:4px;}
+.reconcile-line{font-size:12px;padding:2px 0;color:var(--n700);}
+.reconcile-line.rec-ok{color:var(--tl-green-t);}
+.reconcile-line.rec-warn{color:var(--tl-orange-t);font-weight:600;}
 </style>
 </head>
 <body>
@@ -462,11 +474,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   <div class="view" id="view-hires-all">
     <div class="topbar">
       <h1>All hires</h1>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="filter-pill active" onclick="setHireFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setHireFilter('booked',this)">Booked</button>
         <button class="filter-pill" onclick="setHireFilter('active',this)">Active</button>
-        <button class="filter-pill" onclick="setHireFilter('closed',this)">Closed</button>
-        <button class="filter-pill" onclick="setHireFilter('invoiced',this)">Invoiced</button>
+        <button class="filter-pill" onclick="setHireFilter('offhired',this)">Off-hired</button>
+        <button class="filter-pill" onclick="setHireFilter('invoiced-in',this)">Invoiced in</button>
         <button class="filter-pill" onclick="setHireFilter('recharged',this)">Recharged</button>
       </div>
       <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
@@ -566,14 +579,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-body">
       <div class="form-section-label">Client &amp; Driver</div>
       <div class="form-row">
-        <div class="form-field"><label>Customer *</label><input id="hf-customer" placeholder="e.g. Woodland Trust" list="account-datalist"></div>
+        <div class="form-field"><label>Customer account *</label><select id="hf-account"><option value="">— select —</option></select></div>
         <div class="form-field"><label>Driver *</label><input id="hf-driver" placeholder="First Last"></div>
       </div>
-      <datalist id="account-datalist"></datalist>
-      <div class="form-row">
-        <div class="form-field"><label>Reference</label><input id="hf-reference" placeholder="e.g. 80601024"></div>
-        <div class="form-field"><label>Status</label>
-          <select id="hf-status"><option value="active">Active</option><option value="closed">Closed</option><option value="invoiced">Invoiced</option><option value="recharged">Recharged</option></select>
+      <div class="form-row trio">
+        <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
+        <div class="form-field"><label>Lifecycle status</label>
+          <select id="hf-lifecycle"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
+        </div>
+        <div class="form-field"><label>Billing status</label>
+          <select id="hf-billing"><option value="pending" selected>Pending</option><option value="invoiced-in">Invoiced in</option><option value="recharged">Recharged</option><option value="paid">Paid</option></select>
         </div>
       </div>
       <div class="form-section-label">Vehicle</div>
@@ -1109,39 +1124,122 @@ async function setInvStatus(id,status){
 }
 
 // ─── Extracted short-hire review ───
+// ─── Extracted short-hire review / reconcile ───
 function hireReviewSection(inv){
   if(!inv.is_short_hire||!Array.isArray(inv.extracted_hires)||!inv.extracted_hires.length)return '';
   const hires=inv.extracted_hires;
-  const pending=hires.filter(h=>!h.committed).length;
-  const committed=hires.length-pending;
+  const done=hires.filter(h=>h.matched_hire_id||h.committed).length;
+  const todo=hires.length-done;
   return `<div class="hires-review">
     <div class="hires-review-header">
       <strong>Extracted hires</strong>
-      <span>${pending?pending+' to commit':'all committed'}${committed?' · '+committed+' committed':''}</span>
+      <span>${todo?todo+' to review':'all reviewed'}${done?' · '+done+' linked':''}</span>
     </div>
     ${hires.map((h,i)=>hireReviewRow(inv.id,h,i)).join('')}
   </div>`;
 }
 function hireReviewRow(invId,h,idx){
-  if(h.committed){
-    return `<div class="hire-row committed">✓ ${esc(h.registration||'—')} · ${esc(h.driver||'')} · £${(parseFloat(h.netAmount)||0).toFixed(2)} — committed as <code>${esc(h.committed_hire_id||'')}</code></div>`;
+  // Already linked / committed → collapsed line
+  if(h.matched_hire_id||h.committed){
+    const hireId=h.matched_hire_id||h.committed_hire_id||'';
+    const label=h.matched_hire_id?'matched to':'committed as';
+    return `<div class="hire-row committed">✓ ${esc(h.registration||'—')} · ${esc(h.driver||'')} · £${(parseFloat(h.netAmount)||0).toFixed(2)} — ${label} <code>${esc(hireId)}</code></div>`;
   }
-  const days=h.days||'',rate=h.ratePerDay||'',net=parseFloat(h.netAmount)||0;
+  // Try to find a booking match
+  const candidate=findMatchCandidate(h);
+  if(candidate)return matchedRow(invId,h,idx,candidate);
+  return unmatchedRow(invId,h,idx);
+}
+// Find an existing booking by reference that isn't already invoice-linked
+function findMatchCandidate(h){
+  if(!Array.isArray(allHires))return null;
+  const ref=(h.bookingReference||'').trim();if(!ref)return null;
+  return allHires.find(x=>!x.incoming_invoice_id&&(x.reference===ref||x.agreement_ref===ref))||null;
+}
+// Matched → side-by-side compare + Approve
+function matchedRow(invId,h,idx,c){
   const supps=Array.isArray(h.supplementaries)?h.supplementaries:[];
+  const invDays=h.days||null,invRate=parseFloat(h.ratePerDay)||0,invNet=parseFloat(h.netAmount)||0;
+  const hireDays=daysOn(c),hireCost=parseFloat(c.cost_per_day)||0,hireNet=hireDays&&hireCost?hireDays*hireCost:0;
+  const datesMatch=(c.start_date||'')===(h.startDate||'')&&(c.end_date||'')===(h.endDate||'');
+  const daysMatch=hireDays===invDays;
+  const rateMatch=Math.abs(hireCost-invRate)<0.01;
+  const netMatch=Math.abs(hireNet-invNet)<0.01;
+  const allMatch=datesMatch&&daysMatch&&rateMatch;
+  const cls=v=>v?'rec-ok':'rec-warn';
+  const sym=v=>v?'✓':'⚠';
+  return `<div class="hire-row matched" id="hrw-${invId}-${idx}">
+    <div class="hire-row-title">🔗 ${esc(h.registration||'—')} · ${esc(h.driver||'—')} — matches booking <code>${esc(c.reference||c.agreement_ref||c.id)}</code> (<code>${esc(c.id)}</code>)</div>
+    <div class="reconcile-grid">
+      <div class="reconcile-col">
+        <div class="reconcile-col-label">Booked</div>
+        <div class="reconcile-line">Customer: <strong>${esc(c.customer||'—')}</strong></div>
+        <div class="reconcile-line ${cls(datesMatch)}">${sym(datesMatch)} ${fmtD(c.start_date)} – ${c.end_date?fmtD(c.end_date):'ongoing'}</div>
+        <div class="reconcile-line ${cls(daysMatch)}">${sym(daysMatch)} ${hireDays??'—'} days</div>
+        <div class="reconcile-line ${cls(rateMatch)}">${sym(rateMatch)} £${hireCost.toFixed(2)}/day cost · £${(parseFloat(c.sell_per_day)||0).toFixed(2)}/day sell</div>
+        <div class="reconcile-line ${cls(netMatch)}">${sym(netMatch)} Net £${hireNet.toFixed(2)}</div>
+      </div>
+      <div class="reconcile-col">
+        <div class="reconcile-col-label">Invoiced</div>
+        <div class="reconcile-line">Vendor: <strong>${esc(h.vehicleDescription||'—')}</strong></div>
+        <div class="reconcile-line">${fmtD(h.startDate)} – ${fmtD(h.endDate)}</div>
+        <div class="reconcile-line">${invDays??'—'} days</div>
+        <div class="reconcile-line">£${invRate.toFixed(2)}/day cost</div>
+        <div class="reconcile-line">Net £${invNet.toFixed(2)}</div>
+      </div>
+    </div>
+    ${supps.length?`<div class="hire-row-supps">Supplementary from invoice: ${supps.map(s=>'+ '+esc(s.type||'Other')+' £'+(parseFloat(s.amount)||0).toFixed(2)+(s.notes?' ('+esc(s.notes)+')':'')).join(' · ')}</div>`:''}
+    <div class="hire-row-form">
+      <div style="flex:1;font-size:11px;color:${allMatch?'var(--tl-green-t)':'var(--tl-orange-t)'};font-weight:600">${allMatch?'✓ Everything matches':'⚠ Differences detected — approving will overwrite booking with invoice values (keeps your sell/day rate)'}</div>
+      <button class="btn btn-approve" onclick="approveMatch('${invId}',${idx},'${c.id}')">${allMatch?'✓ Approve & link':'Approve with differences'}</button>
+      <button class="btn btn-edit" onclick="overrideToUnmatched('${invId}',${idx})">Pick different hire…</button>
+    </div>
+  </div>`;
+}
+// Unmatched → pick existing OR create new
+function unmatchedRow(invId,h,idx){
+  const supps=Array.isArray(h.supplementaries)?h.supplementaries:[];
+  const days=h.days||'',rate=h.ratePerDay||'',net=parseFloat(h.netAmount)||0;
+  // Unlinked hires that could be picked
+  const candidates=(allHires||[]).filter(x=>!x.incoming_invoice_id&&x.lifecycle_status!=='cancelled')
+    .sort((a,b)=>(a.customer||'').localeCompare(b.customer||''));
+  const candidateOpts=candidates.map(x=>`<option value="${esc(x.id)}">${esc(x.customer||'?')} — ${esc(x.vehicle_reg||'?')} / ${esc(x.driver||'?')} · ${fmtD(x.start_date)}${x.reference?' · '+esc(x.reference):''}</option>`).join('');
   const guessId=guessAccountId(h);
   const clientAccounts=(allAccounts||[]).filter(a=>(a.type||'client')==='client').slice().sort((a,b)=>(a.company_name||'').localeCompare(b.company_name||''));
   const accountOpts=clientAccounts.map(a=>`<option value="${esc(a.id)}"${guessId===a.id?' selected':''}>${esc(a.company_name)}</option>`).join('');
   return `<div class="hire-row" id="hrw-${invId}-${idx}">
-    <div class="hire-row-title">${esc(h.registration||'—')} · ${esc(h.driver||'—')}${h.vehicleDescription?' · '+esc(h.vehicleDescription):''}</div>
+    <div class="hire-row-title">⚠ ${esc(h.registration||'—')} · ${esc(h.driver||'—')}${h.vehicleDescription?' · '+esc(h.vehicleDescription):''}</div>
     <div class="hire-row-meta">${h.startDate?fmtD(h.startDate):'—'} – ${h.endDate?fmtD(h.endDate):'—'} · ${days} days${rate?' @ £'+parseFloat(rate).toFixed(2)+'/day':''} · Net £${net.toFixed(2)}${h.bookingReference?' · Booking '+esc(h.bookingReference):''}${h.customerPO?' · PO '+esc(h.customerPO):''}</div>
     ${supps.length?`<div class="hire-row-supps">${supps.map(s=>'+ '+esc(s.type||'Other')+' £'+(parseFloat(s.amount)||0).toFixed(2)+(s.notes?' ('+esc(s.notes)+')':'')).join(' · ')}</div>`:''}
+    <div style="font-size:11px;color:var(--tl-orange-t);margin:6px 0 4px;font-weight:600">No matching booking found. Either link to an existing hire below, or create a new one.</div>
+
+    <div class="hire-row-form" style="border-top:1px dashed var(--n100);padding-top:8px">
+      <div class="form-field" style="flex:3 1 260px"><label>Link to existing hire</label>
+        <select id="hrv-pick-${invId}-${idx}"><option value="">— pick a hire —</option>${candidateOpts}</select>
+      </div>
+      <button class="btn btn-edit" onclick="linkToExistingHire('${invId}',${idx})">Link</button>
+    </div>
+
     <div class="hire-row-form">
-      <div class="form-field" style="flex:2 1 220px"><label>Customer account</label><select id="hrv-cust-${invId}-${idx}"><option value="">— select —</option>${accountOpts}</select></div>
+      <div class="form-field" style="flex:2 1 220px"><label>Create new — Customer account</label>
+        <select id="hrv-cust-${invId}-${idx}"><option value="">— select —</option>${accountOpts}</select>
+      </div>
       <div class="form-field" style="flex:0 0 110px"><label>Sell/day £</label><input type="number" step="0.01" id="hrv-sell-${invId}-${idx}" placeholder="0.00"></div>
-      <button class="btn btn-approve" onclick="commitExtractedHire('${invId}',${idx})">Commit hire</button>
+      <button class="btn btn-approve" onclick="createNewFromExtraction('${invId}',${idx})">Create new</button>
     </div>
   </div>`;
 }
+// Force render as unmatched even if booking ref matched (allow manual pick)
+function overrideToUnmatched(invId,idx){
+  const inv=allInvoices.find(x=>x.id===invId);if(!inv)return;
+  const h=inv.extracted_hires[idx];if(!h)return;
+  h._override=true;
+  // Temporarily null out booking ref for rendering by showing unmatched path
+  // Simpler: just set a flag and adjust hireReviewRow — but easiest: render in place
+  const row=document.getElementById(`hrw-${invId}-${idx}`);
+  if(row)row.outerHTML=unmatchedRow(invId,h,idx);
+}
+
 function guessAccountId(h){
   if(!Array.isArray(allAccounts))return '';
   const lc=s=>(s||'').toLowerCase().trim();
@@ -1152,9 +1250,7 @@ function guessAccountId(h){
   }
   if(h.bookingReference&&Array.isArray(allHires)){
     const prev=allHires.find(x=>x.reference===h.bookingReference||x.agreement_ref===h.bookingReference);
-    if(prev&&prev.customer){
-      const m=allAccounts.find(a=>lc(a.company_name)===lc(prev.customer));if(m)return m.id;
-    }
+    if(prev&&prev.client_account_id)return prev.client_account_id;
   }
   return '';
 }
@@ -1168,16 +1264,57 @@ function detectSupplier(vendor){
   if(v.includes('enterprise'))return 'Enterprise';
   return 'Other';
 }
-async function commitExtractedHire(invId,idx){
+
+// PATH 1: matched — update the existing booking with invoice values, link invoice, set billing_status
+async function approveMatch(invId,idx,hireId){
   const inv=allInvoices.find(x=>x.id===invId);if(!inv)return;
-  const hires=Array.isArray(inv.extracted_hires)?inv.extracted_hires.slice():[];
-  const h=hires[idx];if(!h||h.committed)return;
+  const extracted=Array.isArray(inv.extracted_hires)?inv.extracted_hires.slice():[];
+  const h=extracted[idx];if(!h)return;
+  const existing=allHires.find(x=>x.id===hireId);if(!existing){toast('Hire not found','error');return;}
+  const supps=(h.supplementaries||[]).map(s=>({type:s.type||'Other',amount:parseFloat(s.amount)||0,vat_status:s.vatStatus||'full',notes:s.notes||null}));
+  const patch={
+    incoming_invoice_id:invId,
+    billing_status:'invoiced-in',
+    // Overwrite booking to reflect what was actually invoiced (user-visible sell_per_day kept)
+    start_date:h.startDate||existing.start_date,
+    end_date:h.endDate||existing.end_date,
+    cost_per_day:parseFloat(h.ratePerDay)||existing.cost_per_day,
+    vat_status:h.vatStatus||existing.vat_status||'full',
+    supplementaries:supps,
+    supplier_ref:inv.invoice_number||existing.supplier_ref,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(hireId)}`,{method:'PATCH',body:patch,prefer:'return=minimal'});
+    Object.assign(existing,patch);
+    extracted[idx]={...h,matched_hire_id:hireId,matched_at:new Date().toISOString()};
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(invId)}`,{method:'PATCH',body:{extracted_hires:extracted,updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    inv.extracted_hires=extracted;
+    const wasExpanded=document.getElementById('ic-'+invId)?.classList.contains('expanded');
+    renderInvoices();
+    if(wasExpanded)document.getElementById('ic-'+invId)?.classList.add('expanded');
+    updateBadges();
+    toast(`Linked to ${hireId}`,'success');
+  }catch(e){toast('Approve failed: '+e.message,'error');}
+}
+
+// PATH 2: unmatched but user picks an existing hire manually
+async function linkToExistingHire(invId,idx){
+  const hireId=document.getElementById(`hrv-pick-${invId}-${idx}`)?.value;
+  if(!hireId){toast('Pick a hire from the list','error');return;}
+  return approveMatch(invId,idx,hireId);
+}
+
+// PATH 3: create a brand new hire from the extracted data
+async function createNewFromExtraction(invId,idx){
+  const inv=allInvoices.find(x=>x.id===invId);if(!inv)return;
+  const extracted=Array.isArray(inv.extracted_hires)?inv.extracted_hires.slice():[];
+  const h=extracted[idx];if(!h)return;
   const accountId=document.getElementById(`hrv-cust-${invId}-${idx}`)?.value;
-  const sellRateRaw=document.getElementById(`hrv-sell-${invId}-${idx}`)?.value;
-  const sellRate=parseFloat(sellRateRaw);
+  const sellRate=parseFloat(document.getElementById(`hrv-sell-${invId}-${idx}`)?.value);
   if(!accountId){toast('Pick a customer account','error');return;}
   if(isNaN(sellRate)||sellRate<=0){toast('Enter a sell/day rate','error');return;}
-  const account=allAccounts.find(a=>a.id===accountId);if(!account){toast('Account not found','error');return;}
+  const account=(allAccounts||[]).find(a=>a.id===accountId);if(!account){toast('Account not found','error');return;}
   const hireId='hire-'+Date.now();
   const supps=(h.supplementaries||[]).map(s=>({type:s.type||'Other',amount:parseFloat(s.amount)||0,vat_status:s.vatStatus||'full',notes:s.notes||null}));
   const supplier=detectSupplier(inv.vendor||'');
@@ -1188,7 +1325,8 @@ async function commitExtractedHire(invId,idx){
     driver:h.driver||null,
     reference:h.bookingReference||null,
     agreement_ref:h.bookingReference||null,
-    status:'invoiced',
+    lifecycle_status:'offhired',
+    billing_status:'invoiced-in',
     vehicle_reg:h.registration||null,
     make_model:h.vehicleDescription||null,
     supplier,
@@ -1204,16 +1342,16 @@ async function commitExtractedHire(invId,idx){
   };
   try{
     await sbReq('covase_hires',{method:'POST',body:hirePayload,prefer:'return=minimal'});
-    hires[idx]={...h,committed:true,committed_hire_id:hireId,committed_account_id:accountId,committed_at:new Date().toISOString()};
-    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(invId)}`,{method:'PATCH',body:{extracted_hires:hires,updated_at:new Date().toISOString()},prefer:'return=minimal'});
-    inv.extracted_hires=hires;
-    hiresLoaded=false;
-    // Keep card expanded after re-render
+    allHires.unshift(hirePayload);
+    extracted[idx]={...h,committed:true,committed_hire_id:hireId,committed_account_id:accountId,committed_at:new Date().toISOString()};
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(invId)}`,{method:'PATCH',body:{extracted_hires:extracted,updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    inv.extracted_hires=extracted;
     const wasExpanded=document.getElementById('ic-'+invId)?.classList.contains('expanded');
     renderInvoices();
     if(wasExpanded)document.getElementById('ic-'+invId)?.classList.add('expanded');
-    toast(`Hire committed (${hireId})`,'success');
-  }catch(e){toast('Commit failed: '+e.message,'error');}
+    updateBadges();
+    toast(`Created ${hireId}`,'success');
+  }catch(e){toast('Create failed: '+e.message,'error');}
 }
 
 // ─── OUTGOING ───
@@ -1281,11 +1419,36 @@ function rechargeInvoice(id){
   const inv=allInvoices.find(i=>i.id===id);
   if(!inv){window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');return;}
   let items=[];
-  if(inv.line_items){try{items=typeof inv.line_items==='string'?JSON.parse(inv.line_items):inv.line_items;}catch(e){}}
-  if(!Array.isArray(items)||!items.length)items=[{desc:inv.description||inv.vendor||'Recharged item',amt:String(inv.subtotal||inv.total||''),vatExempt:false}];
+  let clientName='';
+  // For short-hire invoices, build rich line items from the hires linked to this invoice
+  if(inv.is_short_hire){
+    const linked=(allHires||[]).filter(h=>h.incoming_invoice_id===id);
+    if(!linked.length){toast('No hires linked to this invoice yet — approve the extracted hires first','error');return;}
+    // Sanity check: all linked hires should belong to the same client
+    const clients=[...new Set(linked.map(h=>h.customer||''))].filter(Boolean);
+    if(clients.length>1){toast('Linked hires span multiple clients — recharge separately','error');return;}
+    clientName=clients[0]||'';
+    linked.forEach(h=>{
+      const days=daysOn(h),sellRate=parseFloat(h.sell_per_day)||0,sellTotal=days?days*sellRate:0;
+      const reg=h.vehicle_reg||'',driver=h.driver||'';
+      const hireDesc=`${reg} for ${driver}${sellRate?' @ £'+sellRate.toFixed(2)+' per day':''}${days?'\n('+days+' Days – '+fmtD(h.start_date)+' – '+fmtD(h.end_date||'')+')':''}`;
+      const vatExempt=(h.vat_status==='outside_of_scope');
+      items.push({desc:hireDesc,amt:sellTotal.toFixed(2),vatExempt,reg,driver});
+      if(Array.isArray(h.supplementaries)){
+        h.supplementaries.forEach(s=>{
+          const amt=parseFloat(s.amount);if(!amt)return;
+          items.push({desc:`${reg}${driver?' — '+driver:''} — ${s.type}${s.notes?' ('+s.notes+')':''}`,amt:amt.toFixed(2),vatExempt:(s.vat_status==='outside_of_scope'),reg,driver});
+        });
+      }
+    });
+  }else{
+    if(inv.line_items){try{items=typeof inv.line_items==='string'?JSON.parse(inv.line_items):inv.line_items;}catch(e){}}
+    if(!Array.isArray(items)||!items.length)items=[{desc:inv.description||inv.vendor||'Recharged item',amt:String(inv.subtotal||inv.total||''),vatExempt:false}];
+  }
+  if(clientName)localStorage.setItem('recharge_client_name',clientName);
   if(items.length<=1){localStorage.setItem('recharge_selected_items',JSON.stringify(items));localStorage.setItem('recharge_source_id',id);window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(id),'_blank');return;}
   rpInv=inv;rpItems=items;
-  document.getElementById('rp-sub').textContent=(inv.vendor||'Invoice')+(inv.invoice_number?' · #'+inv.invoice_number:'');
+  document.getElementById('rp-sub').textContent=(inv.vendor||'Invoice')+(inv.invoice_number?' · #'+inv.invoice_number:'')+(clientName?' → '+clientName:'');
   document.getElementById('rp-lines').innerHTML=items.map((li,i)=>`
     <label class="rp-line"><input type="checkbox" id="rpli-${i}" checked onchange="updateRpTotal()">
       <div class="rp-line-info">${li.reg?`<div class="rp-line-reg">${esc(li.reg)}</div>`:''} ${li.driver?`<div class="rp-line-driver">${esc(li.driver)}</div>`:''}<div class="rp-line-desc">${esc(li.desc||'')}</div></div>
@@ -1311,17 +1474,27 @@ function fmtD(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-GB'
 async function loadHires(){
   const el=document.getElementById('hires-active-list');if(needsSetup(el))return;
   if(!hiresLoaded)['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML='<div class="loading">Loading…</div>';});
-  try{allHires=await sbReq(`covase_hires?order=start_date.desc&limit=500`);hiresLoaded=true;updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);updateBadges();}
-  catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
+  try{
+    allHires=await sbReq(`covase_hires?order=start_date.desc&limit=500`);
+    hiresLoaded=true;
+    // Also load accounts for the hire modal dropdown if not loaded
+    if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
+    updateHireStats();
+    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));
+    renderHireView('hires-all','all-list',null);
+    renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
+    updateBadges();
+  }
+  catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e2=document.getElementById(id);if(e2)e2.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
 }
 function updateHireStats(){
-  const active=allHires.filter(h=>h.status==='active');
-  const pending=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);
-  document.getElementById('sh-active').textContent=active.length;
+  const onHire=allHires.filter(h=>h.lifecycle_status==='active');
+  const pending=allHires.filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
+  document.getElementById('sh-active').textContent=onHire.length;
   document.getElementById('sh-recharge').textContent=pending.length;
-  const exposure=active.reduce((s,h)=>{const d=daysOn(h);return d&&h.cost_per_day?s+d*parseFloat(h.cost_per_day)+suppTotal(h):s;},0);
+  const exposure=onHire.reduce((s,h)=>{const d=daysOn(h);return d&&h.cost_per_day?s+d*parseFloat(h.cost_per_day)+suppTotal(h):s;},0);
   document.getElementById('sh-exposure').textContent=fmtMoney(exposure||null);
-  const mg=active.filter(h=>h.cost_per_day&&h.sell_per_day);
+  const mg=onHire.filter(h=>h.cost_per_day&&h.sell_per_day);
   document.getElementById('sh-margin').textContent=mg.length?((mg.reduce((s,h)=>(parseFloat(h.sell_per_day)-parseFloat(h.cost_per_day))/parseFloat(h.cost_per_day)*100+s,0)/mg.length).toFixed(1)+'%'):'—';
 }
 // Sum of supplementary amounts on a hire
@@ -1333,7 +1506,7 @@ function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#vie
 function renderHireView(viewId,listSuffix,filterFn){
   const el=document.getElementById(`hires-${listSuffix}`);if(!el)return;
   let hires=allHires;if(filterFn)hires=hires.filter(filterFn);
-  if(viewId==='hires-all'&&hireStatusFilter!=='all')hires=hires.filter(h=>h.status===hireStatusFilter);
+  if(viewId==='hires-all'&&hireStatusFilter!=='all')hires=hires.filter(h=>h.lifecycle_status===hireStatusFilter||h.billing_status===hireStatusFilter);
   if(!hires.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-title">No hires here</div><div class="empty-sub">Click "+ New Hire" to log a hire.</div></div>`;return;}
   el.innerHTML=hires.map(h=>buildHireCard(h)).join('');
 }
@@ -1343,24 +1516,26 @@ function buildHireCard(h){
   const cost=days&&h.cost_per_day?days*parseFloat(h.cost_per_day)+supp:null;
   const sell=days&&h.sell_per_day?days*parseFloat(h.sell_per_day)+supp:null;
   const profit=sell!=null&&cost!=null?sell-cost:null;
-  const statusLabels={active:'Active',closed:'Closed',invoiced:'Invoiced',recharged:'Recharged'};
+  const lcLabels={requested:'Requested',booked:'Booked',active:'Active',offhired:'Off-hired',cancelled:'Cancelled'};
+  const blLabels={'pending':'Pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'};
+  const lc=h.lifecycle_status||'booked',bl=h.billing_status||'pending';
   const pClass=profit!=null?(profit>=0?'profit-pos':'profit-neg'):'';
-  const invLinked=h.incoming_invoice_id?` <span style="color:var(--covase);font-size:11px" title="Invoice linked">📄</span>`:'';
-  const rechBadge=h.outgoing_invoice_id?` <span style="color:var(--purple);font-size:11px">↑</span>`:'';
+  const invLinked=h.incoming_invoice_id?` <span style="color:var(--covase);font-size:11px" title="Supplier invoice linked">📄</span>`:'';
+  const rechBadge=h.outgoing_invoice_id?` <span style="color:var(--purple);font-size:11px" title="Recharge raised">↑</span>`:'';
   return `<div class="hire-card" id="hc-${h.id}">
     <div class="hire-header" onclick="toggleCard('hc-${h.id}')">
       <div><div class="h-customer">${esc(h.customer)}${invLinked}${rechBadge}</div><div class="h-meta">${esc(h.vehicle_reg||'—')} · ${esc(h.driver||'—')} · ${esc(h.supplier||'—')}</div></div>
       <div class="inv-col"><div class="inv-col-label">Start</div><div class="inv-col-val">${fmtD(h.start_date)}</div></div>
       <div class="inv-col"><div class="inv-col-label">End / Days</div><div class="inv-col-val">${h.end_date?fmtD(h.end_date):'<span style="color:var(--tl-orange);font-weight:600">Ongoing</span>'}${days!=null?' · '+days+'d':''}</div></div>
       <div class="inv-col"><div class="inv-col-label">Sell total</div><div class="inv-amount">${fmtMoney(sell)}</div></div>
-      <div style="display:flex;flex-direction:column;gap:4px"><span class="badge badge-${h.status||'active'}">${statusLabels[h.status]||h.status}</span>${h.category?`<span class="badge badge-sm">${esc(h.category)}</span>`:''}</div>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="badge badge-${lc}">${lcLabels[lc]||lc}</span><span class="badge badge-${bl==='invoiced-in'?'invoiced':bl}" style="font-size:9px">${blLabels[bl]||bl}</span></div>
       <div class="expand-arrow">▶</div>
     </div>
     <div class="card-detail">
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">Customer</div><div class="detail-val">${esc(h.customer||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Reference</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Booking ref</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(h.vehicle_reg||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Make / Model</div><div class="detail-val">${esc(h.make_model||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Agreement ref</div><div class="detail-val">${esc(h.agreement_ref||'—')}</div></div>
@@ -1375,22 +1550,16 @@ function buildHireCard(h){
       </div>
       ${Array.isArray(h.supplementaries)&&h.supplementaries.length?`<div class="notes-box">📎 Supplementary: ${fmtMoney(supp)} — ${h.supplementaries.map(s=>esc(s.type)+' '+fmtMoney(s.amount)+(s.vat_status==='outside_of_scope'?' (OoS)':'')).join(', ')}</div>`:''}
       ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
-      ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Invoice: <span style="color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
+      ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Supplier invoice: <span style="color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
       <div class="inline-panel yellow" id="hco-${h.id}">
         <div><label>End date</label><input type="date" id="hco-d-${h.id}" value="${new Date().toISOString().split('T')[0]}"></div>
-        <button class="btn btn-close-hire" onclick="doCloseHire('${h.id}')">✓ Close off</button>
+        <button class="btn btn-close-hire" onclick="doCloseHire('${h.id}')">✓ Off-hire</button>
         <button class="btn btn-link" onclick="togglePanel('hco-${h.id}',false)">Cancel</button>
-      </div>
-      <div class="inline-panel blue" id="hli-${h.id}">
-        <div><label>Invoice ID (from Billing)</label><input id="hli-id-${h.id}" placeholder="inv-8901"></div>
-        <button class="btn btn-edit" onclick="doLinkInv('${h.id}')">✓ Link</button>
-        <button class="btn btn-link" onclick="togglePanel('hli-${h.id}',false)">Cancel</button>
       </div>
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditHire('${h.id}')">✎ Edit</button>
-        ${h.status==='active'?`<button class="btn btn-close-hire" onclick="togglePanel('hco-${h.id}',true)">⊠ Close off</button>`:''}
-        ${!h.incoming_invoice_id?`<button class="btn btn-link" onclick="togglePanel('hli-${h.id}',true)">📄 Link invoice</button>`:''}
-        ${['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id?`<button class="btn btn-recharge" onclick="rechargeHire('${h.id}')">↑ Recharge</button>`:''}
+        ${lc==='active'?`<button class="btn btn-close-hire" onclick="togglePanel('hco-${h.id}',true)">⊠ Off-hire</button>`:''}
+        ${bl==='invoiced-in'&&!h.outgoing_invoice_id?`<button class="btn btn-recharge" onclick="rechargeHire('${h.id}')">↑ Recharge</button>`:''}
         <button class="btn btn-danger" onclick="deleteHire('${h.id}')">✗</button>
       </div>
     </div>
@@ -1399,13 +1568,16 @@ function buildHireCard(h){
 function togglePanel(id,open){const el=document.getElementById(id);if(el)el.classList.toggle('open',open);}
 async function doCloseHire(id){
   const d=document.getElementById(`hco-d-${id}`)?.value;if(!d){toast('Enter date','error');return;}
-  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,status:'closed'},prefer:'return=minimal'});const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.status='closed';}updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);renderHireView('hires-all','all-list',null);updateBadges();toast('Hire closed off','success');}
-  catch(e){toast('Failed: '+e.message,'error');}
-}
-async function doLinkInv(id){
-  const invId=document.getElementById(`hli-id-${id}`)?.value?.trim();if(!invId){toast('Enter invoice ID','error');return;}
-  try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{incoming_invoice_id:invId,status:'invoiced'},prefer:'return=minimal'});const h=allHires.find(x=>x.id===id);if(h){h.incoming_invoice_id=invId;h.status='invoiced';}updateHireStats();renderHireView('hires-all','all-list',null);toast('Invoice linked','success');}
-  catch(e){toast('Failed: '+e.message,'error');}
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,lifecycle_status:'offhired'},prefer:'return=minimal'});
+    const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.lifecycle_status='offhired';}
+    updateHireStats();
+    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));
+    renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
+    renderHireView('hires-all','all-list',null);
+    updateBadges();
+    toast('Hire off-hired','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
 }
 function rechargeHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;
@@ -1428,17 +1600,25 @@ function rechargeHire(id){
   toast('Opening generator…','success');
 }
 let editHireId=null;
-function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];document.getElementById('hire-modal').classList.add('open');}
+function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();document.getElementById('hire-modal').classList.add('open');}
 function openEditHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
   document.getElementById('hire-modal-title').textContent='Edit hire';
+  populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-customer',h.customer);f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-status',h.status);f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-lifecycle',h.lifecycle_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-sell',h.sell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   supps=Array.isArray(h.supplementaries)?h.supplementaries.map(s=>({...s})):[];renderSupps();
   document.getElementById('hire-modal').classList.add('open');
 }
+function populateHireAccountDropdown(){
+  const sel=document.getElementById('hf-account');if(!sel)return;
+  const cur=sel.value;
+  const clients=(allAccounts||[]).filter(a=>(a.type||'client')==='client').slice().sort((a,b)=>(a.company_name||'').localeCompare(b.company_name||''));
+  sel.innerHTML='<option value="">— select —</option>'+clients.map(a=>`<option value="${esc(a.id)}">${esc(a.company_name)}</option>`).join('');
+  if(cur)sel.value=cur;
+}
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-customer','hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-sell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-status').value='active';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();}
+function clearHireForm(){['hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-sell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-lifecycle').value='booked';document.getElementById('hf-billing').value='pending';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();}
 
 // ─── Supplementary charges repeater ───
 let supps=[];
@@ -1478,17 +1658,18 @@ function renderSupps(){
 }
 
 async function saveHire(){
-  const customer=document.getElementById('hf-customer').value.trim();if(!customer){toast('Customer required','error');return;}
+  const accountId=document.getElementById('hf-account').value;if(!accountId){toast('Customer account required','error');return;}
+  const account=(allAccounts||[]).find(a=>a.id===accountId);if(!account){toast('Customer account not found','error');return;}
   // Clean supplementaries: drop rows with no amount
   const cleanSupps=supps.filter(s=>s.amount!=null&&!isNaN(s.amount)&&s.amount!==0).map(s=>({type:s.type||'Other',amount:Number(s.amount),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
-  const payload={customer,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,status:document.getElementById('hf-status').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,sell_per_day:parseFloat(document.getElementById('hf-sell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,lifecycle_status:document.getElementById('hf-lifecycle').value,billing_status:document.getElementById('hf-billing').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,sell_per_day:parseFloat(document.getElementById('hf-sell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
     closeHireModal();hiresLoaded=false;loadHires();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
-async function deleteHire(id){if(!confirm('Delete this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>h.status==='active');renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id);updateBadges();toast('Hire deleted','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
 
 // ─── ACCOUNTS ───
 let allAccounts=[],accountFilter='all';
@@ -1869,8 +2050,8 @@ async function deleteVehicle(id){if(!confirm('Remove this vehicle? Cannot be und
 function toggleCard(id){document.getElementById(id)?.classList.toggle('expanded');}
 function updateBadges(){
   document.getElementById('badge-pending').textContent=allInvoices.filter(i=>i.status==='pending').length||'0';
-  document.getElementById('badge-active-hires').textContent=allHires.filter(h=>h.status==='active').length||'0';
-  document.getElementById('badge-pending-recharge').textContent=allHires.filter(h=>['closed','invoiced'].includes(h.status)&&!h.outgoing_invoice_id).length||'0';
+  document.getElementById('badge-active-hires').textContent=allHires.filter(h=>['requested','booked','active'].includes(h.lifecycle_status)).length||'0';
+  document.getElementById('badge-pending-recharge').textContent=allHires.filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id).length||'0';
 }
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
