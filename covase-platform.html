@@ -332,6 +332,44 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .reconcile-line{font-size:12px;padding:2px 0;color:var(--n700);}
 .reconcile-line.rec-ok{color:var(--tl-green-t);}
 .reconcile-line.rec-warn{color:var(--tl-orange-t);font-weight:600;}
+
+/* Kanban pipeline */
+.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:start;}
+.kan-col{background:var(--n50);border:1px solid var(--n100);border-radius:var(--radius);display:flex;flex-direction:column;min-height:320px;max-height:calc(100vh - 170px);overflow:hidden;}
+.kan-col-header{padding:10px 12px;border-bottom:1px solid var(--n100);display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--card);border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);}
+.kan-col-title{font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n700);}
+.kan-col-count{font-size:11px;font-weight:600;color:var(--n500);background:var(--n100);padding:2px 7px;border-radius:10px;}
+.kan-col-body{padding:8px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;}
+.kan-col-body::-webkit-scrollbar{width:6px}
+.kan-col-body::-webkit-scrollbar-thumb{background:var(--n200);border-radius:3px}
+.kan-col-empty{font-size:11px;color:var(--n400);text-align:center;padding:18px 6px;font-style:italic;}
+.kan-card{background:var(--card);border:1px solid var(--n100);border-left:3px solid var(--n200);border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;transition:all .12s;}
+.kan-card:hover{border-color:var(--n200);box-shadow:var(--shadow);transform:translateY(-1px);}
+.kan-card.bill-pending{border-left-color:var(--n300);}
+.kan-card.bill-invoiced-in{border-left-color:var(--covase);}
+.kan-card.bill-recharged{border-left-color:var(--purple);}
+.kan-card.bill-paid{border-left-color:var(--tl-green-t);}
+.kan-card.cancelled{opacity:.55;border-left-color:var(--tl-red);background:var(--n50);}
+.kan-card-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:2px;}
+.kan-card-client{font-family:'Outfit',sans-serif;font-weight:600;font-size:13px;color:var(--n800);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kan-card-sell{font-weight:700;color:var(--n800);font-size:12px;white-space:nowrap;}
+.kan-card-meta{font-size:11px;color:var(--n500);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kan-card-dates{font-size:11px;color:var(--n600);margin-bottom:5px;}
+.kan-card-bottom{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:5px;}
+.kan-bill-pill{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;padding:2px 7px;border-radius:10px;white-space:nowrap;}
+.kan-bill-pill.pending{background:var(--n100);color:var(--n500);}
+.kan-bill-pill.invoiced-in{background:var(--covase-l);color:#0a7a72;}
+.kan-bill-pill.recharged{background:var(--purple-l);color:var(--purple);}
+.kan-bill-pill.paid{background:var(--tl-green-l);color:var(--tl-green-t);}
+.kan-card-actions{display:flex;gap:4px;flex-wrap:wrap;}
+.kan-advance{background:var(--covase-l);color:#0a7a72;border:1px solid var(--covase);font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;cursor:pointer;transition:all .1s;}
+.kan-advance:hover{background:var(--covase);color:#fff;}
+.kan-advance.purple{background:var(--purple-l);color:var(--purple);border-color:var(--purple);}
+.kan-advance.purple:hover{background:var(--purple);color:#fff;}
+.kan-advance.green{background:var(--tl-green-l);color:var(--tl-green-t);border-color:var(--tl-green);}
+.kan-advance.green:hover{background:var(--tl-green-t);color:#fff;}
+.kan-cancel{background:transparent;color:var(--n400);border:1px solid var(--n200);font-size:10px;padding:2px 6px;border-radius:6px;cursor:pointer;}
+.kan-cancel:hover{color:var(--tl-red-t);border-color:var(--tl-red);}
 </style>
 </head>
 <body>
@@ -360,6 +398,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="sb-divider"></div>
     <div class="sb-section">
       <div class="sb-section-label">Short Hires</div>
+      <div class="sb-item" onclick="showView('hires-pipeline',this)">
+        <span class="icon">▦</span> Pipeline
+        <span class="sb-badge" id="badge-pipeline">—</span>
+      </div>
       <div class="sb-item" onclick="showView('hires-active',this)">
         <span class="icon">🚗</span> Active hires
         <span class="sb-badge" id="badge-active-hires">—</span>
@@ -452,6 +494,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <button class="topbar-btn primary" onclick="openGenerator()">+ New Invoice</button>
     </div>
     <div class="content"><div class="card-list" id="outgoing-list"><div class="loading">Loading…</div></div></div>
+  </div>
+
+  <!-- HIRES PIPELINE (Kanban) -->
+  <div class="view" id="view-hires-pipeline">
+    <div class="topbar">
+      <h1>Pipeline</h1>
+      <label style="font-size:12px;color:var(--n500);display:flex;align-items:center;gap:6px;margin-right:auto;margin-left:14px">
+        <input type="checkbox" id="pipe-show-cancelled" onchange="renderPipeline()"> Show cancelled
+      </label>
+      <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewHire()">+ New Hire</button>
+    </div>
+    <div class="content" style="padding:0 14px 14px 14px">
+      <div class="kanban" id="kanban-board"><div class="loading" style="grid-column:1/-1">Loading pipeline…</div></div>
+    </div>
   </div>
 
   <!-- HIRES ACTIVE -->
@@ -584,8 +641,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       </div>
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
-        <div class="form-field"><label>Lifecycle status</label>
-          <select id="hf-lifecycle"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
+        <div class="form-field"><label>Hire status</label>
+          <select id="hf-hire-status"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
         </div>
         <div class="form-field"><label>Billing status</label>
           <select id="hf-billing"><option value="pending" selected>Pending</option><option value="invoiced-in">Invoiced in</option><option value="recharged">Recharged</option><option value="paid">Paid</option></select>
@@ -1030,7 +1087,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
@@ -1202,7 +1259,7 @@ function unmatchedRow(invId,h,idx){
   const supps=Array.isArray(h.supplementaries)?h.supplementaries:[];
   const days=h.days||'',rate=h.ratePerDay||'',net=parseFloat(h.netAmount)||0;
   // Unlinked hires that could be picked
-  const candidates=(allHires||[]).filter(x=>!x.incoming_invoice_id&&x.lifecycle_status!=='cancelled')
+  const candidates=(allHires||[]).filter(x=>!x.incoming_invoice_id&&x.hire_status!=='cancelled')
     .sort((a,b)=>(a.customer||'').localeCompare(b.customer||''));
   const candidateOpts=candidates.map(x=>`<option value="${esc(x.id)}">${esc(x.customer||'?')} — ${esc(x.vehicle_reg||'?')} / ${esc(x.driver||'?')} · ${fmtD(x.start_date)}${x.reference?' · '+esc(x.reference):''}</option>`).join('');
   const guessId=guessAccountId(h);
@@ -1307,7 +1364,7 @@ async function approveMatch(invId,idx,hireId){
     const wasExpanded=document.getElementById('ic-'+invId)?.classList.contains('expanded');
     renderInvoices();
     if(wasExpanded)document.getElementById('ic-'+invId)?.classList.add('expanded');
-    updateBadges();
+    renderPipeline();updateBadges();
     toast(`Linked to ${hireId}`,'success');
   }catch(e){toast('Approve failed: '+e.message,'error');}
 }
@@ -1339,7 +1396,7 @@ async function createNewFromExtraction(invId,idx){
     driver:h.driver||null,
     reference:h.bookingReference||null,
     agreement_ref:h.bookingReference||null,
-    lifecycle_status:'offhired',
+    hire_status:'offhired',
     billing_status:'invoiced-in',
     vehicle_reg:h.registration||null,
     make_model:h.vehicleDescription||null,
@@ -1363,7 +1420,7 @@ async function createNewFromExtraction(invId,idx){
     const wasExpanded=document.getElementById('ic-'+invId)?.classList.contains('expanded');
     renderInvoices();
     if(wasExpanded)document.getElementById('ic-'+invId)?.classList.add('expanded');
-    updateBadges();
+    renderPipeline();updateBadges();
     toast(`Created ${hireId}`,'success');
   }catch(e){toast('Create failed: '+e.message,'error');}
 }
@@ -1418,8 +1475,21 @@ function buildOutCard(inv){
   </div>`;
 }
 async function setOutStatus(id,status){
-  try{await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status},prefer:'return=minimal'});const i=outInvoices.find(x=>x.id===id);if(i)i.status=status;renderOutgoing();toast(`Invoice ${status}`,'success');}
-  catch(e){toast('Update failed: '+e.message,'error');}
+  try{
+    await sbReq(`covase_invoices?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{status},prefer:'return=minimal'});
+    const i=outInvoices.find(x=>x.id===id);if(i)i.status=status;
+    // If marking paid, cascade to any hires linked to this outgoing invoice
+    if(status==='paid'||status==='approved'){
+      const linkedHires=(allHires||[]).filter(h=>h.outgoing_invoice_id===id&&h.billing_status!=='paid');
+      if(linkedHires.length){
+        await Promise.all(linkedHires.map(h=>sbReq(`covase_hires?id=eq.${encodeURIComponent(h.id)}`,{method:'PATCH',body:{billing_status:'paid',updated_at:new Date().toISOString()},prefer:'return=minimal'})));
+        linkedHires.forEach(h=>h.billing_status='paid');
+        renderPipeline();updateHireStats();updateBadges();
+      }
+    }
+    renderOutgoing();
+    toast(`Invoice ${status}`,'success');
+  }catch(e){toast('Update failed: '+e.message,'error');}
 }
 function openGenerator(id){
   const base=localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html';
@@ -1482,7 +1552,27 @@ function confirmRecharge(){
   if(!selected.length){toast('Select at least one line','error');return;}
   localStorage.setItem('recharge_selected_items',JSON.stringify(selected));localStorage.setItem('recharge_source_id',rpInv.id);
   closeRechargePicker();window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_from='+encodeURIComponent(rpInv.id),'_blank');
+  markHiresRecharged(rpInv.id);
   toast(`Opening generator with ${selected.length} line${selected.length>1?'s':''}…`,'success');
+}
+// Flip any hires linked to this invoice to billing_status=recharged (local + remote)
+async function markHiresRecharged(invId){
+  const linked=(allHires||[]).filter(h=>h.incoming_invoice_id===invId&&h.billing_status==='invoiced-in');
+  if(!linked.length)return;
+  const ids=linked.map(h=>h.id);
+  try{
+    await sbReq(`covase_hires?id=in.(${ids.map(encodeURIComponent).join(',')})`,{method:'PATCH',body:{billing_status:'recharged',updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    linked.forEach(h=>h.billing_status='recharged');
+    renderPipeline();updateHireStats();updateBadges();
+  }catch(e){console.warn('markHiresRecharged failed',e);}
+}
+async function markHireRecharged(hireId){
+  const h=allHires.find(x=>x.id===hireId);if(!h||h.billing_status==='recharged'||h.billing_status==='paid')return;
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(hireId)}`,{method:'PATCH',body:{billing_status:'recharged',updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    h.billing_status='recharged';
+    renderPipeline();updateHireStats();updateBadges();
+  }catch(e){console.warn('markHireRecharged failed',e);}
 }
 
 // ─── HIRES ───
@@ -1499,15 +1589,16 @@ async function loadHires(){
     // Also load accounts for the hire modal dropdown if not loaded
     if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
     updateHireStats();
-    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));
+    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));
     renderHireView('hires-all','all-list',null);
     renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
+    renderPipeline();
     updateBadges();
   }
   catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e2=document.getElementById(id);if(e2)e2.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
 }
 function updateHireStats(){
-  const onHire=allHires.filter(h=>h.lifecycle_status==='active');
+  const onHire=allHires.filter(h=>h.hire_status==='active');
   const pending=allHires.filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
   document.getElementById('sh-active').textContent=onHire.length;
   document.getElementById('sh-recharge').textContent=pending.length;
@@ -1528,10 +1619,126 @@ function suppUpsellTotal(h){
   return h.supplementaries.reduce((s,x)=>s+(parseFloat(x.upsell_amount)||0),0);
 }
 function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#view-hires-all .filter-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderHireView('hires-all','all-list',null);}
+
+// ─── Pipeline (Kanban) ───
+const PIPELINE_COLS=[
+  {key:'requested', label:'Requested'},
+  {key:'booked',    label:'Booked'},
+  {key:'active',    label:'Active'},
+  {key:'offhired',  label:'Off-hired'},
+  {key:'paid',      label:'Paid'}
+];
+// Advance chain: which hire_status comes next on "→ Move" click
+const HIRE_NEXT={requested:'booked',booked:'active',active:'offhired'};
+function renderPipeline(){
+  const wrap=document.getElementById('kanban-board');if(!wrap)return;
+  const showCancelled=document.getElementById('pipe-show-cancelled')?.checked;
+  // Bucket hires by column
+  const buckets={requested:[],booked:[],active:[],offhired:[],paid:[],cancelled:[]};
+  (allHires||[]).forEach(h=>{
+    if(h.hire_status==='cancelled'){buckets.cancelled.push(h);return;}
+    // Any hire with billing_status='paid' belongs in the Paid column regardless of hire_status
+    if(h.billing_status==='paid'){buckets.paid.push(h);return;}
+    if(buckets[h.hire_status])buckets[h.hire_status].push(h);
+  });
+  const cols=PIPELINE_COLS.map(c=>{
+    const items=buckets[c.key]||[];
+    const body=items.length
+      ? items.map(h=>kanCard(h)).join('')
+      : `<div class="kan-col-empty">Nothing here</div>`;
+    return `<div class="kan-col">
+      <div class="kan-col-header"><span class="kan-col-title">${esc(c.label)}</span><span class="kan-col-count">${items.length}</span></div>
+      <div class="kan-col-body">${body}</div>
+    </div>`;
+  }).join('');
+  let out=cols;
+  if(showCancelled&&buckets.cancelled.length){
+    out+=`<div class="kan-col" style="grid-column:1/-1;margin-top:14px">
+      <div class="kan-col-header"><span class="kan-col-title" style="color:var(--tl-red-t)">Cancelled</span><span class="kan-col-count">${buckets.cancelled.length}</span></div>
+      <div class="kan-col-body" style="max-height:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px">${buckets.cancelled.map(h=>kanCard(h)).join('')}</div>
+    </div>`;
+  }
+  wrap.innerHTML=out;
+}
+function kanCard(h){
+  const bl=h.billing_status||'pending';
+  const blLabels={'pending':'Pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'};
+  const days=daysOn(h);
+  const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0;
+  const suppC=suppTotal(h),suppU=suppUpsellTotal(h);
+  const sell=days!=null?days*(cpd+upd)+suppC+suppU:null;
+  const cls=['kan-card','bill-'+bl,h.hire_status==='cancelled'?'cancelled':''].filter(Boolean).join(' ');
+  // Advance button: which action makes sense next?
+  const adv=nextAdvance(h);
+  const advBtn=adv?`<button class="kan-advance ${adv.cls||''}" onclick="event.stopPropagation();advanceHire('${esc(h.id)}','${adv.action}')" title="${esc(adv.tip||'')}">→ ${esc(adv.label)}</button>`:'';
+  const cancelBtn=h.hire_status!=='cancelled'&&h.billing_status!=='paid'?`<button class="kan-cancel" onclick="event.stopPropagation();cancelHire('${esc(h.id)}')" title="Cancel hire">✕</button>`:'';
+  return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
+    <div class="kan-card-top"><div class="kan-card-client">${esc(h.customer||'—')}</div><div class="kan-card-sell">${fmtMoney(sell)}</div></div>
+    <div class="kan-card-meta">${esc(h.vehicle_reg||'—')} · ${esc(h.driver||'—')}${h.make_model?' · '+esc(h.make_model):''}</div>
+    <div class="kan-card-dates">${fmtD(h.start_date)} – ${h.end_date?fmtD(h.end_date):'ongoing'}${days!=null?' · '+days+'d':''}</div>
+    <div class="kan-card-bottom">
+      <span class="kan-bill-pill ${bl}">${esc(blLabels[bl]||bl)}</span>
+      <div class="kan-card-actions">${advBtn}${cancelBtn}</div>
+    </div>
+  </div>`;
+}
+// Decide the next sensible action for a hire
+function nextAdvance(h){
+  if(h.hire_status==='cancelled')return null;
+  if(h.billing_status==='paid')return null;
+  // Operational progression first
+  if(HIRE_NEXT[h.hire_status]){
+    const lbl={requested:'Book',booked:'On hire',active:'Off-hire'}[h.hire_status];
+    return {action:'hire:'+HIRE_NEXT[h.hire_status],label:lbl,tip:'Move hire to '+HIRE_NEXT[h.hire_status]};
+  }
+  // hire_status is offhired — next action depends on billing_status
+  if(h.hire_status==='offhired'){
+    if(h.billing_status==='pending')return {action:'bill:invoiced-in',label:'Mark invoiced in',cls:'',tip:'Mark supplier invoice received'};
+    if(h.billing_status==='invoiced-in')return {action:'recharge',label:'Recharge',cls:'purple',tip:'Raise client recharge invoice'};
+    if(h.billing_status==='recharged')return {action:'bill:paid',label:'Mark paid',cls:'green',tip:'Mark client has paid'};
+  }
+  return null;
+}
+async function advanceHire(id,action){
+  const h=allHires.find(x=>x.id===id);if(!h)return;
+  if(action==='recharge'){rechargeHire(id);return;}
+  const patch={updated_at:new Date().toISOString()};
+  if(action.startsWith('hire:')){
+    patch.hire_status=action.split(':')[1];
+    // Convenience: when going to offhired without an end_date, default to today
+    if(patch.hire_status==='offhired'&&!h.end_date)patch.end_date=new Date().toISOString().split('T')[0];
+  }
+  if(action.startsWith('bill:')){
+    patch.billing_status=action.split(':')[1];
+  }
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:patch,prefer:'return=minimal'});
+    Object.assign(h,patch);
+    renderPipeline();updateHireStats();updateBadges();
+    toast('Updated','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+async function cancelHire(id){
+  if(!confirm('Cancel this hire?'))return;
+  const h=allHires.find(x=>x.id===id);if(!h)return;
+  const patch={hire_status:'cancelled',updated_at:new Date().toISOString()};
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:patch,prefer:'return=minimal'});
+    Object.assign(h,patch);
+    renderPipeline();updateHireStats();updateBadges();
+    toast('Hire cancelled','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+function updatePipelineBadge(){
+  const el=document.getElementById('badge-pipeline');if(!el)return;
+  // Count hires that need attention: anything not paid and not cancelled
+  const n=(allHires||[]).filter(h=>h.hire_status!=='cancelled'&&h.billing_status!=='paid').length;
+  el.textContent=n||'0';
+}
 function renderHireView(viewId,listSuffix,filterFn){
   const el=document.getElementById(`hires-${listSuffix}`);if(!el)return;
   let hires=allHires;if(filterFn)hires=hires.filter(filterFn);
-  if(viewId==='hires-all'&&hireStatusFilter!=='all')hires=hires.filter(h=>h.lifecycle_status===hireStatusFilter||h.billing_status===hireStatusFilter);
+  if(viewId==='hires-all'&&hireStatusFilter!=='all')hires=hires.filter(h=>h.hire_status===hireStatusFilter||h.billing_status===hireStatusFilter);
   if(!hires.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-title">No hires here</div><div class="empty-sub">Click "+ New Hire" to log a hire.</div></div>`;return;}
   el.innerHTML=hires.map(h=>buildHireCard(h)).join('');
 }
@@ -1546,7 +1753,7 @@ function buildHireCard(h){
   const margin=totalUpsell;
   const lcLabels={requested:'Requested',booked:'Booked',active:'Active',offhired:'Off-hired',cancelled:'Cancelled'};
   const blLabels={'pending':'Pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'};
-  const lc=h.lifecycle_status||'booked',bl=h.billing_status||'pending';
+  const lc=h.hire_status||'booked',bl=h.billing_status||'pending';
   const pClass=margin!=null?(margin>=0?'profit-pos':'profit-neg'):'';
   const invLinked=h.incoming_invoice_id?` <span style="color:var(--covase);font-size:11px" title="Supplier invoice linked">📄</span>`:'';
   const rechBadge=h.outgoing_invoice_id?` <span style="color:var(--purple);font-size:11px" title="Recharge raised">↑</span>`:'';
@@ -1598,10 +1805,10 @@ function togglePanel(id,open){const el=document.getElementById(id);if(el)el.clas
 async function doCloseHire(id){
   const d=document.getElementById(`hco-d-${id}`)?.value;if(!d){toast('Enter date','error');return;}
   try{
-    await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,lifecycle_status:'offhired'},prefer:'return=minimal'});
-    const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.lifecycle_status='offhired';}
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,hire_status:'offhired'},prefer:'return=minimal'});
+    const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.hire_status='offhired';}
     updateHireStats();
-    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));
+    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));
     renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
     renderHireView('hires-all','all-list',null);
     updateBadges();
@@ -1631,6 +1838,7 @@ function rechargeHire(id){
   }
   localStorage.setItem('recharge_selected_items',JSON.stringify(lineItems));localStorage.setItem('recharge_source_hire',id);localStorage.setItem('recharge_client_name',h.customer||'');
   window.open((localStorage.getItem('covase_generator_url')||'covase-invoice-generator.html')+'?recharge_hire='+encodeURIComponent(id),'_blank');
+  markHireRecharged(id);
   toast('Opening generator…','success');
 }
 let editHireId=null;
@@ -1640,7 +1848,7 @@ function openEditHire(id){
   document.getElementById('hire-modal-title').textContent='Edit hire';
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-lifecycle',h.lifecycle_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   supps=Array.isArray(h.supplementaries)?h.supplementaries.map(s=>({...s})):[];renderSupps();updateHireRatePreview();
   document.getElementById('hire-modal').classList.add('open');
 }
@@ -1652,7 +1860,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-lifecycle').value='booked';document.getElementById('hf-billing').value='pending';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();updateHireRatePreview();}
+function clearHireForm(){['hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();updateHireRatePreview();}
 
 // ─── Supplementary charges repeater ───
 let supps=[];
@@ -1722,14 +1930,14 @@ async function saveHire(){
   const cleanSupps=supps
     .filter(s=>{const c=suppCost(s),u=suppUpsell(s);return (c||u);})
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,lifecycle_status:document.getElementById('hf-lifecycle').value,billing_status:document.getElementById('hf-billing').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
     closeHireModal();hiresLoaded=false;loadHires();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
-async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.lifecycle_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
 
 // ─── ACCOUNTS ───
 let allAccounts=[],accountFilter='all';
@@ -2110,8 +2318,9 @@ async function deleteVehicle(id){if(!confirm('Remove this vehicle? Cannot be und
 function toggleCard(id){document.getElementById(id)?.classList.toggle('expanded');}
 function updateBadges(){
   document.getElementById('badge-pending').textContent=allInvoices.filter(i=>i.status==='pending').length||'0';
-  document.getElementById('badge-active-hires').textContent=allHires.filter(h=>['requested','booked','active'].includes(h.lifecycle_status)).length||'0';
+  document.getElementById('badge-active-hires').textContent=allHires.filter(h=>['requested','booked','active'].includes(h.hire_status)).length||'0';
   document.getElementById('badge-pending-recharge').textContent=allHires.filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id).length||'0';
+  updatePipelineBadge();
 }
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
