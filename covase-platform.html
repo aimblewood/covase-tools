@@ -245,6 +245,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .form-field input,.form-field select,.form-field textarea{background:var(--n50);border:1px solid var(--n200);color:var(--n800);padding:8px 11px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s;width:100%}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--covase);background:#fff}
 .form-field textarea{min-height:56px;resize:vertical;line-height:1.5}
+.form-field .label-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.form-field .label-row label{margin:0}
+.dynamics-link{font-size:10px;font-weight:600;color:var(--covase);cursor:pointer;text-transform:none;letter-spacing:0;user-select:none}
+.dynamics-link:hover{text-decoration:underline}
+.d365-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--indigo);background:var(--covase-l);border:1px solid rgba(3,211,198,.35);padding:3px 8px;border-radius:999px;text-decoration:none;margin-left:6px;white-space:nowrap}
+.d365-chip:hover{background:var(--covase);color:var(--indigo)}
+.d365-chip.small{font-size:9px;padding:2px 6px}
+.lookup-wrap{position:relative}
+.lookup-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--n200);border-radius:8px;margin-top:4px;z-index:100;max-height:220px;overflow-y:auto;display:none;box-shadow:var(--shadow-lg)}
+.lookup-results.open{display:block}
+.lookup-item{padding:8px 11px;cursor:pointer;font-size:12px;color:var(--n600);border-bottom:1px solid var(--n100);line-height:1.35}
+.lookup-item:last-child{border-bottom:none}
+.lookup-item:hover{background:var(--covase-l);color:var(--n800)}
+.lookup-item strong{display:block;color:var(--n800);font-size:13px;font-weight:600}
+.lookup-item .meta{font-size:10px;color:var(--n400);margin-top:2px}
+.lookup-status{font-size:10px;color:var(--n400);padding:8px 11px;font-style:italic}
 .btn-primary-modal{background:var(--covase);color:var(--indigo);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .btn-primary-modal:hover{filter:brightness(1.05)}
 .btn-secondary-modal{background:var(--n100);color:var(--n600);border:none;border-radius:8px;padding:9px 15px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
@@ -447,12 +463,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="sb-item disabled" title="Coming soon"><span class="icon">◉</span> GoCardless</div>
     </div>
   </nav>
-  <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Supabase settings</div>
+  <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Settings</div>
   <div class="sb-config-panel" id="config-panel">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin-bottom:2px">Supabase</div>
     <label>Project URL</label>
     <input type="text" id="sb-url" placeholder="https://xxx.supabase.co">
     <label>Anon Key</label>
     <input type="password" id="sb-key" placeholder="eyJ...">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Dynamics 365 (via n8n)</div>
+    <label>Client lookup webhook</label>
+    <input type="text" id="n8n-client-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-client-lookup">
+    <label>Contact lookup webhook</label>
+    <input type="text" id="n8n-contact-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-contact-lookup">
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
   </div>
 </aside>
@@ -636,8 +658,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-body">
       <div class="form-section-label">Client &amp; Driver</div>
       <div class="form-row">
-        <div class="form-field"><label>Customer account *</label><select id="hf-account"><option value="">— select —</option></select></div>
-        <div class="form-field"><label>Driver *</label><input id="hf-driver" placeholder="First Last"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Customer account *</label><span class="dynamics-link" onclick="hireLookupToggle('account')" id="hf-account-lookup-toggle">🔍 Dynamics</span></div>
+          <select id="hf-account" onchange="updateHireD365Link('account')"><option value="">— select —</option></select>
+          <input type="text" id="hf-account-search" placeholder="Search Dynamics 365…" style="display:none;margin-top:6px" oninput="lookupDynamicsAccount(this.value)" autocomplete="off">
+          <div id="hf-account-results" class="lookup-results"></div>
+          <a id="hf-account-d365" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none;margin-top:6px;align-self:flex-start">↗ Open in Dynamics</a>
+        </div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Driver *</label><span class="dynamics-link" id="hf-driver-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <input id="hf-driver" placeholder="Start typing driver name…" oninput="lookupDynamicsDriver(this.value)" autocomplete="off">
+          <input type="hidden" id="hf-driver-contact-id">
+          <input type="hidden" id="hf-driver-dynamics-id">
+          <div id="hf-driver-results" class="lookup-results"></div>
+          <a id="hf-driver-d365" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none;margin-top:6px;align-self:flex-start">↗ Open in Dynamics</a>
+        </div>
       </div>
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
@@ -743,7 +778,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
         <div class="form-field"><label>Payment terms</label>
           <select id="acf-terms"><option>7 days</option><option>14 days</option><option>28 days</option><option>30 days</option><option>45 days</option><option>60 days</option></select>
         </div>
-        <div class="form-field"><label>Dynamics ID</label><input id="acf-dynamics" placeholder="transition ref"></div>
+        <div class="form-field">
+          <div class="label-row"><label>Dynamics ID</label><a id="acf-dynamics-link" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none">↗ Open in Dynamics</a></div>
+          <input id="acf-dynamics" placeholder="GUID from Dynamics 365" oninput="updateAccountDynamicsLink()">
+        </div>
       </div>
       <div class="form-section-label">Notes</div>
       <div class="form-field"><textarea id="acf-notes" placeholder="Any notes about this account…"></textarea></div>
@@ -798,6 +836,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-row">
         <div class="form-field"><label>Job description</label><input id="ctf-job" placeholder="e.g. Fleet Manager"></div>
         <div class="form-field"><label>Driver grade</label><input id="ctf-grade" placeholder="e.g. Grade A / Band 3"></div>
+      </div>
+      <div class="form-section-label">Dynamics 365</div>
+      <div class="form-row">
+        <div class="form-field">
+          <div class="label-row"><label>Dynamics contact ID</label><a id="ctf-dynamics-link" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none">↗ Open in Dynamics</a></div>
+          <input id="ctf-dynamics" placeholder="GUID from Dynamics 365" oninput="updateContactDynamicsLink()">
+        </div>
       </div>
       <div class="form-section-label">Notes</div>
       <div class="form-field"><textarea id="ctf-notes" placeholder="Any notes about this contact…"></textarea></div>
@@ -1041,18 +1086,233 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 
 <script>
 // ─── CONFIG ───
-function getConfig(){return{url:localStorage.getItem('covase_sb_url')||'',key:localStorage.getItem('covase_sb_key')||''};}
+const DEFAULT_N8N_CLIENT='https://covase.app.n8n.cloud/webhook/covase-client-lookup';
+const DEFAULT_N8N_CONTACT='https://covase.app.n8n.cloud/webhook/covase-contact-lookup';
+const D365_HOST='https://covase.crm11.dynamics.com';
+function getConfig(){return{
+  url:localStorage.getItem('covase_sb_url')||'',
+  key:localStorage.getItem('covase_sb_key')||'',
+  n8nClient:localStorage.getItem('covase_n8n_webhook')||DEFAULT_N8N_CLIENT,
+  n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT
+};}
+function d365Url(entity,id){if(!id)return null;return `${D365_HOST}/main.aspx?pagetype=entityrecord&etn=${entity}&id=${encodeURIComponent(id)}`;}
 function saveConfig(){
   const url=document.getElementById('sb-url').value.trim(),key=document.getElementById('sb-key').value.trim();
-  if(!url||!key){toast('Enter both URL and key','error');return;}
+  if(!url||!key){toast('Enter Supabase URL and key','error');return;}
   localStorage.setItem('covase_sb_url',url);localStorage.setItem('covase_sb_key',key);
+  const nc=document.getElementById('n8n-client-url').value.trim();
+  const nt=document.getElementById('n8n-contact-url').value.trim();
+  if(nc)localStorage.setItem('covase_n8n_webhook',nc);else localStorage.removeItem('covase_n8n_webhook');
+  if(nt)localStorage.setItem('covase_n8n_contact_webhook',nt);else localStorage.removeItem('covase_n8n_contact_webhook');
   document.getElementById('config-panel').classList.remove('open');
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
 function toggleConfig(){
   const p=document.getElementById('config-panel');p.classList.toggle('open');
-  const c=getConfig();document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
+  const c=getConfig();
+  document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
+  document.getElementById('n8n-client-url').value=c.n8nClient===DEFAULT_N8N_CLIENT?'':c.n8nClient;
+  document.getElementById('n8n-contact-url').value=c.n8nContact===DEFAULT_N8N_CONTACT?'':c.n8nContact;
 }
+
+// ─── DYNAMICS 365 LOOKUP (via n8n) ───
+let _dynAccountResults=[], _dynDriverResults=[], _dynAccountTimer=null, _dynDriverTimer=null;
+
+function hireLookupToggle(which){
+  if(which==='account'){
+    const search=document.getElementById('hf-account-search');
+    const open=search.style.display==='none';
+    search.style.display=open?'block':'none';
+    if(open){search.value='';search.focus();}
+    else{document.getElementById('hf-account-results').classList.remove('open');}
+  }
+}
+
+function updateHireD365Link(which){
+  if(which==='account'){
+    const id=document.getElementById('hf-account').value;
+    const chip=document.getElementById('hf-account-d365');
+    const acc=(allAccounts||[]).find(a=>a.id===id);
+    const dyn=acc&&acc.dynamics_id?d365Url('account',acc.dynamics_id):null;
+    if(dyn){chip.href=dyn;chip.style.display='inline-flex';}
+    else{chip.removeAttribute('href');chip.style.display='none';}
+  }else if(which==='driver'){
+    const dynId=document.getElementById('hf-driver-dynamics-id').value;
+    const chip=document.getElementById('hf-driver-d365');
+    const dyn=dynId?d365Url('contact',dynId):null;
+    if(dyn){chip.href=dyn;chip.style.display='inline-flex';}
+    else{chip.removeAttribute('href');chip.style.display='none';}
+  }
+}
+
+async function lookupDynamicsAccount(q){
+  clearTimeout(_dynAccountTimer);
+  const res=document.getElementById('hf-account-results');
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  const url=getConfig().n8nClient;
+  if(!url){res.innerHTML='<div class="lookup-status">⚙ Set client lookup webhook in Settings</div>';res.classList.add('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Dynamics…</div>';res.classList.add('open');
+  _dynAccountTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(`${url}?q=${encodeURIComponent(q)}`,{mode:'cors'});
+      const data=await r.json();
+      if(!Array.isArray(data)||!data.length){res.innerHTML='<div class="lookup-status">No matches in Dynamics</div>';return;}
+      _dynAccountResults=data.slice(0,8);
+      res.innerHTML=_dynAccountResults.map((c,i)=>{
+        const local=(allAccounts||[]).find(a=>a.dynamics_id===c.accountId);
+        const badge=local?'<span style="color:var(--covase);font-size:9px;font-weight:700;margin-left:6px">● in Covase</span>':'<span style="color:var(--n400);font-size:9px;margin-left:6px">new</span>';
+        const addr=(c.address||'').split('\n')[0]||'';
+        return `<div class="lookup-item" onclick="selectDynamicsAccount(${i})"><strong>${esc(c.name||'')}${badge}</strong><div class="meta">${esc(addr)}${c.paymentTerms?' · '+esc(c.paymentTerms):''}</div></div>`;
+      }).join('');
+    }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed — check webhook</div>';}
+  },350);
+}
+
+async function selectDynamicsAccount(idx){
+  const c=_dynAccountResults[idx];if(!c)return;
+  document.getElementById('hf-account-results').classList.remove('open');
+  document.getElementById('hf-account-search').style.display='none';
+  // 1) Try match by dynamics_id on existing covase_accounts
+  let local=(allAccounts||[]).find(a=>a.dynamics_id===c.accountId);
+  if(local){
+    document.getElementById('hf-account').value=local.id;
+    updateHireD365Link('account');
+    toast('Matched to existing Covase account','success');
+    return;
+  }
+  // 2) No match — offer to create new covase_accounts row
+  if(!confirm(`"${c.name}" isn't in Covase accounts yet. Create it now?`))return;
+  try{
+    const payload={
+      id:'acc-'+Date.now(),
+      company_name:c.name,
+      type:'client',
+      status:'active',
+      address:c.address||null,
+      contact_email:c.email||null,
+      contact_phone:c.phone||null,
+      payment_terms:c.paymentTerms||'28 days',
+      payment_method:'BACS',
+      account_manager:'Simon Homer',
+      dynamics_id:c.accountId,
+      updated_at:new Date().toISOString()
+    };
+    const res=await sbReq('covase_accounts',{method:'POST',body:payload});
+    const row=Array.isArray(res)?res[0]:res||payload;
+    allAccounts.push(row);
+    populateHireAccountDropdown();
+    document.getElementById('hf-account').value=row.id;
+    updateHireD365Link('account');
+    toast('Account created from Dynamics','success');
+  }catch(e){toast('Create failed: '+e.message,'error');}
+}
+
+async function lookupDynamicsDriver(q){
+  clearTimeout(_dynDriverTimer);
+  const res=document.getElementById('hf-driver-results');
+  // Clear link if user is editing away from a matched driver
+  const hiddenName=(document.getElementById('hf-driver-contact-id').value||document.getElementById('hf-driver-dynamics-id').value);
+  if(hiddenName&&q!==(window._lastSelectedDriverName||'')){
+    document.getElementById('hf-driver-contact-id').value='';
+    document.getElementById('hf-driver-dynamics-id').value='';
+    updateHireD365Link('driver');
+  }
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  const url=getConfig().n8nContact;
+  if(!url){res.innerHTML='<div class="lookup-status">⚙ Set contact lookup webhook in Settings</div>';res.classList.add('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Dynamics…</div>';res.classList.add('open');
+  _dynDriverTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(`${url}?q=${encodeURIComponent(q)}`,{mode:'cors'});
+      const data=await r.json();
+      // Also surface local covase_contacts matches (by name) that aren't in Dynamics
+      const local=(allContacts||[]).filter(ct=>{
+        const fn=((ct.first_name||'')+' '+(ct.last_name||'')).toLowerCase();
+        return fn.includes(q.toLowerCase());
+      }).slice(0,4);
+      const merged=[];
+      if(Array.isArray(data))data.slice(0,8).forEach(d=>merged.push({src:'dyn',d}));
+      local.forEach(ct=>{if(!merged.some(m=>m.src==='dyn'&&m.d.contactId===ct.dynamics_id))merged.push({src:'local',d:ct});});
+      if(!merged.length){res.innerHTML='<div class="lookup-status">No matches</div>';return;}
+      _dynDriverResults=merged;
+      res.innerHTML=merged.map((m,i)=>{
+        if(m.src==='dyn'){
+          const matched=(allContacts||[]).find(ct=>ct.dynamics_id===m.d.contactId);
+          const badge=matched?'<span style="color:var(--covase);font-size:9px;font-weight:700;margin-left:6px">● in Covase</span>':'<span style="color:var(--n400);font-size:9px;margin-left:6px">Dynamics</span>';
+          const meta=[m.d.jobTitle,m.d.accountName,m.d.email].filter(Boolean).join(' · ');
+          return `<div class="lookup-item" onclick="selectDynamicsDriver(${i})"><strong>${esc(m.d.fullName||'')}${badge}</strong><div class="meta">${esc(meta)}</div></div>`;
+        }else{
+          const ct=m.d;const fn=((ct.first_name||'')+' '+(ct.last_name||'')).trim();
+          const acc=(allAccounts||[]).find(a=>a.id===ct.account_id);
+          const meta=[ct.job_description,acc&&acc.company_name,ct.email].filter(Boolean).join(' · ');
+          return `<div class="lookup-item" onclick="selectDynamicsDriver(${i})"><strong>${esc(fn)}<span style="color:var(--n400);font-size:9px;font-weight:700;margin-left:6px">● Covase only</span></strong><div class="meta">${esc(meta)}</div></div>`;
+        }
+      }).join('');
+    }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed — check webhook</div>';}
+  },350);
+}
+
+async function selectDynamicsDriver(idx){
+  const m=_dynDriverResults[idx];if(!m)return;
+  document.getElementById('hf-driver-results').classList.remove('open');
+  if(m.src==='local'){
+    const ct=m.d;const fn=((ct.first_name||'')+' '+(ct.last_name||'')).trim();
+    document.getElementById('hf-driver').value=fn;
+    document.getElementById('hf-driver-contact-id').value=ct.id;
+    document.getElementById('hf-driver-dynamics-id').value=ct.dynamics_id||'';
+    window._lastSelectedDriverName=fn;
+    updateHireD365Link('driver');
+    return;
+  }
+  // src=dyn — match or create covase_contacts
+  const d=m.d;const fn=d.fullName||((d.firstName||'')+' '+(d.lastName||'')).trim();
+  document.getElementById('hf-driver').value=fn;
+  window._lastSelectedDriverName=fn;
+  let local=(allContacts||[]).find(ct=>ct.dynamics_id===d.contactId);
+  if(local){
+    document.getElementById('hf-driver-contact-id').value=local.id;
+    document.getElementById('hf-driver-dynamics-id').value=local.dynamics_id||d.contactId;
+    updateHireD365Link('driver');
+    toast('Matched to existing Covase contact','success');
+    return;
+  }
+  // Resolve account_id via the Dynamics parent account, if present in covase_accounts
+  let accId=null;
+  if(d.accountId){
+    const accMatch=(allAccounts||[]).find(a=>a.dynamics_id===d.accountId);
+    if(accMatch)accId=accMatch.id;
+  }
+  try{
+    const payload={
+      id:'ct-'+Date.now(),
+      first_name:d.firstName||fn.split(' ')[0]||fn,
+      last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,
+      account_id:accId,
+      email:d.email||null,
+      mobile:d.mobile||null,
+      job_description:d.jobTitle||null,
+      contact_type:'driver',
+      employee_status:'employed',
+      address_type:'home',
+      dynamics_id:d.contactId,
+      updated_at:new Date().toISOString()
+    };
+    const res=await sbReq('covase_contacts',{method:'POST',body:payload});
+    const row=Array.isArray(res)?res[0]:res||payload;
+    allContacts.push(row);
+    document.getElementById('hf-driver-contact-id').value=row.id;
+    document.getElementById('hf-driver-dynamics-id').value=row.dynamics_id;
+    updateHireD365Link('driver');
+    toast('Contact created from Dynamics','success');
+  }catch(e){toast('Contact create failed: '+e.message,'error');}
+}
+
+// Close any open lookup dropdown on outside click
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.lookup-wrap')){
+    document.querySelectorAll('.lookup-results.open').forEach(el=>el.classList.remove('open'));
+  }
+});
 
 // ─── SUPABASE ───
 async function sbReq(path,opts={}){
@@ -1842,14 +2102,24 @@ function rechargeHire(id){
   toast('Opening generator…','success');
 }
 let editHireId=null;
-function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();document.getElementById('hire-modal').classList.add('open');}
+async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();document.getElementById('hire-modal').classList.add('open');
+  // Ensure contacts are loaded so driver lookup can surface local matches + match by dynamics_id on save-back
+  if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
+}
 function openEditHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
   document.getElementById('hire-modal-title').textContent='Edit hire';
+  clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
   f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-agreement',h.agreement_ref);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-vat-status',h.vat_status||'full');f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  // Driver FK + Dynamics id (if contact exists with dynamics_id)
+  f('hf-driver-contact-id',h.driver_contact_id||'');
+  const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
+  f('hf-driver-dynamics-id',driverContact?.dynamics_id||'');
+  window._lastSelectedDriverName=h.driver||'';
   supps=Array.isArray(h.supplementaries)?h.supplementaries.map(s=>({...s})):[];renderSupps();updateHireRatePreview();
+  updateHireD365Link('account');updateHireD365Link('driver');
   document.getElementById('hire-modal').classList.add('open');
 }
 function populateHireAccountDropdown(){
@@ -1860,7 +2130,13 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();updateHireRatePreview();}
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-reference','hf-reg','hf-makemodel','hf-agreement','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';document.getElementById('hf-vat-status').value='full';supps=[];renderSupps();updateHireRatePreview();
+  // reset Dynamics UI bits
+  const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
+  document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
+  ['hf-account-d365','hf-driver-d365'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.removeAttribute('href');}});
+  window._lastSelectedDriverName='';
+}
 
 // ─── Supplementary charges repeater ───
 let supps=[];
@@ -1930,7 +2206,7 @@ async function saveHire(){
   const cleanSupps=supps
     .filter(s=>{const c=suppCost(s),u=suppUpsell(s);return (c||u);})
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,vehicle_reg:document.getElementById('hf-reg').value.trim().toUpperCase()||null,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,agreement_ref:document.getElementById('hf-agreement').value.trim()||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:document.getElementById('hf-vat-status').value||'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
@@ -1991,7 +2267,7 @@ function buildAccountCard(a){
         <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-val">${esc(a.contact_phone||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Account manager</div><div class="detail-val">${esc(a.account_manager||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Payment method</div><div class="detail-val">${pmLabel}</div></div>
-        <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${esc(a.dynamics_id||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${a.dynamics_id?`<a href="${d365Url('account',a.dynamics_id)}" target="_blank" rel="noopener" class="d365-chip small" title="${esc(a.dynamics_id)}">↗ Open in Dynamics</a>`:'—'}</div></div>
       </div>
       ${a.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(a.address)}</div>`:''}
       ${a.notes?`<div class="notes-box">${esc(a.notes)}</div>`:''}
@@ -2016,10 +2292,11 @@ function openEditAccount(id){
   document.getElementById('account-modal-title').textContent='Edit account';
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
   f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);f('acf-address',a.address);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);
+  updateAccountDynamicsLink();
   document.getElementById('account-modal').classList.add('open');
 }
 function closeAccountModal(){document.getElementById('account-modal').classList.remove('open');}
-function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';}
+function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';updateAccountDynamicsLink();}
 async function saveAccount(){
   const company=document.getElementById('acf-company').value.trim();if(!company){toast('Company name required','error');return;}
   const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,updated_at:new Date().toISOString()};
@@ -2102,11 +2379,26 @@ function openEditContact(id){
   document.getElementById('contact-modal-title').textContent='Edit contact';
   populateContactAccountSelect(c.account_id);
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('ctf-first',c.first_name);f('ctf-surname',c.last_name);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);
+  f('ctf-first',c.first_name);f('ctf-surname',c.last_name);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);f('ctf-dynamics',c.dynamics_id);
+  updateContactDynamicsLink();
   document.getElementById('contact-modal').classList.add('open');
 }
 function closeContactModal(){document.getElementById('contact-modal').classList.remove('open');}
-function clearContactForm(){['ctf-first','ctf-surname','ctf-preferred','ctf-empno','ctf-email','ctf-mobile','ctf-address','ctf-job','ctf-grade','ctf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('ctf-addr-type').value='home';document.getElementById('ctf-type').value='driver';document.getElementById('ctf-status').value='employed';}
+function clearContactForm(){['ctf-first','ctf-surname','ctf-preferred','ctf-empno','ctf-email','ctf-mobile','ctf-address','ctf-job','ctf-grade','ctf-notes','ctf-dynamics'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('ctf-addr-type').value='home';document.getElementById('ctf-type').value='driver';document.getElementById('ctf-status').value='employed';updateContactDynamicsLink();}
+function updateContactDynamicsLink(){
+  const id=(document.getElementById('ctf-dynamics')?.value||'').trim();
+  const link=document.getElementById('ctf-dynamics-link');if(!link)return;
+  const url=id?d365Url('contact',id):null;
+  if(url){link.href=url;link.style.display='inline-flex';}
+  else{link.removeAttribute('href');link.style.display='none';}
+}
+function updateAccountDynamicsLink(){
+  const id=(document.getElementById('acf-dynamics')?.value||'').trim();
+  const link=document.getElementById('acf-dynamics-link');if(!link)return;
+  const url=id?d365Url('account',id):null;
+  if(url){link.href=url;link.style.display='inline-flex';}
+  else{link.removeAttribute('href');link.style.display='none';}
+}
 function populateContactAccountSelect(selectedId=''){
   const sel=document.getElementById('ctf-account');if(!sel)return;
   sel.innerHTML='<option value="">— no account —</option>'+allAccounts.sort((a,b)=>a.company_name.localeCompare(b.company_name)).map(a=>`<option value="${a.id}"${a.id===selectedId?' selected':''}>${esc(a.company_name)}</option>`).join('');
@@ -2114,7 +2406,7 @@ function populateContactAccountSelect(selectedId=''){
 async function saveContact(){
   const first=document.getElementById('ctf-first').value.trim(),surname=document.getElementById('ctf-surname').value.trim();
   if(!first||!surname){toast('First name and surname required','error');return;}
-  const payload={first_name:first,last_name:surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={first_name:first,last_name:surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,dynamics_id:document.getElementById('ctf-dynamics').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editContactId){await sbReq(`covase_contacts?id=eq.${encodeURIComponent(editContactId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allContacts.findIndex(x=>x.id===editContactId);if(idx>=0)allContacts[idx]={...allContacts[idx],...payload};toast('Contact updated','success');}
     else{const res=await sbReq('covase_contacts',{method:'POST',body:{...payload,id:'ct-'+Date.now()}});allContacts.push(Array.isArray(res)?res[0]:res||{...payload,id:'ct-'+Date.now()});allContacts.sort((a,b)=>a.last_name.localeCompare(b.last_name));toast('Contact saved','success');}
