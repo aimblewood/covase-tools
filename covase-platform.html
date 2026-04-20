@@ -522,9 +522,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   <div class="view" id="view-hires-pipeline">
     <div class="topbar">
       <h1>Pipeline</h1>
-      <label style="font-size:12px;color:var(--n500);display:flex;align-items:center;gap:6px;margin-right:auto;margin-left:14px">
-        <input type="checkbox" id="pipe-show-cancelled" onchange="renderPipeline()"> Show cancelled
-      </label>
+      <div style="display:flex;align-items:center;gap:10px;margin-right:auto;margin-left:14px;font-size:12px;color:var(--n500);">
+        <label style="display:flex;align-items:center;gap:6px">
+          <span>Client</span>
+          <select id="pipe-filter-client" onchange="renderPipeline()" style="font-size:12px;padding:3px 6px;border:1px solid var(--n200);border-radius:6px;background:#fff;min-width:160px">
+            <option value="">All clients</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px">
+          <span>Sort</span>
+          <select id="pipe-sort" onchange="renderPipeline()" style="font-size:12px;padding:3px 6px;border:1px solid var(--n200);border-radius:6px;background:#fff">
+            <option value="default">Default</option>
+            <option value="account_asc">Account name (A–Z)</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="pipe-show-cancelled" onchange="renderPipeline()"> Show cancelled
+        </label>
+      </div>
       <button class="topbar-btn" onclick="loadHires()">↻ Refresh</button>
       <button class="topbar-btn primary" onclick="openNewHire()">+ New Hire</button>
     </div>
@@ -1893,14 +1908,29 @@ const HIRE_NEXT={requested:'booked',booked:'active',active:'offhired'};
 function renderPipeline(){
   const wrap=document.getElementById('kanban-board');if(!wrap)return;
   const showCancelled=document.getElementById('pipe-show-cancelled')?.checked;
-  // Bucket hires by column
+  const clientFilter=document.getElementById('pipe-filter-client')?.value||'';
+  const sortMode=document.getElementById('pipe-sort')?.value||'default';
+  // Populate client dropdown from current hires (unique customer strings)
+  populatePipeClientFilter();
+  // Bucket hires by column, applying the client filter first
   const buckets={requested:[],booked:[],active:[],offhired:[],paid:[],cancelled:[]};
   (allHires||[]).forEach(h=>{
+    if(clientFilter){
+      // Match by client_account_id if set, else fall back to customer text
+      const matches=(h.client_account_id&&h.client_account_id===clientFilter)
+                 ||(!h.client_account_id&&(h.customer||'')===clientFilter);
+      if(!matches)return;
+    }
     if(h.hire_status==='cancelled'){buckets.cancelled.push(h);return;}
     // Any hire with billing_status='paid' belongs in the Paid column regardless of hire_status
     if(h.billing_status==='paid'){buckets.paid.push(h);return;}
     if(buckets[h.hire_status])buckets[h.hire_status].push(h);
   });
+  // Apply sort per bucket
+  if(sortMode==='account_asc'){
+    const byName=(a,b)=>(a.customer||'').localeCompare(b.customer||'',undefined,{sensitivity:'base'});
+    Object.keys(buckets).forEach(k=>buckets[k].sort(byName));
+  }
   const cols=PIPELINE_COLS.map(c=>{
     const items=buckets[c.key]||[];
     const body=items.length
@@ -1919,6 +1949,31 @@ function renderPipeline(){
     </div>`;
   }
   wrap.innerHTML=out;
+}
+// Build the Pipeline "Client" filter dropdown from current hires.
+// Uses client_account_id when available (preferred — stable), falls back to customer text for legacy rows.
+function populatePipeClientFilter(){
+  const sel=document.getElementById('pipe-filter-client');if(!sel)return;
+  const current=sel.value;
+  // Map of value → label, preferring account_id keys
+  const byId=new Map(),byName=new Map();
+  (allHires||[]).forEach(h=>{
+    if(h.client_account_id){
+      if(!byId.has(h.client_account_id))byId.set(h.client_account_id,h.customer||h.client_account_id);
+    }else if(h.customer){
+      byName.set(h.customer,h.customer);
+    }
+  });
+  // Prefer account names from allAccounts if loaded (keeps labels in sync if renamed)
+  if(Array.isArray(allAccounts)){
+    allAccounts.forEach(a=>{if(byId.has(a.id))byId.set(a.id,a.company_name||byId.get(a.id));});
+  }
+  const entries=[...[...byId.entries()].map(([v,l])=>({value:v,label:l})),
+                 ...[...byName.entries()].map(([v,l])=>({value:v,label:l}))];
+  entries.sort((a,b)=>a.label.localeCompare(b.label,undefined,{sensitivity:'base'}));
+  sel.innerHTML='<option value="">All clients</option>'+entries.map(e=>`<option value="${esc(e.value)}">${esc(e.label)}</option>`).join('');
+  // Restore selection if still valid
+  if(current&&[...sel.options].some(o=>o.value===current))sel.value=current;
 }
 function kanCard(h){
   const bl=h.billing_status||'pending';
