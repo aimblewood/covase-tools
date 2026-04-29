@@ -370,7 +370,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .kan-card-l1{font-family:'Outfit',sans-serif;font-weight:600;font-size:13px;color:var(--n800);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kan-card-l2{font-size:12px;color:var(--n700);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kan-card-l3{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
-.kan-card-l4{font-size:11px;color:var(--n500);line-height:1.25;font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
+.kan-card-l4{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
 .kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;}
 .kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;}
 .kan-card-r2.profit-pos{color:var(--tl-green-t);}
@@ -407,7 +407,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   <nav class="sb-nav">
     <div class="sb-section">
       <div class="sb-section-label">Billing</div>
-      <div class="sb-item active" onclick="showView('received',this)">
+      <div class="sb-item" onclick="showView('received',this)">
         <span class="icon">↓</span> Received invoices
         <span class="sb-badge" id="badge-pending">—</span>
       </div>
@@ -419,16 +419,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="sb-divider"></div>
     <div class="sb-section">
       <div class="sb-section-label">Short Hires</div>
-      <div class="sb-item" onclick="showView('hires-pipeline',this)">
-        <span class="icon">▦</span> Pipeline
-        <span class="sb-badge" id="badge-pipeline">—</span>
-      </div>
-      <div class="sb-item" onclick="showView('hires-active',this)">
+      <div class="sb-item active" onclick="showView('hires-pipeline',this)">
         <span class="icon">🚗</span> Active hires
-        <span class="sb-badge" id="badge-active-hires">—</span>
-      </div>
-      <div class="sb-item" onclick="showView('hires-all',this)">
-        <span class="icon">☰</span> All hires
+        <span class="sb-badge" id="badge-pipeline">—</span>
       </div>
       <div class="sb-item" onclick="showView('hires-recharge',this)">
         <span class="icon">↑</span> Pending recharge
@@ -488,7 +481,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 <main class="main">
 
   <!-- RECEIVED INVOICES -->
-  <div class="view active" id="view-received">
+  <div class="view" id="view-received">
     <div class="topbar">
       <h1>Received invoices</h1>
       <div style="display:flex;gap:6px">
@@ -523,10 +516,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="content"><div class="card-list" id="outgoing-list"><div class="loading">Loading…</div></div></div>
   </div>
 
-  <!-- HIRES PIPELINE (Kanban) -->
-  <div class="view" id="view-hires-pipeline">
+  <!-- HIRES PIPELINE (Kanban) — sidebar label "Active hires" -->
+  <div class="view active" id="view-hires-pipeline">
     <div class="topbar">
-      <h1>Pipeline</h1>
+      <h1>Active hires</h1>
       <div style="display:flex;align-items:center;gap:10px;margin-right:auto;margin-left:14px;font-size:12px;color:var(--n500);">
         <label style="display:flex;align-items:center;gap:6px">
           <span>Client</span>
@@ -1909,6 +1902,8 @@ const PIPELINE_COLS=[
   {key:'offhired',  label:'Off-hired'},
   {key:'paid',      label:'Paid'}
 ];
+// How many days back to include in the Off-hired column (number) or 'all'.
+let pipeOffhiredWindow='30';
 // Advance chain: which hire_status comes next on "→ Move" click
 const HIRE_NEXT={requested:'booked',booked:'active',active:'offhired'};
 function renderPipeline(){
@@ -1932,6 +1927,16 @@ function renderPipeline(){
     if(h.billing_status==='paid'){buckets.paid.push(h);return;}
     if(buckets[h.hire_status])buckets[h.hire_status].push(h);
   });
+  // Off-hired window filter — only affects the off-hired bucket
+  if(pipeOffhiredWindow!=='all'){
+    const days=parseInt(pipeOffhiredWindow,10)||30;
+    const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);cutoff.setHours(0,0,0,0);
+    buckets.offhired=buckets.offhired.filter(h=>{
+      if(!h.end_date)return true;       // no end date — show
+      const d=new Date(h.end_date);
+      return !isNaN(d)&&d>=cutoff;
+    });
+  }
   // Apply sort per bucket
   if(sortMode==='account_asc'){
     const byName=(a,b)=>(a.customer||'').localeCompare(b.customer||'',undefined,{sensitivity:'base'});
@@ -1942,8 +1947,16 @@ function renderPipeline(){
     const body=items.length
       ? items.map(h=>kanCard(h)).join('')
       : `<div class="kan-col-empty">Nothing here</div>`;
+    // Off-hired column gets a small window-filter dropdown next to the count
+    const offhiredCtl=c.key==='offhired'
+      ? `<select onchange="pipeOffhiredWindow=this.value;renderPipeline()" style="font-size:10px;padding:1px 4px;border:1px solid var(--n200);border-radius:5px;background:#fff;color:var(--n600);margin-left:auto;margin-right:6px" title="Off-hired date window">
+           <option value="30"${pipeOffhiredWindow==='30'?' selected':''}>Last 30d</option>
+           <option value="60"${pipeOffhiredWindow==='60'?' selected':''}>Last 60d</option>
+           <option value="all"${pipeOffhiredWindow==='all'?' selected':''}>All</option>
+         </select>`
+      : '';
     return `<div class="kan-col">
-      <div class="kan-col-header"><span class="kan-col-title">${esc(c.label)}</span><span class="kan-col-count">${items.length}</span></div>
+      <div class="kan-col-header"><span class="kan-col-title">${esc(c.label)}</span>${offhiredCtl}<span class="kan-col-count">${items.length}</span></div>
       <div class="kan-col-body">${body}</div>
     </div>`;
   }).join('');
@@ -2007,8 +2020,7 @@ function kanCard(h){
       <div class="kan-card-l4">${esc(h.reference||'—')}</div>
     </div>
     <div class="kan-card-bottom">
-      <span class="kan-bill-pill ${bl}">${esc(blLabels[bl]||bl)}</span>
-      <div class="kan-card-actions">${advBtn}${cancelBtn}</div>
+      <div class="kan-card-actions" style="margin-left:auto">${advBtn}${cancelBtn}</div>
     </div>
   </div>`;
 }
@@ -2707,8 +2719,10 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
   });
 });
 
-// Boot
-loadInvoices();
+// Boot — Active hires (Pipeline) is the default landing view
+loadHires();
+// Also load accounts in the background so the client filter dropdown is populated immediately
+loadAccounts();
 </script>
 </body>
 </html>
