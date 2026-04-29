@@ -24,8 +24,11 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;font-size:14px}
 
 /* ─── SIDEBAR ─── */
-.sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;overflow-y:auto;}
-.sidebar::-webkit-scrollbar{width:0}
+.sidebar{width:var(--sidebar-w);height:100vh;background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
+.sidebar::-webkit-scrollbar{width:6px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+.sidebar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
 .sb-logo{padding:22px 20px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}
 .sb-logo-mark{width:36px;height:36px;border-radius:10px;background:var(--covase);display:flex;align-items:center;justify-content:center;color:var(--indigo);font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;box-shadow:0 2px 12px rgba(3,211,198,.3);flex-shrink:0}
 .sb-logo-text .name{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:-.3px}
