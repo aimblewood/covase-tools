@@ -707,10 +707,6 @@ body{padding-top:32px}
           <a id="hf-driver-d365" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none;margin-top:6px;align-self:flex-start">↗ Open in Dynamics</a>
         </div>
       </div>
-      <div class="form-row">
-        <div></div>
-        <div class="form-field"><label>Driver mobile</label><input id="hf-mobile" type="tel" placeholder="07XXX XXX XXX" autocomplete="off"></div>
-      </div>
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
         <div class="form-field"><label>Hire status</label>
@@ -731,6 +727,10 @@ body{padding-top:32px}
       <div class="form-row">
         <div class="form-field"><label>Town / city</label><input id="hf-town" placeholder=""></div>
         <div class="form-field"><label>Postcode</label><input id="hf-postcode" placeholder="" style="text-transform:uppercase"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Driver mobile</label><input id="hf-mobile" type="tel" placeholder="07XXX XXX XXX" autocomplete="off"></div>
+        <div></div>
       </div>
       <div class="form-section-label">Vehicle</div>
       <div class="form-row">
@@ -1351,11 +1351,18 @@ async function selectDynamicsDriver(idx){
     toast('Matched to existing Covase contact','success');
     return;
   }
-  // Resolve account_id via the Dynamics parent account, if present in covase_accounts
+  // Resolve account_id: prefer the Dynamics parent account (if matched locally),
+  // otherwise fall back to whatever customer the user has picked on the hire form.
+  // covase_contacts.account_id is NOT NULL so we must always have a value.
   let accId=null;
   if(d.accountId){
     const accMatch=(allAccounts||[]).find(a=>a.dynamics_id===d.accountId);
     if(accMatch)accId=accMatch.id;
+  }
+  if(!accId)accId=document.getElementById('hf-account')?.value||null;
+  if(!accId){
+    toast('Pick a customer account first — driver can\'t be saved without one','error');
+    return;
   }
   try{
     const payload={
