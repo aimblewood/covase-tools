@@ -729,10 +729,10 @@ body::after {
 
 /* Annotations */
 .annot-line {
-  stroke: var(--ink-3);
-  stroke-width: 0.8;
-  stroke-dasharray: 1 4;
-  opacity: 0.55;
+  stroke: var(--ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+  opacity: 0.75;
 }
 
 .annot-marker {
@@ -769,6 +769,208 @@ body::after {
   max-width: 280px;
   line-height: 1.45;
 }
+
+/* ════════════════════════════════════════════════════════════
+   FROM THE WIRES — news bulletin boxes
+   ════════════════════════════════════════════════════════════ */
+
+.section-head.wires-head {
+  position: relative;
+}
+
+.wires-refresh {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 5px 10px 5px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.wires-refresh:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.wires-refresh svg {
+  flex-shrink: 0;
+  transition: transform 0.6s ease;
+}
+
+.wires-refresh.spinning svg {
+  transform: rotate(360deg);
+}
+
+.wires {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 3px double var(--ink);
+  border-bottom: 3px double var(--ink);
+  margin: 14px 0 28px;
+}
+
+.wire {
+  padding: 18px 18px 16px;
+  border-right: 1px solid var(--rule-soft);
+  position: relative;
+  min-height: 220px;
+  overflow: hidden; /* contain floats */
+}
+
+.wire:last-child { border-right: none; }
+
+.wire-banner {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 8px,
+      rgba(110, 31, 21, 0.025) 8px 9px
+    );
+}
+
+.wire-banner::before {
+  content: "★ EXTRA ★";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 8.5px;
+  letter-spacing: 0.32em;
+  color: var(--diesel);
+  background: var(--paper);
+  padding: 2px 6px;
+  border: 1px solid var(--diesel);
+  z-index: 1;
+}
+
+.wire-thumb {
+  width: 64px;
+  height: 64px;
+  float: left;
+  margin: 22px 12px 4px 0;
+  /* sepia / lithograph treatment */
+  filter:
+    sepia(1)
+    saturate(1.3)
+    hue-rotate(-12deg)
+    brightness(0.78)
+    contrast(1.1);
+  opacity: 0.78;
+}
+
+.wire-thumb svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wire-thumb svg path,
+.wire-thumb svg line,
+.wire-thumb svg circle,
+.wire-thumb svg ellipse,
+.wire-thumb svg rect {
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wire-body {
+  display: block;
+}
+
+.wire-kicker {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 4px;
+}
+
+.wire-headline {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1.05;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  margin-bottom: 6px;
+  text-wrap: balance;
+}
+
+.wire-banner .wire-headline {
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.wire-deck {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+  border-bottom: 1px dotted var(--rule-soft);
+  padding-bottom: 8px;
+}
+
+.wire-lead {
+  font-family: 'IM Fell English', serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-align: justify;
+  hyphens: auto;
+  /* drop-cap on banner */
+}
+
+.wire-banner .wire-lead::first-letter {
+  font-family: 'Playfair Display', serif;
+  font-weight: 800;
+  font-size: 36px;
+  float: left;
+  line-height: 0.9;
+  margin: 4px 6px 0 0;
+  color: var(--diesel);
+}
+
+.wire-source {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.wire-source a {
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-3);
+}
+.wire-source a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
 
 /* ════════════════════════════════════════════════════════════
    CALCULATOR — classified-style box
@@ -962,6 +1164,12 @@ body::after {
     padding: 8px 0;
   }
   .calc-result > div:last-child { border-bottom: none; }
+  .wires { grid-template-columns: 1fr; }
+  .wire { border-right: none; border-bottom: 1px solid var(--rule-soft); }
+  .wire:last-child { border-bottom: none; }
+  .wires-refresh span { display: none; }
+  .wires-refresh { padding: 5px 7px; }
+  .wire-banner .wire-headline { font-size: 22px; }
 }
 
 @media (max-width: 640px) {
@@ -1090,6 +1298,60 @@ body::after {
     <svg class="chart-svg" id="chart" preserveAspectRatio="none"></svg>
     <div class="tooltip" id="tooltip"></div>
   </div>
+
+  <!-- ════ FROM THE WIRES — News bulletins ════ -->
+  <div class="section-head wires-head">
+    <h2>From the Wires <span class="ornament">·</span> Despatches on Motor Fuel</h2>
+    <button class="wires-refresh" id="wiresRefresh" title="Reset the press — fresh wires" aria-label="Refresh news">
+      <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+        <path d="M14 8 A6 6 0 1 1 8 2 L8 0 L12 3 L8 6 L8 4 A4 4 0 1 0 12 8 Z" fill="currentColor"/>
+      </svg>
+      <span>Re-set the wires</span>
+    </button>
+  </div>
+
+  <section class="wires">
+    <!-- Box 1: PERMANENT — Iran war begins -->
+    <article class="wire wire-banner">
+      <div class="wire-thumb wire-thumb-war" aria-hidden="true">
+        <svg viewBox="0 0 80 80">
+          <!-- horizon -->
+          <line x1="0" y1="64" x2="80" y2="64"/>
+          <!-- bomber plane silhouette top-left -->
+          <path d="M4 14 L24 14 L26 16 L24 18 L4 18 L2 16 Z"/>
+          <!-- bomber wings -->
+          <path d="M11 14 L13 6 L17 6 L17 14"/>
+          <path d="M11 18 L13 26 L17 26 L17 18"/>
+          <!-- bomber tail -->
+          <path d="M2 14 L-1 11 L-1 19 L2 18"/>
+          <!-- bombs falling in succession -->
+          <ellipse cx="20" cy="32" rx="1.3" ry="3"/>
+          <line x1="20" y1="35.5" x2="20" y2="38" stroke-width="0.8"/>
+          <ellipse cx="32" cy="44" rx="1.3" ry="3"/>
+          <line x1="32" y1="47.5" x2="32" y2="50" stroke-width="0.8"/>
+          <!-- big star-burst explosion -->
+          <path d="M48 60 L40 48 M48 60 L44 44 M48 60 L48 40 M48 60 L52 44 M48 60 L56 48 M48 60 L60 52 M48 60 L36 56 M48 60 L60 56"/>
+          <!-- burning refinery / derrick on right -->
+          <path d="M62 64 L66 50 M76 64 L66 50 M64 56 L74 56 M65 60 L75 60"/>
+          <!-- smoke plume -->
+          <path d="M66 50 Q62 42 68 36 Q76 30 70 42 Q78 36 72 48"/>
+          <!-- dashed rubble lines -->
+          <line x1="0" y1="70" x2="80" y2="70" stroke-dasharray="3 2"/>
+          <line x1="0" y1="74" x2="80" y2="74" stroke-dasharray="2 3"/>
+        </svg>
+      </div>
+      <div class="wire-body">
+        <div class="wire-kicker">By Cable Wire · New York &amp; London · 28 February MMXXVI</div>
+        <h3 class="wire-headline">War! Yanks Bomb Persia</h3>
+        <div class="wire-deck">Hormuz Strait Sealed Tight as American &amp; Israeli Guns Open Up; Iran's Oil Lanes Choked, Tehran in Flames</div>
+        <p class="wire-lead">Motorists from Manchester to Manhattan brace for a calamity at the pump as the Civilised World's chief artery for crude is severed by gunfire and mine. Despatches from the front speak of refineries ablaze and tankers turned back. Forecourts the world over are warned to expect prices unseen since the Russian troubles of '22.</p>
+      </div>
+    </article>
+
+    <!-- Boxes 2 & 3: REFRESHABLE wires from a curated pool -->
+    <article class="wire wire-live" id="wire-2"></article>
+    <article class="wire wire-live" id="wire-3"></article>
+  </section>
 
   <!-- Tank calculator -->
   <section class="calc">
@@ -2613,20 +2875,39 @@ function render() {
       .map(ev => ({ ...ev, _day: dateToDay(ev.date), _x: x(dateToDay(ev.date)) }))
       .sort((a, b) => a._x - b._x);
 
-    // Stagger labels: cycle through 3 vertical positions so close events don't collide.
-    // Flip labels to the left of the marker if right-anchored would overflow the chart.
+    // Place labels with proper collision detection. Each label gets the first
+    // vertical slot that doesn't overlap any previously-placed label.
     const rightBound = W - M.right;
-    visibleEvents.forEach((ev, i) => {
+    const slots = [M.top + 12, M.top + 25, M.top + 38, M.top + 51, M.top + 64];
+    const placedLabels = []; // {x1, x2, y}
+    visibleEvents.forEach(ev => {
       const xp = ev._x;
-      const labelY = M.top + 12 + (i % 3) * 13;
       svgContent += `<line class="annot-line" x1="${xp}" y1="${M.top}" x2="${xp}" y2="${H - M.bottom}"/>`;
-      // Triangle marker at the bottom of the chart pointing up
       const triY = H - M.bottom;
       svgContent += `<path class="annot-marker" d="M${xp - 4},${triY + 1} L${xp + 4},${triY + 1} L${xp},${triY - 5} Z"/>`;
-      // Label — estimate width (small-caps at 9.5px ≈ 6px/char with letter-spacing).
-      // If left-anchored would overflow the right edge, flip to right-anchor on the other side of the line.
+
+      // Estimate label width & decide anchor side
       const estLabelWidth = ev.label.length * 6;
       const overflowsRight = xp + 4 + estLabelWidth > rightBound;
+      let lx1, lx2;
+      if (overflowsRight) {
+        lx2 = xp - 4;
+        lx1 = lx2 - estLabelWidth;
+      } else {
+        lx1 = xp + 4;
+        lx2 = lx1 + estLabelWidth;
+      }
+
+      // Find first slot with no horizontal overlap with previously-placed labels
+      let labelY = slots[slots.length - 1];
+      for (const sy of slots) {
+        const overlaps = placedLabels.some(p =>
+          p.y === sy && !(lx2 < p.x1 - 4 || lx1 > p.x2 + 4)
+        );
+        if (!overlaps) { labelY = sy; break; }
+      }
+      placedLabels.push({ x1: lx1, x2: lx2, y: labelY });
+
       if (overflowsRight) {
         svgContent += `<text class="annot-label" text-anchor="end" x="${xp - 4}" y="${labelY}">${ev.label}</text>`;
       } else {
@@ -2867,6 +3148,181 @@ function renderCalculator(stats) {
   document.getElementById('costAnnual').textContent = fmtGbp(avgAnnual);
 }
 
+// ─── From the Wires — news pool ────────────────────────────
+// Curated pool of real, recent fuel-cost-related headlines from the searches
+// done at build time. The "Reset the wires" button shuffles two of these into
+// the live boxes. Each entry tags the right SVG illustration to render alongside.
+const WIRE_POOL = [
+  {
+    headline: "Yankee Pumps Top Six Bucks the Gallon",
+    deck: "California's forecourts breach $6.11 — a high not seen since '23 — as the Hormuz blockade tightens its grip",
+    lead: "The Golden State's motorists pay a fearsome toll. Refiners on the Pacific seaboard, starved of Persian crude and barred from their usual Asian feedstock channels, lean ever harder on slim domestic stocks. Sacramento speaks of emergency price-cap measures whilst hauliers along Interstate Five report queueing twenty deep at certain depots.",
+    source: "OilPrice.com · 5 May MMXXVI",
+    icon: "PUMP",
+  },
+  {
+    headline: "Oil Tanker Inches Through Hormuz",
+    deck: "First Persian-linked LPG cargo since the blockade slips through to Indian shores under armed guard",
+    lead: "A solitary LPG carrier breaks the silence in the Gulf, slipping through the narrows under naval escort. Shipping insurers describe it as a hopeful signal — though premiums remain perilous, and Lloyd's of London continues to charge wartime rates. The vessel's safe arrival in Mumbai is met with cautious relief in the trading rooms of Singapore and Geneva alike.",
+    source: "OilPrice.com · 4 May MMXXVI",
+    icon: "TANKER",
+  },
+  {
+    headline: "Whitehall Mulls Wartime Fuel Powers",
+    deck: "Global jet-fuel shipments fall to record lows; Ministers weigh emergency measures to keep aircraft flying",
+    lead: "The Aviation Ministry calls an extraordinary session at Westminster. Insiders speak of rationing measures should the Persian crisis stretch into the high summer trade. Carriers from Heathrow to Ringway have already trimmed schedules; officials caution that further cuts may prove unavoidable should Hormuz remain shut into July.",
+    source: "OilPrice.com · 4 May MMXXVI",
+    icon: "GLOBE",
+  },
+  {
+    headline: "OPEC+ Opens the Taps",
+    deck: "Cartel agrees to lift output 188,000 bbl/day in June — a measured response to the supply emergency",
+    lead: "Riyadh and Moscow speak of restraint and discipline at the Vienna meeting. Western analysts, however, call the increase symbolic at best — the loss from Hormuz dwarfs it many times over. The cartel's traders concede privately that without Persian crude returning to market, no production hike can plug the breach.",
+    source: "Trading Economics · 4 May MMXXVI",
+    icon: "DERRICK",
+  },
+  {
+    headline: "U.A.E. Quits OPEC; Cartel in Disarray",
+    deck: "Emirates' shock departure followed by Kazakh murmurings — the old order of oil cracks under wartime strain",
+    lead: "A second cartel — OAPEC — also loses Abu Dhabi this fortnight, in a coordinated diplomatic withdrawal. Diplomats whisper that the Persian crisis has shaken the producers' compact to its foundations. The Emirates' move is described in Riyadh as a betrayal; in Washington, as the inevitable consequence of putting commerce before alliance.",
+    source: "OilPrice.com · 3 May MMXXVI",
+    icon: "GLOBE",
+  },
+  {
+    headline: "Hormuz Ceasefire Trembles",
+    deck: "Persian Gulf clash reignites the four-week truce; tankers turn about-face in panic",
+    lead: "Shells exchanged off Bandar Abbas Monday last, with reports of two American naval craft engaging Iranian patrol boats. The careful peace, brokered through Doha, hangs by a thread according to Mid-Eastern correspondents. Tehran denies the engagement; Washington's response has been pointedly reserved, raising fears that the ceasefire's collapse is a matter of weeks, not months.",
+    source: "OilPrice.com · 3 May MMXXVI",
+    icon: "TANKER",
+  },
+  {
+    headline: "Britain's Pump Prices Steady — For Now",
+    deck: "UK average diesel holds at 188.5p; petrol at 157p — but forecourt margins remain twice the pre-war norm",
+    lead: "The Competition Authority sounds a warning bell on margins. The spread between wholesale and forecourt has not narrowed even as crude eases from its March peak — instead, retailers appear to be banking the difference. Consumer groups call for the Authority's enforcement powers to be wielded more sharply against the worst-offending forecourts.",
+    source: "Heycar UK · 1 May MMXXVI",
+    icon: "PUMP",
+  },
+  {
+    headline: "Moody's Sounds Recession Klaxon",
+    deck: "Sustained crude above $100 the barrel would tip the world's economies over the brink, warns analyst",
+    lead: "The international ratings house issues a sobering despatch from its Sydney office. Asia, says the report, would bear the first and heaviest blow — particularly the export economies of Japan and South Korea. Europe and the Americas, while better cushioned, would feel the squeeze through their automotive and aviation industries within months of any prolonged supply disruption.",
+    source: "OilPrice.com · 30 April MMXXVI",
+    icon: "GLOBE",
+  },
+  {
+    headline: "India Condemns Strike on Fujairah",
+    deck: "Persian assault on the U.A.E. oil hub draws sharp protest from New Delhi; LPG queues swell across the subcontinent",
+    lead: "Long lines reported at fuel depots from Mumbai to Calcutta as the populace lays in supplies. The Government's emergency rations of kerosene grow thinner by the day. New Delhi's protest at the United Nations is met with sympathy but little practical assistance; the subcontinent's vulnerability to Gulf disruption is now an urgent matter of state.",
+    source: "OilPrice.com · 28 April MMXXVI",
+    icon: "DERRICK",
+  },
+  {
+    headline: "U.K. Fuel Finder Goes Live",
+    deck: "Forecourts must report price changes within thirty minutes — the C.M.A. seeks to break the postcode lottery",
+    lead: "Ministers laud the new transparency law as a triumph of competition policy. Sceptics, however, note that openness alone may not ease the strain on the motorist's wallet — particularly in rural districts where forecourt choice is limited. The Authority promises a three-month grace period before enforcement begins in earnest, after which laggard retailers will face stiff penalties.",
+    source: "Heycar UK · 9 February MMXXVI",
+    icon: "PUMP",
+  },
+  {
+    headline: "Gasoline Futures Touch Four-Year High",
+    deck: "New York Harbor gasoline futures kiss $3.65/gal as US stocks fall for an eleventh consecutive week",
+    lead: "Refiners along the Eastern seaboard prioritise distillates over motor spirit, leaving gasoline stocks dangerously thin. Analysts warn the summer driving season may be the most expensive in living memory. The American Automobile Association already advises members to delay long journeys until the autumn, when supply conditions may prove more favourable.",
+    source: "Trading Economics · 5 May MMXXVI",
+    icon: "DERRICK",
+  },
+  {
+    headline: "Diesel-Petrol Gulf Widens",
+    deck: "DESNZ figures show pump spread at 18.4p/L — more than double the long-run average",
+    lead: "Hauliers feel the pinch sharpest, with smaller firms reporting margin erosion of seven pence per mile. Food manufacturers warn that the differential will travel directly into the price of the weekly basket of groceries. The Federation of British Industries calls upon Westminster to consider further duty relief for goods vehicles, lest the supply chain begin to seize.",
+    source: "DESNZ Quarterly · 31 March MMXXVI",
+    icon: "PUMP",
+  },
+];
+
+// SVG illustration library — sepia-styled etchings
+const WIRE_ICONS = {
+  DERRICK: `
+    <svg viewBox="0 0 80 80">
+      <line x1="0" y1="68" x2="80" y2="68"/>
+      <path d="M28 68 L40 22 M52 68 L40 22 M30 56 L50 56 M32 62 L48 62 M28 50 L52 50"/>
+      <path d="M30 38 L50 38 M32 30 L48 30"/>
+      <path d="M40 22 Q34 14 41 8 Q49 4 47 14 Q56 8 53 20 Q60 16 56 26"/>
+    </svg>`,
+  PUMP: `
+    <svg viewBox="0 0 80 80">
+      <line x1="6" y1="68" x2="74" y2="68"/>
+      <rect x="22" y="22" width="28" height="44"/>
+      <line x1="22" y1="36" x2="50" y2="36"/>
+      <line x1="22" y1="40" x2="50" y2="40"/>
+      <path d="M50 30 Q60 30 60 38 L60 52 L57 52 L57 60 L52 60"/>
+      <circle cx="36" cy="56" r="5"/>
+      <line x1="36" y1="51" x2="36" y2="55" stroke-width="0.8"/>
+    </svg>`,
+  GLOBE: `
+    <svg viewBox="0 0 80 80">
+      <circle cx="40" cy="40" r="28"/>
+      <ellipse cx="40" cy="40" rx="28" ry="11"/>
+      <ellipse cx="40" cy="40" rx="14" ry="28"/>
+      <line x1="12" y1="40" x2="68" y2="40"/>
+      <path d="M22 28 Q40 22 58 28" />
+      <path d="M22 52 Q40 58 58 52" />
+    </svg>`,
+  TANKER: `
+    <svg viewBox="0 0 80 80">
+      <path d="M8 50 L72 50 L66 62 L14 62 Z"/>
+      <rect x="34" y="40" width="22" height="10"/>
+      <line x1="45" y1="40" x2="45" y2="28"/>
+      <line x1="42" y1="33" x2="48" y2="33" stroke-width="0.8"/>
+      <line x1="0" y1="68" x2="80" y2="68" stroke-dasharray="2 3"/>
+      <line x1="0" y1="72" x2="80" y2="72" stroke-dasharray="3 2"/>
+      <line x1="20" y1="50" x2="20" y2="44" stroke-width="0.8"/>
+      <line x1="60" y1="50" x2="60" y2="44" stroke-width="0.8"/>
+    </svg>`,
+};
+
+// Track which wires are currently shown so we don't repeat on refresh
+let lastWireIndices = [];
+
+function pickRandomWires(count = 2) {
+  // Pick `count` distinct entries from WIRE_POOL, avoiding the previous picks if possible
+  const indices = WIRE_POOL.map((_, i) => i);
+  const available = indices.filter(i => !lastWireIndices.includes(i));
+  const pool = available.length >= count ? available : indices;
+  // Shuffle
+  const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+  const chosen = shuffled.slice(0, count);
+  lastWireIndices = chosen;
+  return chosen.map(i => WIRE_POOL[i]);
+}
+
+function renderWire(el, wire) {
+  const icon = WIRE_ICONS[wire.icon] || WIRE_ICONS.GLOBE;
+  el.innerHTML = `
+    <div class="wire-thumb wire-thumb-${wire.icon.toLowerCase()}" aria-hidden="true">${icon}</div>
+    <div class="wire-body">
+      <div class="wire-kicker">${wire.source}</div>
+      <h3 class="wire-headline">${wire.headline}</h3>
+      <div class="wire-deck">${wire.deck}</div>
+      <p class="wire-lead">${wire.lead}</p>
+    </div>
+  `;
+}
+
+function refreshWires() {
+  const picks = pickRandomWires(2);
+  const el2 = document.getElementById('wire-2');
+  const el3 = document.getElementById('wire-3');
+  if (el2) renderWire(el2, picks[0]);
+  if (el3) renderWire(el3, picks[1]);
+
+  // Spin animation on the refresh icon
+  const btn = document.getElementById('wiresRefresh');
+  if (btn) {
+    btn.classList.add('spinning');
+    setTimeout(() => btn.classList.remove('spinning'), 600);
+  }
+}
+
 // ─── Init ───────────────────────────────────────────────────
 function init() {
   // Set boundary dates on inputs
@@ -2944,6 +3400,11 @@ function init() {
     const stats = computeStats(filteredData());
     renderCalculator(stats);
   });
+
+  // Wires section — initial render and refresh button
+  refreshWires();
+  const refreshBtn = document.getElementById('wiresRefresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshWires);
 
   // Re-render on resize
   let resizeTimer;
