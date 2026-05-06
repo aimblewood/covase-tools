@@ -707,6 +707,10 @@ body{padding-top:32px}
           <a id="hf-driver-d365" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none;margin-top:6px;align-self:flex-start">↗ Open in Dynamics</a>
         </div>
       </div>
+      <div class="form-row">
+        <div></div>
+        <div class="form-field"><label>Driver mobile</label><input id="hf-mobile" type="tel" placeholder="07XXX XXX XXX" autocomplete="off"></div>
+      </div>
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
         <div class="form-field"><label>Hire status</label>
@@ -1309,11 +1313,13 @@ function prefillDeliveryFromDynamics(d){
   const line2=pick('address2','addressLine2','address1_line2','address1_line3');
   const town =pick('town','city','address1_city');
   const post =pick('postcode','postCode','postal_code','address1_postalcode','zip');
+  const mob  =pick('mobile','mobilePhone','mobilephone','phone','telephone1');
   // Only overwrite fields we have data for — preserves anything user already typed
   if(line1)document.getElementById('hf-addr1').value=line1;
   if(line2)document.getElementById('hf-addr2').value=line2;
   if(town) document.getElementById('hf-town').value=town;
   if(post) document.getElementById('hf-postcode').value=post.toUpperCase();
+  if(mob)  document.getElementById('hf-mobile').value=mob;
   // Visual cue
   const tag=document.getElementById('hf-delivery-source');
   if(tag&&(line1||town||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
@@ -1326,6 +1332,7 @@ async function selectDynamicsDriver(idx){
     document.getElementById('hf-driver').value=fn;
     document.getElementById('hf-driver-contact-id').value=ct.id;
     document.getElementById('hf-driver-dynamics-id').value=ct.dynamics_id||'';
+    if(ct.mobile)document.getElementById('hf-mobile').value=ct.mobile;
     window._lastSelectedDriverName=fn;
     updateHireD365Link('driver');
     return;
@@ -2208,7 +2215,7 @@ function buildHireCard(h){
     <div class="card-detail">
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">Customer</div><div class="detail-val">${esc(h.customer||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}${h.driver_mobile?` <span style="color:var(--n500);font-weight:400;font-size:11px">· ${esc(h.driver_mobile)}</span>`:''}</div></div>
         <div class="detail-field"><div class="detail-label">Booking ref</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(h.vehicle_reg||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Make / Model</div><div class="detail-val">${esc(h.make_model||'—')}</div></div>
@@ -2297,7 +2304,7 @@ function openEditHire(id){
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   // Driver FK + Dynamics id (if contact exists with dynamics_id)
   f('hf-driver-contact-id',h.driver_contact_id||'');
   const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
@@ -2315,7 +2322,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -2393,7 +2400,7 @@ async function saveHire(){
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
