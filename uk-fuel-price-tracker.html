@@ -3,27 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Fuel Price Tracker — 2003–2026</title>
+<title>The Homer Pump Ledger — A Chronicle of Roadway Motor-Fuel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700;1,900&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Special+Elite&display=swap" rel="stylesheet">
 <style>
+/* ════════════════════════════════════════════════════════════════
+   THE HOMER PUMP LEDGER  —  ESTABLISHED MMXXVI
+   A Chronicle of Roadway Motor-Fuel
+   Set in the manner of the Times, Herald & Tribune of New York
+   ════════════════════════════════════════════════════════════════ */
+
 :root {
-  --paper:        #f5f1e8;
-  --paper-2:      #efe8d6;
-  --paper-3:      #e6dec8;
-  --ink:          #1a1815;
-  --ink-2:        #3a342c;
-  --ink-dim:      #756e60;
-  --rule:         #c9c0a8;
-  --rule-soft:    #ddd5bf;
-  --petrol:       #1f5f4a;
-  --petrol-soft:  rgba(31, 95, 74, 0.12);
-  --diesel:       #b8541f;
-  --diesel-soft:  rgba(184, 84, 31, 0.10);
-  --trend:        #8a2c1f;
-  --highlight:    #d4af37;
-  --shadow:       0 1px 0 rgba(26, 24, 21, 0.04), 0 4px 16px rgba(26, 24, 21, 0.06);
+  --paper:        #ede2c8;     /* yellowed newsprint */
+  --paper-2:      #e3d6b8;     /* slightly darker for boxes */
+  --paper-3:      #d8c9a4;     /* darkest for accents */
+  --paper-edge:   #c4b08a;     /* deep paper edge */
+  --ink:          #1a1108;     /* warm ink-black */
+  --ink-2:        #2c1f12;     /* slightly lighter ink */
+  --ink-3:        #4a3a26;     /* mid-tone ink */
+  --ink-dim:      #6e5a3e;     /* faded type */
+  --ink-faint:    #8d7a5a;     /* very faded */
+  --rule:         #2c1f12;     /* hard rule (matches ink) */
+  --rule-soft:    #8d7a5a;     /* soft rule */
+  --petrol:       #1a1108;     /* solid black for petrol */
+  --petrol-soft:  rgba(26, 17, 8, 0.10);
+  --diesel:       #6e1f15;     /* deep oxblood for diesel */
+  --diesel-soft:  rgba(110, 31, 21, 0.08);
+  --trend:        #6e1f15;     /* same red, dashed */
+  --highlight:    #8a2c1f;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,233 +39,431 @@
 html, body {
   background: var(--paper);
   color: var(--ink);
-  font-family: 'DM Sans', system-ui, sans-serif;
-  font-feature-settings: 'ss01', 'cv11';
+  font-family: 'IM Fell English', 'Old Standard TT', Georgia, serif;
+  font-feature-settings: 'onum', 'kern';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
+/* ─── Newsprint texture: aged paper with grain & vignette ──── */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212, 175, 55, 0.04), transparent 60%),
-    repeating-linear-gradient(0deg, rgba(26, 24, 21, 0.012) 0 1px, transparent 1px 3px);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 18% 8%, rgba(120, 90, 50, 0.14), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 92% 92%, rgba(80, 50, 20, 0.16), transparent 65%),
+    radial-gradient(ellipse 80% 80% at 50% 100%, rgba(40, 25, 10, 0.10), transparent 70%);
   pointer-events: none;
   z-index: 0;
+  mix-blend-mode: multiply;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.018) 0 1px,
+      transparent 1px 2px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(60,40,20,0.012) 0 1px,
+      transparent 1px 3px
+    );
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.7;
 }
 
 .shell {
-  max-width: 1280px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 28px 48px;
+  padding: 36px 32px 48px;
   position: relative;
   z-index: 1;
 }
 
-/* ─── Masthead ─────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   MASTHEAD — full newspaper plate
+   ════════════════════════════════════════════════════════════ */
+
 .masthead {
+  text-align: center;
+  border-bottom: 3px double var(--ink);
+  padding-bottom: 14px;
+  margin-bottom: 0;
+  position: relative;
+}
+
+.masthead::before {
+  content: "";
+  display: block;
+  border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
-  padding-bottom: 18px;
-  margin-bottom: 28px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: 24px;
+  height: 4px;
+  margin-bottom: 12px;
+}
+
+.flag-line {
+  font-family: 'IM Fell English SC', 'IM Fell English', serif;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.flag-line::before, .flag-line::after {
+  content: "";
+  display: block;
+  flex: 1;
+  height: 1px;
+  background: var(--ink);
+  max-width: 220px;
+}
+
+.flag-line .ornament {
+  font-family: 'Playfair Display', serif;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .masthead h1 {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 144, 'SOFT' 50;
+  font-family: 'Playfair Display', 'Old Standard TT', serif;
+  font-weight: 900;
+  font-style: normal;
+  font-size: clamp(46px, 9vw, 96px);
+  line-height: 0.95;
+  color: var(--ink);
+  letter-spacing: -0.012em;
+  margin: 6px 0 8px;
+  /* faint ink-bleed feel */
+  text-shadow: 0 0 0.5px rgba(26, 17, 8, 0.4);
+  filter: contrast(1.04);
+  font-feature-settings: 'lnum';
+}
+
+.masthead h1 .the {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
   font-weight: 700;
-  font-size: clamp(36px, 6vw, 68px);
-  line-height: 0.92;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.masthead h1 em {
-  font-style: italic;
-  font-variation-settings: 'opsz' 144, 'SOFT' 100;
-  color: var(--diesel);
-}
-
-.masthead .meta {
-  text-align: right;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  line-height: 1.6;
-}
-
-.masthead .meta strong {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.subtitle {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 14;
-  font-style: italic;
-  font-size: 17px;
+  font-size: 0.42em;
+  vertical-align: 0.55em;
+  margin-right: 0.18em;
+  letter-spacing: 0.01em;
   color: var(--ink-2);
-  margin-top: 4px;
-  font-weight: 400;
 }
 
-/* ─── Stats strip ──────────────────────────────────────────────── */
+.tagline {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 16px;
+  color: var(--ink-2);
+  margin-top: 2px;
+  margin-bottom: 14px;
+  letter-spacing: 0.01em;
+}
+
+.tagline::before, .tagline::after {
+  content: "•";
+  margin: 0 14px;
+  font-style: normal;
+  color: var(--ink-3);
+}
+
+/* Edition strip beneath the flag */
+.edition-strip {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: center;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  margin-top: 2px;
+}
+
+.edition-strip > div {
+  padding: 0 12px;
+}
+
+.edition-strip .left { text-align: left; border-right: 1px solid var(--rule-soft); }
+.edition-strip .center {
+  text-align: center;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 500;
+  color: var(--ink);
+}
+.edition-strip .right { text-align: right; border-left: 1px solid var(--rule-soft); }
+
+.edition-strip strong {
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.18em;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SECTION HEADERS — small caps with rules
+   ════════════════════════════════════════════════════════════ */
+
+.section-head {
+  text-align: center;
+  margin: 28px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.section-head::before, .section-head::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ink);
+}
+
+.section-head h2 {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 14px;
+  letter-spacing: 0.32em;
+  font-weight: 400;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.section-head .ornament {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  color: var(--ink-3);
+  font-size: 18px;
+  margin: 0 6px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   STATS — newspaper-box bulletins
+   ════════════════════════════════════════════════════════════ */
+
 .stats {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 1px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  margin-bottom: 28px;
-  overflow: hidden;
+  gap: 0;
+  margin: 16px 0 22px;
+  border-top: 3px double var(--ink);
+  border-bottom: 3px double var(--ink);
 }
 
 .stat {
-  background: var(--paper);
-  padding: 16px 18px 14px;
+  background: transparent;
+  padding: 16px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-height: 92px;
+  min-height: 110px;
+  position: relative;
+  border-right: 1px solid var(--rule-soft);
+  text-align: center;
 }
+
+.stat:last-child { border-right: none; }
 
 .stat .label {
   font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.12em;
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-dim);
-  font-weight: 500;
+  color: var(--ink-3);
+  font-weight: 400;
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .stat .value {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 32;
-  font-weight: 600;
-  font-size: 30px;
+  font-family: 'Playfair Display', serif;
+  font-weight: 800;
+  font-size: 32px;
   line-height: 1.05;
   color: var(--ink);
   letter-spacing: -0.01em;
-  font-feature-settings: 'tnum';
+  font-feature-settings: 'lnum';
+  font-variant-numeric: lining-nums;
+  margin-top: 6px;
 }
 
 .stat .sub {
-  font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--ink-dim);
+  font-size: 11px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  color: var(--ink-3);
   font-weight: 400;
   margin-top: auto;
+  padding-top: 4px;
 }
 
 .stat.petrol .value { color: var(--petrol); }
 .stat.diesel .value { color: var(--diesel); }
 
-.delta-up   { color: #b8541f; }
-.delta-down { color: var(--petrol); }
+.delta-up   { color: var(--diesel); font-style: italic; }
+.delta-down { color: var(--petrol); font-style: italic; }
 
-/* ─── Controls ─────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   CONTROLS — typeset button row
+   ════════════════════════════════════════════════════════════ */
+
 .controls {
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 16px 18px;
-  margin-bottom: 20px;
+  background: transparent;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 14px 0;
+  margin-bottom: 22px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 20px;
+  grid-template-columns: 1fr;
+  gap: 14px;
   align-items: center;
 }
 
 .preset-row {
   display: flex;
-  gap: 4px;
   align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .preset-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-dim);
-  margin-right: 8px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  border: none;
 }
 
 .preset-btn {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IM Fell English SC', serif;
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  color: var(--ink-2);
-  padding: 6px 10px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 6px 11px;
   cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
+  text-transform: uppercase;
+  text-align: center;
+  min-width: 48px;
+  font-feature-settings: 'lnum';
 }
 
+.preset-btn:last-child { border-right: 1px solid var(--ink); }
+
 .preset-btn:hover {
-  border-color: var(--ink);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .preset-btn.active {
   background: var(--ink);
   color: var(--paper);
-  border-color: var(--ink);
+  font-weight: 700;
+}
+
+.bottom-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 32px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule-soft);
 }
 
 .date-inputs {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 13px;
 }
 
 .date-inputs label {
+  font-family: 'IM Fell English SC', serif;
   font-size: 10px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-3);
+  font-weight: 400;
 }
 
 .date-inputs input {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--rule);
-  background: var(--paper);
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 13px;
+  padding: 5px 8px;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
   color: var(--ink);
-  border-radius: 2px;
   width: 130px;
-  font-weight: 500;
+  font-weight: 400;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.date-inputs input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  filter: invert(0.15) sepia(0.4);
+}
+
+.date-inputs input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .date-inputs input:focus {
   outline: none;
-  border-color: var(--ink);
+  border-bottom: 2px solid var(--ink);
 }
 
 .toggles {
   display: flex;
-  gap: 16px;
+  gap: 18px;
   align-items: center;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IM Fell English SC', serif;
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .toggle {
@@ -266,29 +472,31 @@ body::before {
   gap: 6px;
   cursor: pointer;
   user-select: none;
+  color: var(--ink-2);
 }
+
+.toggle:hover { color: var(--ink); }
 
 .toggle input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--ink-2);
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--ink);
   background: var(--paper);
-  border-radius: 1px;
   cursor: pointer;
   position: relative;
-  transition: all 0.15s;
+  transition: all 0.12s;
   margin: 0;
+  border-radius: 0;
 }
 
 .toggle input[type="checkbox"]:checked {
   background: var(--ink);
-  border-color: var(--ink);
 }
 
 .toggle input[type="checkbox"]:checked::after {
-  content: "✓";
+  content: "✕";
   position: absolute;
   inset: 0;
   display: flex;
@@ -297,49 +505,89 @@ body::before {
   color: var(--paper);
   font-size: 11px;
   line-height: 1;
+  font-family: serif;
 }
 
 .toggle .swatch {
-  width: 14px;
-  height: 2px;
   display: inline-block;
+  height: 10px;
+  width: 18px;
+  position: relative;
 }
-.toggle.petrol .swatch { background: var(--petrol); }
-.toggle.diesel .swatch { background: var(--diesel); }
-.toggle.trend  .swatch { background: var(--trend); height: 0; border-top: 1.5px dashed var(--trend); }
+.toggle.petrol .swatch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--petrol);
+  transform: translateY(-50%);
+}
+.toggle.diesel .swatch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--diesel);
+  transform: translateY(-50%);
+}
+.toggle.trend .swatch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  border-top: 1.5px dashed var(--diesel);
+  transform: translateY(-50%);
+}
 
-/* ─── Chart ────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   CHART — set as a newspaper plate
+   ════════════════════════════════════════════════════════════ */
+
 .chart-wrap {
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 20px 24px 12px;
+  background: transparent;
+  border-top: 3px double var(--ink);
+  border-bottom: 3px double var(--ink);
+  padding: 16px 6px 12px;
   margin-bottom: 28px;
   position: relative;
 }
 
 .chart-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
   align-items: baseline;
-  margin-bottom: 6px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--rule-soft);
+  margin-bottom: 12px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--ink);
 }
 
 .chart-title {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 24;
-  font-weight: 600;
-  font-size: 18px;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 22px;
   color: var(--ink);
+  letter-spacing: 0.005em;
+}
+
+.chart-byline {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .chart-period {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Special Elite', monospace;
   font-size: 11px;
-  color: var(--ink-dim);
-  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-align: right;
 }
 
 .chart-svg {
@@ -347,24 +595,27 @@ body::before {
   height: 460px;
   display: block;
   cursor: crosshair;
+  padding: 0 8px;
 }
 
 .gridline {
   stroke: var(--rule-soft);
-  stroke-width: 1;
-  stroke-dasharray: 2 4;
+  stroke-width: 0.8;
+  stroke-dasharray: 1 4;
+  opacity: 0.7;
 }
 
 .axis-line {
-  stroke: var(--ink-2);
+  stroke: var(--ink);
   stroke-width: 1;
 }
 
 .axis-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  fill: var(--ink-dim);
-  font-weight: 500;
+  font-family: 'IM Fell English', serif;
+  font-size: 11px;
+  fill: var(--ink-2);
+  font-weight: 400;
+  font-feature-settings: 'lnum';
 }
 
 .axis-label.y { text-anchor: end; }
@@ -372,7 +623,7 @@ body::before {
 
 .line-petrol {
   stroke: var(--petrol);
-  stroke-width: 1.6;
+  stroke-width: 1.7;
   fill: none;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -380,7 +631,7 @@ body::before {
 
 .line-diesel {
   stroke: var(--diesel);
-  stroke-width: 1.6;
+  stroke-width: 1.7;
   fill: none;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -390,22 +641,23 @@ body::before {
 .area-diesel { fill: var(--diesel-soft); }
 
 .line-trend {
-  stroke: var(--trend);
-  stroke-width: 1.4;
-  stroke-dasharray: 5 4;
+  stroke: var(--diesel);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
   fill: none;
+  opacity: 0.7;
 }
 
 .crosshair {
-  stroke: var(--ink-2);
-  stroke-width: 1;
-  stroke-dasharray: 2 3;
+  stroke: var(--ink);
+  stroke-width: 0.8;
+  stroke-dasharray: 1 3;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.1s;
 }
 
-.crosshair.active { opacity: 1; }
+.crosshair.active { opacity: 0.7; }
 
 .hover-dot {
   r: 4;
@@ -422,200 +674,338 @@ body::before {
 
 .tooltip {
   position: absolute;
-  background: var(--ink);
-  color: var(--paper);
-  padding: 10px 12px;
-  border-radius: 2px;
-  font-size: 11px;
-  font-family: 'JetBrains Mono', monospace;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 10px 14px;
+  border: 1px solid var(--ink);
+  font-size: 12px;
+  font-family: 'IM Fell English', serif;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.1s;
+  transition: opacity 0.12s;
   white-space: nowrap;
   z-index: 10;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  line-height: 1.6;
+  box-shadow: 2px 2px 0 var(--ink), 4px 4px 0 var(--paper-3);
+  line-height: 1.5;
 }
 
 .tooltip.active { opacity: 1; }
 
 .tooltip .tip-date {
-  font-family: 'Fraunces', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 12px;
-  color: #d4c8a8;
-  margin-bottom: 4px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule-soft);
+  letter-spacing: 0.02em;
 }
 
 .tooltip .tip-row {
   display: flex;
   justify-content: space-between;
-  gap: 14px;
-  font-feature-settings: 'tnum';
+  gap: 18px;
+  font-feature-settings: 'lnum';
+  font-size: 12px;
 }
 
 .tooltip .tip-row .tip-label {
-  color: #d4c8a8;
+  font-family: 'IM Fell English SC', serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-size: 10px;
 }
 
 .tooltip .tip-row .tip-val {
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'Playfair Display', serif;
+  font-size: 14px;
 }
 
-.tip-val.p { color: #6fc299; }
-.tip-val.d { color: #f39862; }
+.tip-val.p { color: var(--petrol); }
+.tip-val.d { color: var(--diesel); }
 
 /* Annotations */
 .annot-line {
-  stroke: var(--ink-dim);
-  stroke-width: 1;
-  stroke-dasharray: 1 3;
-  opacity: 0.5;
+  stroke: var(--ink-3);
+  stroke-width: 0.8;
+  stroke-dasharray: 1 4;
+  opacity: 0.55;
+}
+
+.annot-marker {
+  fill: var(--diesel);
+  stroke: var(--ink);
+  stroke-width: 0.8;
+  opacity: 0.85;
 }
 
 .annot-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  fill: var(--ink-dim);
-  font-weight: 500;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9.5px;
+  fill: var(--ink-3);
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
-/* ─── Tank calculator ────────────────────────────────────────── */
+.tooltip .tip-event-label {
+  font-family: 'Playfair Display', serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 4px;
+  letter-spacing: 0.005em;
+}
+
+.tooltip .tip-event-desc {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: normal;
+  max-width: 280px;
+  line-height: 1.45;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CALCULATOR — classified-style box
+   ════════════════════════════════════════════════════════════ */
+
 .calc {
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 18px 20px;
-  margin-bottom: 28px;
+  background: transparent;
+  border: 1px solid var(--ink);
+  outline: 4px solid var(--paper);
+  box-shadow: 0 0 0 5px var(--ink);
+  padding: 22px 24px 20px;
+  margin: 28px 4px;
   display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 24px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  text-align: center;
+  position: relative;
+}
+
+.calc::before {
+  content: "✻ ADVERTISEMENT ✻";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper);
+  padding: 0 12px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  color: var(--ink-3);
 }
 
 .calc h3 {
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 18;
-  font-weight: 600;
-  font-size: 16px;
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: clamp(22px, 3.5vw, 30px);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+.calc h3 em {
+  font-style: italic;
+  font-weight: 700;
+  color: var(--diesel);
 }
 
 .calc-input {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  justify-content: center;
 }
 
 .calc-input label {
-  font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.1em;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-3);
 }
 
 .calc-input input {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 6px 8px;
-  border: 1px solid var(--rule);
-  background: var(--paper);
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border: none;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
   color: var(--ink);
-  border-radius: 2px;
   width: 90px;
+  text-align: center;
+  font-feature-settings: 'lnum';
 }
 
 .calc-input input:focus {
   outline: none;
-  border-color: var(--ink);
 }
 
 .calc-result {
-  display: flex;
-  gap: 24px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--ink-dim);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--ink);
+  padding-top: 14px;
 }
+
+.calc-result > div {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--rule-soft);
+  padding: 0 10px;
+}
+
+.calc-result > div:last-child { border-right: none; }
 
 .calc-result strong {
   display: block;
-  font-family: 'Fraunces', serif;
-  font-variation-settings: 'opsz' 24;
-  font-size: 22px;
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(22px, 3.2vw, 30px);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.01em;
   text-transform: none;
-  margin-top: 2px;
-  font-feature-settings: 'tnum';
+  margin-top: 4px;
+  font-feature-settings: 'lnum';
 }
 
 .calc-result .p strong { color: var(--petrol); }
 .calc-result .d strong { color: var(--diesel); }
 
-/* ─── Footer ──────────────────────────────────────────────────── */
-.colophon {
-  border-top: 1px solid var(--rule);
+/* ════════════════════════════════════════════════════════════
+   COLOPHON — the closing rule
+   ════════════════════════════════════════════════════════════ */
+
+.colophon-wrap {
+  margin-top: 36px;
+  border-top: 3px double var(--ink);
   padding-top: 16px;
-  display: flex;
-  justify-content: space-between;
-  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+}
+
+.colophon-ornament {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+
+.colophon {
+  font-family: 'IM Fell English SC', serif;
   font-size: 10px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-3);
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.colophon span {
+  display: flex;
+  align-items: center;
+  gap: 22px;
 }
 
 .colophon a {
   color: var(--ink-2);
   text-decoration: none;
-  border-bottom: 1px dotted var(--ink-dim);
+  border-bottom: 1px dotted var(--ink-3);
 }
 
 .colophon a:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
-/* ─── Responsive ──────────────────────────────────────────────── */
+.colophon-rule {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background: var(--ink-3);
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════════════ */
+
 @media (max-width: 980px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
+  .stat:nth-child(3n) { border-right: none; }
+  .stat:nth-child(n+4) { border-top: 1px solid var(--rule-soft); }
   .controls {
     grid-template-columns: 1fr;
     gap: 14px;
   }
-  .calc { grid-template-columns: 1fr; gap: 14px; }
-  .calc-result { flex-direction: column; gap: 8px; }
+  .calc-result { grid-template-columns: 1fr; }
+  .calc-result > div {
+    border-right: none;
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 8px 0;
+  }
+  .calc-result > div:last-child { border-bottom: none; }
 }
 
 @media (max-width: 640px) {
-  .shell { padding: 20px 16px 32px; }
-  .masthead {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .masthead .meta { text-align: left; }
+  .shell { padding: 22px 16px 32px; }
+  .masthead h1 { font-size: clamp(40px, 14vw, 60px); }
+  .flag-line { font-size: 9px; letter-spacing: 0.22em; }
+  .flag-line::before, .flag-line::after { max-width: 60px; }
+  .edition-strip { grid-template-columns: 1fr; gap: 4px; padding: 8px; }
+  .edition-strip .left, .edition-strip .right { border: none; text-align: center; padding: 2px 0; }
+  .edition-strip .center { padding: 4px 0; border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); }
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .stat { padding: 12px 14px 10px; min-height: 80px; }
-  .stat .value { font-size: 22px; }
-  .chart-wrap { padding: 14px 12px 8px; }
+  .stat:nth-child(3n) { border-right: 1px solid var(--rule-soft); }
+  .stat:nth-child(2n) { border-right: none; }
+  .stat:nth-child(n+3) { border-top: 1px solid var(--rule-soft); }
+  .stat .value { font-size: 24px; }
+  .stat { padding: 14px 10px 12px; min-height: 96px; }
+  .chart-wrap { padding: 12px 4px 8px; }
+  .chart-header { grid-template-columns: 1fr; gap: 6px; text-align: center; }
+  .chart-period, .chart-byline { text-align: center; }
   .chart-svg { height: 360px; }
-  .preset-btn { padding: 5px 8px; font-size: 10px; }
+  .preset-btn { padding: 5px 8px; font-size: 10px; letter-spacing: 0.06em; min-width: 40px; }
+  .preset-label { font-size: 10px; }
+  .preset-row { gap: 10px; }
+  .preset-buttons { gap: 4px; }
+  .bottom-controls { gap: 14px 18px; }
   .date-inputs { flex-wrap: wrap; }
-  .date-inputs input { width: 110px; font-size: 11px; }
-  .toggles { flex-wrap: wrap; gap: 10px; }
+  .date-inputs input { width: 110px; font-size: 12px; }
+  .toggles { flex-wrap: wrap; gap: 12px; }
+  .calc { margin: 24px 0; padding: 20px 16px; }
   .colophon { flex-direction: column; gap: 6px; }
+  .colophon span { gap: 10px; }
 }
 
-/* ─── Print ──────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  .stats { grid-template-columns: 1fr; }
+  .stat { border-right: none !important; }
+  .stat:nth-child(n+2) { border-top: 1px solid var(--rule-soft); }
+}
+
+/* Print */
 @media print {
-  body { background: white; }
-  body::before { display: none; }
+  body { background: white; color: black; }
+  body::before, body::after { display: none; }
   .controls, .calc { display: none; }
-  .chart-wrap { border: 1px solid #999; }
 }
 </style>
 </head>
@@ -623,51 +1013,78 @@ body::before {
 <div class="shell">
 
   <header class="masthead">
-    <div>
-      <h1>The Pump <em>Ledger</em></h1>
-      <div class="subtitle">UK average pump prices, weekly — official DESNZ figures since June 2003</div>
+    <div class="flag-line">
+      <span class="ornament">✻</span>
+      <span>Established Anno Domini MMXXVI</span>
+      <span class="ornament">✻</span>
     </div>
-    <div class="meta">
-      <strong>Vol. XXIII · Iss. 18</strong><br>
-      <span id="latestDate">—</span><br>
-      <span id="dataPoints">—</span>
+    <h1><span class="the">The</span>Homer Pump Ledger</h1>
+    <div class="tagline">All the prices that's fit to print</div>
+    <div class="edition-strip">
+      <div class="left">
+        <strong>Vol. <span id="volNo">XXIII</span></strong> · No. <strong id="issueNo">XVIII</strong>
+      </div>
+      <div class="center" id="editionDate">— London &amp; New York Edition —</div>
+      <div class="right">
+        Price · <strong>Two Cents</strong>
+      </div>
     </div>
   </header>
 
+  <!-- Sub-deck headlines, newspaper-style -->
+  <div class="section-head">
+    <h2>Bulletin <span class="ornament">·</span> The Week's Reckoning</h2>
+  </div>
+
   <!-- Stats strip -->
   <section class="stats" id="stats"></section>
+
+  <div class="section-head">
+    <h2>Range &amp; Indices <span class="ornament">·</span> Set the Period</h2>
+  </div>
 
   <!-- Controls -->
   <section class="controls">
     <div class="preset-row">
       <span class="preset-label">Range</span>
-      <button class="preset-btn" data-preset="1m">1M</button>
-      <button class="preset-btn" data-preset="6m">6M</button>
-      <button class="preset-btn" data-preset="ytd">YTD</button>
-      <button class="preset-btn active" data-preset="1y">1Y</button>
-      <button class="preset-btn" data-preset="3y">3Y</button>
-      <button class="preset-btn" data-preset="5y">5Y</button>
-      <button class="preset-btn" data-preset="10y">10Y</button>
-      <button class="preset-btn" data-preset="all">All</button>
+      <div class="preset-buttons">
+        <button class="preset-btn" data-preset="1w">1W</button>
+        <button class="preset-btn" data-preset="1m">1M</button>
+        <button class="preset-btn" data-preset="3m">3M</button>
+        <button class="preset-btn" data-preset="6m">6M</button>
+        <button class="preset-btn" data-preset="ytd">YTD</button>
+        <button class="preset-btn active" data-preset="1y">1Y</button>
+        <button class="preset-btn" data-preset="3y">3Y</button>
+        <button class="preset-btn" data-preset="5y">5Y</button>
+        <button class="preset-btn" data-preset="10y">10Y</button>
+        <button class="preset-btn" data-preset="all">All</button>
+      </div>
     </div>
-    <div class="date-inputs">
-      <label>From</label>
-      <input type="date" id="dateFrom">
-      <label>To</label>
-      <input type="date" id="dateTo">
-    </div>
-    <div class="toggles">
-      <label class="toggle petrol"><input type="checkbox" id="showPetrol" checked><span class="swatch"></span> Petrol</label>
-      <label class="toggle diesel"><input type="checkbox" id="showDiesel" checked><span class="swatch"></span> Diesel</label>
-      <label class="toggle trend"><input type="checkbox" id="showTrend"><span class="swatch"></span> Trend</label>
-      <label class="toggle"><input type="checkbox" id="showAnnot" checked><span style="font-size:10px;color:var(--ink-dim)">EVENTS</span></label>
+    <div class="bottom-controls">
+      <div class="date-inputs">
+        <label>From</label>
+        <input type="date" id="dateFrom">
+        <label>To</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="toggles">
+        <label class="toggle petrol"><input type="checkbox" id="showPetrol" checked><span class="swatch"></span> Petrol</label>
+        <label class="toggle diesel"><input type="checkbox" id="showDiesel" checked><span class="swatch"></span> Diesel</label>
+        <label class="toggle trend"><input type="checkbox" id="showTrend"><span class="swatch"></span> Trend</label>
+        <label class="toggle"><input type="checkbox" id="showAnnot" checked><span style="font-size:10px;color:var(--ink-dim)">EVENTS</span></label>
+      </div>
     </div>
   </section>
+
+  <div class="section-head">
+    <h2>The Pump <span class="ornament">·</span> Pence Per Litre, Weekly Recorded</h2>
+  </div>
 
   <!-- Chart -->
   <div class="chart-wrap">
     <div class="chart-header">
-      <div class="chart-title" id="chartTitle">Pence per litre</div>
+      <div class="chart-title" id="chartTitle">Pence per Litre</div>
+      <div class="chart-byline">A Weekly Reading from Our Forecourts</div>
       <div class="chart-period" id="chartPeriod">—</div>
     </div>
     <svg class="chart-svg" id="chart" preserveAspectRatio="none"></svg>
@@ -676,22 +1093,29 @@ body::before {
 
   <!-- Tank calculator -->
   <section class="calc">
-    <h3>Tank fill cost</h3>
+    <h3>The Motorist's <em>Reckoner</em></h3>
     <div class="calc-input">
-      <label>Litres</label>
+      <label>For a tank of</label>
       <input type="number" id="tankSize" value="55" min="1" max="500" step="1">
+      <label>litres, the cost is —</label>
     </div>
     <div class="calc-result">
-      <div class="p"><span>Petrol</span><strong id="costPetrol">—</strong></div>
-      <div class="d"><span>Diesel</span><strong id="costDiesel">—</strong></div>
-      <div><span>Annual @ 10k miles, 45mpg</span><strong id="costAnnual">—</strong></div>
+      <div class="p"><span>Petrol Tank</span><strong id="costPetrol">—</strong></div>
+      <div class="d"><span>Diesel Tank</span><strong id="costDiesel">—</strong></div>
+      <div><span>Yr. @ 10k mi · 45 mpg</span><strong id="costAnnual">—</strong></div>
     </div>
   </section>
 
-  <footer class="colophon">
-    <span>Data: gov.uk weekly road fuel prices · DESNZ</span>
-    <span id="updateStamp">—</span>
-  </footer>
+  <div class="colophon-wrap">
+    <div class="colophon-ornament">✦ &nbsp; ❦ &nbsp; ✦</div>
+    <div class="colophon">
+      <span>Compiled from official figures · Dept. for Energy Security &amp; Net Zero</span>
+      <span class="colophon-rule"></span>
+      <span id="updateStamp">—</span>
+      <span class="colophon-rule"></span>
+      <span>End of bulletin</span>
+    </div>
+  </div>
 
 </div>
 
@@ -1899,13 +2323,32 @@ const FUEL_DATA = [
   [8517,15699,18981],
 ];
 
-// Major events to annotate
+// Major events relevant to UK pump prices, with hover descriptions
 const EVENTS = [
-  { date: '2008-07-07', label: 'Oil $147/bbl' },
-  { date: '2014-12-15', label: 'Oil crash' },
-  { date: '2020-04-06', label: 'Covid' },
-  { date: '2022-03-23', label: 'Russia / fuel duty cut' },
-  { date: '2022-07-04', label: 'Record high' },
+  { date: '2005-09-05', label: 'Hurricane Katrina',
+    desc: 'Gulf of Mexico refining crippled. UK petrol jumped ~3p in a fortnight to 95p.' },
+  { date: '2008-07-07', label: 'Oil $147 peak',
+    desc: 'Brent hits all-time high of $147/barrel. UK petrol peaked at 119.4p, diesel 132.9p — both records at the time.' },
+  { date: '2008-10-13', label: 'Lehman / financial crisis',
+    desc: 'Demand collapses with the global financial crisis. Oil falls below $40 by year end; UK petrol drops ~30p in 6 months.' },
+  { date: '2011-03-07', label: 'Libya / Arab Spring',
+    desc: 'Libyan civil war takes 1.6m bpd offline. UK petrol pushed past 137p for first time.' },
+  { date: '2014-12-01', label: 'OPEC oil glut',
+    desc: 'OPEC refuses to cut output amid US shale boom. Brent crashes from $115 to under $30 over 18 months.' },
+  { date: '2016-02-01', label: 'Oil decade low',
+    desc: 'Brent hits $27/barrel — lowest since 2003. UK petrol bottoms at 101p, diesel briefly cheaper than petrol.' },
+  { date: '2020-03-23', label: 'Covid lockdown',
+    desc: 'UK enters lockdown; oil demand collapses. WTI futures briefly turn negative in April. UK petrol falls to 105p.' },
+  { date: '2022-02-24', label: 'Russia invades Ukraine',
+    desc: 'Major sanctions on Russian oil and gas. Brent surges past $120; UK petrol jumps 20p in 4 weeks.' },
+  { date: '2022-03-23', label: 'UK fuel duty cut 5p',
+    desc: 'Spring Statement: Sunak cuts fuel duty by 5p/litre. Pump prices fall briefly before resuming climb.' },
+  { date: '2022-07-04', label: 'Record peak',
+    desc: 'UK records all-time high: petrol 191.55p, diesel 199.22p. CMA later finds supermarket margin-widening contributed.' },
+  { date: '2026-02-28', label: 'Iran war begins',
+    desc: 'US/Israel strikes Iran; Strait of Hormuz traffic collapses. IEA calls it the largest oil supply disruption in history.' },
+  { date: '2026-04-08', label: 'Iran-US ceasefire',
+    desc: 'Ceasefire announced but Hormuz shipping remains far below pre-war levels. Diesel stays elevated at ~190p.' },
 ];
 </script>
 
@@ -1978,7 +2421,9 @@ function applyPreset(preset) {
   const lastIso = isoDate(last);
   let from;
   switch (preset) {
+    case '1w':  from = new Date(last); from.setDate(from.getDate() - 8); break;
     case '1m':  from = new Date(last); from.setMonth(from.getMonth() - 1); break;
+    case '3m':  from = new Date(last); from.setMonth(from.getMonth() - 3); break;
     case '6m':  from = new Date(last); from.setMonth(from.getMonth() - 6); break;
     case 'ytd': from = new Date(last.getFullYear(), 0, 1); break;
     case '1y':  from = new Date(last); from.setFullYear(from.getFullYear() - 1); break;
@@ -2155,17 +2600,39 @@ function render() {
   // X-axis line
   svgContent += `<line class="axis-line" x1="${M.left}" y1="${H - M.bottom}" x2="${W - M.right}" y2="${H - M.bottom}"/>`;
 
-  // Annotations
+  // Annotations — events relevant to UK fuel prices
+  // Each event gets: dashed vertical line, small triangle at the bottom of chart,
+  // staggered label, and a wide invisible hitbox for hover lookup.
+  let visibleEvents = [];
   if (state.showAnnot) {
-    for (const ev of EVENTS) {
-      const day = dateToDay(ev.date);
-      if (day < xMin || day > xMax) continue;
-      const xp = x(day);
+    visibleEvents = EVENTS
+      .filter(ev => {
+        const d = dateToDay(ev.date);
+        return d >= xMin && d <= xMax;
+      })
+      .map(ev => ({ ...ev, _day: dateToDay(ev.date), _x: x(dateToDay(ev.date)) }))
+      .sort((a, b) => a._x - b._x);
+
+    // Stagger labels: cycle through 3 vertical positions so close events don't collide.
+    // Flip labels to the left of the marker if right-anchored would overflow the chart.
+    const rightBound = W - M.right;
+    visibleEvents.forEach((ev, i) => {
+      const xp = ev._x;
+      const labelY = M.top + 12 + (i % 3) * 13;
       svgContent += `<line class="annot-line" x1="${xp}" y1="${M.top}" x2="${xp}" y2="${H - M.bottom}"/>`;
-      // Stagger labels to avoid overlap
-      const labelY = M.top + 10 + (EVENTS.indexOf(ev) % 2) * 12;
-      svgContent += `<text class="annot-label" x="${xp + 4}" y="${labelY}">${ev.label}</text>`;
-    }
+      // Triangle marker at the bottom of the chart pointing up
+      const triY = H - M.bottom;
+      svgContent += `<path class="annot-marker" d="M${xp - 4},${triY + 1} L${xp + 4},${triY + 1} L${xp},${triY - 5} Z"/>`;
+      // Label — estimate width (small-caps at 9.5px ≈ 6px/char with letter-spacing).
+      // If left-anchored would overflow the right edge, flip to right-anchor on the other side of the line.
+      const estLabelWidth = ev.label.length * 6;
+      const overflowsRight = xp + 4 + estLabelWidth > rightBound;
+      if (overflowsRight) {
+        svgContent += `<text class="annot-label" text-anchor="end" x="${xp - 4}" y="${labelY}">${ev.label}</text>`;
+      } else {
+        svgContent += `<text class="annot-label" x="${xp + 4}" y="${labelY}">${ev.label}</text>`;
+      }
+    });
   }
 
   // Build line paths
@@ -2229,11 +2696,12 @@ function render() {
   svg.innerHTML = svgContent;
 
   // Set up hover
-  setupHover(svg, rows, x, y, M, W, H);
+  setupHover(svg, rows, x, y, M, W, H, visibleEvents);
 }
 
 // ─── Hover interactions ────────────────────────────────────
-function setupHover(svg, rows, xScale, yScale, M, W, H) {
+function setupHover(svg, rows, xScale, yScale, M, W, H, events) {
+  events = events || [];
   const tooltip = document.getElementById('tooltip');
   const crosshair = svg.querySelector('#crosshair-x');
   const dotP = svg.querySelector('#dot-p');
@@ -2307,6 +2775,36 @@ function setupHover(svg, rows, xScale, yScale, M, W, H) {
     tooltip.style.top = Math.max(8, offsetY) + 'px';
   };
 
+  // Show an event tooltip near the marker
+  const showEvent = (ev, screenPxX) => {
+    crosshair.classList.remove('active');
+    dotP.classList.remove('active');
+    dotD.classList.remove('active');
+    const dt = new Date(ev.date + 'T00:00:00Z');
+    const dateLabel = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    tooltip.innerHTML = `
+      <div class="tip-date">${dateLabel}</div>
+      <div class="tip-event-label">${ev.label}</div>
+      <div class="tip-event-desc">${ev.desc || ''}</div>
+    `;
+    tooltip.classList.add('active');
+
+    const wrap = svg.parentElement;
+    const wrapRect = wrap.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    const scale = svgRect.width / W;
+    const tipX_inSvg = ev._x * scale;
+    const offsetX = svgRect.left - wrapRect.left + tipX_inSvg + 12;
+    const offsetY = svgRect.top - wrapRect.top + 30;
+    const tipW = tooltip.offsetWidth;
+    let finalX = offsetX;
+    if (offsetX + tipW > wrapRect.width - 8) {
+      finalX = svgRect.left - wrapRect.left + tipX_inSvg - tipW - 12;
+    }
+    tooltip.style.left = Math.max(8, finalX) + 'px';
+    tooltip.style.top = Math.max(8, offsetY) + 'px';
+  };
+
   function pointerMove(ev) {
     const svgRect = svg.getBoundingClientRect();
     const scaleX = W / svgRect.width;
@@ -2315,6 +2813,20 @@ function setupHover(svg, rows, xScale, yScale, M, W, H) {
       showHover(-1);
       return;
     }
+
+    // Check event proximity first — within 6 SVG-units of an event line shows event tooltip
+    if (events && events.length) {
+      let nearestEv = null, nearestDist = Infinity;
+      for (const e of events) {
+        const d = Math.abs(e._x - px);
+        if (d < nearestDist) { nearestDist = d; nearestEv = e; }
+      }
+      if (nearestEv && nearestDist < 6) {
+        showEvent(nearestEv, px);
+        return;
+      }
+    }
+
     // Find nearest row by x position
     let bestIdx = 0, bestDist = Infinity;
     for (let i = 0; i < rows.length; i++) {
@@ -2367,9 +2879,30 @@ function init() {
 
   // Display latest data
   const last = FUEL_DATA[FUEL_DATA.length - 1];
-  document.getElementById('latestDate').textContent = `Latest: ${fmtDate(dayToDate(last[0]), {short: true})}`;
-  document.getElementById('dataPoints').textContent = `${FUEL_DATA.length.toLocaleString()} weekly readings`;
-  document.getElementById('updateStamp').textContent = `${FUEL_DATA.length} weeks · 2003–2026`;
+  // Roman numerals helper — issue # cycles per year, volume = year - 2003
+  function toRoman(n) {
+    const map = [['M',1000],['CM',900],['D',500],['CD',400],['C',100],['XC',90],
+                 ['L',50],['XL',40],['X',10],['IX',9],['V',5],['IV',4],['I',1]];
+    let s = '';
+    for (const [r, v] of map) { while (n >= v) { s += r; n -= v; } }
+    return s;
+  }
+
+  const lastDate = dayToDate(last[0]);
+  // Edition date in long form, e.g. "London ⋅ Wednesday, 27 April 2026"
+  const editionStr = lastDate.toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+  document.getElementById('editionDate').textContent = `London · ${editionStr}`;
+
+  // Issue number = ISO week of the year of the latest reading
+  const startOfYear = new Date(Date.UTC(lastDate.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((lastDate - startOfYear) / DAY_MS + 1) / 7);
+  document.getElementById('issueNo').textContent = toRoman(weekNum);
+  document.getElementById('volNo').textContent = toRoman(lastDate.getUTCFullYear() - 2003);
+
+  document.getElementById('updateStamp').textContent =
+    `${FUEL_DATA.length.toLocaleString()} weekly readings · MMIII–MMXXVI`;
 
   // Apply default preset
   applyPreset('1y');
@@ -2389,6 +2922,17 @@ function init() {
     state.preset = 'custom';
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     render();
+  });
+
+  // Make clicking anywhere on the date input open the calendar (showPicker is more reliable
+  // than relying on the native calendar icon, which is hit-or-miss across browsers).
+  [fromInput, toInput].forEach(inp => {
+    inp.addEventListener('click', () => {
+      try { inp.showPicker(); } catch (e) { /* older browser, native icon will work */ }
+    });
+    inp.addEventListener('focus', () => {
+      try { inp.showPicker(); } catch (e) {}
+    });
   });
 
   document.getElementById('showPetrol').addEventListener('change', e => { state.showPetrol = e.target.checked; render(); });
