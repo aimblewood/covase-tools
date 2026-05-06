@@ -752,13 +752,30 @@ body{padding-top:32px}
         <div class="form-field"><label>Engine (cc)</label><input type="number" step="1" id="hf-engine-cc" placeholder="0"></div>
       </div>
       <div class="form-section-label">Dates &amp; Rates</div>
-      <div class="form-row">
+      <div class="form-row trio">
         <div class="form-field"><label>Start date *</label><input type="date" id="hf-start"></div>
         <div class="form-field"><label>End date (blank = ongoing)</label><input type="date" id="hf-end"></div>
+        <div class="form-field"><label>Preferred start time</label>
+          <select id="hf-start-time">
+            <option value="">— any time —</option>
+            <option value="08:00">08:00</option>
+            <option value="09:00">09:00</option>
+            <option value="10:00">10:00</option>
+            <option value="11:00">11:00</option>
+            <option value="12:00">12:00</option>
+            <option value="13:00">13:00</option>
+            <option value="14:00">14:00</option>
+            <option value="15:00">15:00</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+            <option value="18:00">18:00</option>
+          </select>
+        </div>
       </div>
-      <div class="form-row">
+      <div class="form-row trio">
         <div class="form-field"><label>Cost/day (supplier)</label><input type="number" step="0.01" id="hf-cost" placeholder="0.00" oninput="updateHireRatePreview()"></div>
         <div class="form-field"><label>Upsell/day (markup)</label><input type="number" step="0.01" id="hf-upsell" placeholder="0.00" oninput="updateHireRatePreview()"></div>
+        <div class="form-field"><label>RFT/day (passthrough)</label><input type="number" step="0.01" id="hf-rft" placeholder="(blank if N/A)" oninput="updateHireRatePreview()"></div>
       </div>
       <div id="hf-rate-preview" style="font-size:11px;color:var(--n500);margin:-4px 0 8px;text-align:right">Client rate: <strong id="hf-rate-preview-val" style="color:var(--n700)">£0.00 / day</strong></div>
       <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -1856,8 +1873,8 @@ function rechargeInvoice(id){
     clientName=clients[0]||'';
     linked.forEach(h=>{
       const days=daysOn(h);
-      const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0;
-      const dailyRate=cpd+upd;
+      const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0,rft=parseFloat(h.rft_per_day)||0;
+      const dailyRate=cpd+upd+rft;
       const sellTotal=days?days*dailyRate:0;
       const reg=h.vehicle_reg||'',driver=h.driver||'';
       const hireDesc=`${reg} for ${driver}${dailyRate?' @ £'+dailyRate.toFixed(2)+' per day':''}${days?'\n('+days+' Days – '+fmtD(h.start_date)+' – '+fmtD(h.end_date||'')+')':''}`;
@@ -2199,8 +2216,10 @@ function buildHireCard(h){
   const days=daysOn(h);
   const suppC=suppTotal(h),suppU=suppUpsellTotal(h);
   const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0;
-  const dailyClient=cpd+upd;
-  const totalCost=days?days*cpd+suppC:null;
+  // RFT is passthrough: adds to both supplier cost AND client sell, profit-neutral
+  const rft=parseFloat(h.rft_per_day)||0;
+  const dailyClient=cpd+upd+rft;
+  const totalCost=days?days*(cpd+rft)+suppC:null;
   const totalUpsell=days?days*upd+suppU:null;
   const totalSell=totalCost!=null&&totalUpsell!=null?totalCost+totalUpsell:null;
   const margin=totalUpsell;
@@ -2224,6 +2243,7 @@ function buildHireCard(h){
         <div class="detail-field"><div class="detail-label">Customer</div><div class="detail-val">${esc(h.customer||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}${h.driver_mobile?` <span style="color:var(--n500);font-weight:400;font-size:11px">· ${esc(h.driver_mobile)}</span>`:''}</div></div>
         <div class="detail-field"><div class="detail-label">Booking ref</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Preferred start time</div><div class="detail-val">${h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'—'}</div></div>
         <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(h.vehicle_reg||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Make / Model</div><div class="detail-val">${esc(h.make_model||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Category</div><div class="detail-val">${esc(h.category||'—')}</div></div>
@@ -2237,6 +2257,7 @@ function buildHireCard(h){
         <div><span>Days</span><strong>${days??'—'}</strong></div>
         <div><span>Cost/day</span><strong>${cpd?'£'+cpd.toFixed(2):'—'}</strong></div>
         <div><span>Upsell/day</span><strong>${upd?'£'+upd.toFixed(2):'—'}</strong></div>
+        <div><span>RFT/day</span><strong>${rft?'£'+rft.toFixed(2):'—'}</strong></div>
         <div><span>Client rate/day</span><strong>${dailyClient?'£'+dailyClient.toFixed(2):'—'}</strong></div>
         <div><span>Total cost</span><strong>${fmtMoney(totalCost)}</strong></div>
         <div><span>Total sell</span><strong>${fmtMoney(totalSell)}</strong></div>
@@ -2277,8 +2298,8 @@ async function doCloseHire(id){
 function rechargeHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;
   const days=daysOn(h);
-  const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0;
-  const dailyRate=cpd+upd;
+  const cpd=parseFloat(h.cost_per_day)||0,upd=parseFloat(h.upsell_per_day)||0,rft=parseFloat(h.rft_per_day)||0;
+  const dailyRate=cpd+upd+rft;
   const sellTotal=days?days*dailyRate:0;
   const reg=h.vehicle_reg||'',driver=h.driver||'';
   // Main hire line — Woodland Trust format (client sees all-in rate)
@@ -2311,7 +2332,7 @@ function openEditHire(id){
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   // Driver FK + Dynamics id (if contact exists with dynamics_id)
   f('hf-driver-contact-id',h.driver_contact_id||'');
   const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
@@ -2329,7 +2350,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-cost','hf-upsell','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -2339,7 +2360,7 @@ function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics
 
 // ─── Supplementary charges repeater ───
 let supps=[];
-const SUPP_TYPES=['Fuel','Fine','Admin fee for fine/penalty','Admin fee for damage','One way charge','Comp for Damage','Other'];
+const SUPP_TYPES=['Fuel','Fine','Admin fee for fine/penalty','Admin fee for damage','One way charge','Comp for Damage','Delivery','Collection','Delivery/Collection','Other'];
 // Backward-compat helpers — read either new (cost_amount/upsell_amount) or old (amount) shape
 function suppCost(s){return parseFloat(s.cost_amount!=null?s.cost_amount:s.amount)||0;}
 function suppUpsell(s){return parseFloat(s.upsell_amount)||0;}
@@ -2392,9 +2413,15 @@ function renderSupps(){
 function updateHireRatePreview(){
   const c=parseFloat(document.getElementById('hf-cost')?.value)||0;
   const u=parseFloat(document.getElementById('hf-upsell')?.value)||0;
+  const rftRaw=document.getElementById('hf-rft')?.value;
+  const r=rftRaw!==''&&rftRaw!=null?(parseFloat(rftRaw)||0):0;
   const el=document.getElementById('hf-rate-preview-val');if(!el)return;
-  if(!c&&!u){el.textContent='£0.00 / day';el.style.color='var(--n400)';return;}
-  el.textContent=`£${(c+u).toFixed(2)} / day  (cost £${c.toFixed(2)} + upsell £${u.toFixed(2)})`;
+  if(!c&&!u&&!r){el.textContent='£0.00 / day';el.style.color='var(--n400)';return;}
+  const total=c+u+r;
+  // Build the breakdown — only mention RFT if non-zero, to keep it tidy
+  const parts=[`cost £${c.toFixed(2)}`,`upsell £${u.toFixed(2)}`];
+  if(r)parts.push(`RFT £${r.toFixed(2)}`);
+  el.textContent=`£${total.toFixed(2)} / day  (${parts.join(' + ')})`;
   el.style.color='var(--n700)';
 }
 
@@ -2407,7 +2434,7 @@ async function saveHire(){
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
