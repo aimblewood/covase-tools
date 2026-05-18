@@ -374,7 +374,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .kan-card-l2{font-size:12px;color:var(--n700);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kan-card-l3{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
 .kan-card-l4{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
-.kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;}
+.kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;}
+.kan-card-r-date{font-size:10px;color:var(--n500);}
 .kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;}
 .kan-card-r2.profit-pos{color:var(--tl-green-t);}
 .kan-card-r2.profit-neg{color:var(--tl-red-t);}
@@ -2207,7 +2208,7 @@ function kanCard(h){
   return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
     <div class="kan-card-grid">
       <div class="kan-card-l1">${esc(h.customer||'—')}</div>
-      <div class="kan-card-r1">${days!=null?days+'d on hire':'—'}</div>
+      <div class="kan-card-r1">${h.start_date?`<div class="kan-card-r-date">Start Date: ${fmtD(h.start_date)}</div>`:''}<div>${days!=null?days+'d on hire':'—'}</div></div>
       <div class="kan-card-l2">${esc(h.driver||'—')}</div>
       <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${fmtMoney(profit)}</div>
       <div class="kan-card-l3">${esc(regMake)}</div>
@@ -2885,50 +2886,4 @@ function getVehiclePayload(){
     reg:(document.getElementById('vf-reg')?.value||'').trim().toUpperCase()||null,name:nd('vf-name'),description:nd('vf-desc'),source:nd('vf-source'),funders_quote_no:nd('vf-fqno'),covase_po_number:nd('vf-cpo'),legacy_po_number:nd('vf-lpo'),lex_900_number:nd('vf-lex'),status:nd('vf-status')||'active',notes:nd('vf-notes'),dynamics_id:nd('vf-dynamics'),
     vehicle_type:nd('vf-vtype'),body_style:nd('vf-body'),num_doors:ni('vf-doors'),manufacturer:nd('vf-make'),model:nd('vf-model'),derivative:nd('vf-deriv'),engine_size:nd('vf-engsize'),engine_cc:ni('vf-engcc'),fuel_type:nd('vf-fuel'),transmission:nd('vf-trans'),ev_range:nf('vf-evrange'),exterior_colour:nd('vf-extcol'),interior_trim:nd('vf-intrim'),chassis_number:nd('vf-chassis'),key_number:nd('vf-key'),p11d_value:nf('vf-p11d'),co2_emissions:ni('vf-co2'),fuel_consumption:ni('vf-mpg'),mot_held:document.getElementById('vf-motheld')?.value==='true',standard_items:nd('vf-std'),optional_extras:nd('vf-opts'),
     term_months:ni('vf-term'),annual_mileage:ni('vf-miles'),payment_profile:nd('vf-profile'),vat_type:nd('vf-vattype'),funding_method:nd('vf-fundmethod'),contract_type:nd('vf-conttype'),finance_rental:nf('vf-finrent'),service_rental:nf('vf-svcrent'),excess_mileage_ppm:nf('vf-xsmile'),otr:nf('vf-otr'),initial_payment:nf('vf-initpay'),final_payment:nf('vf-finalpay'),driver_contribution:nf('vf-drivercon'),
-    commissions:nf('vf-commissions'),setup_fee:nf('vf-setupfee'),management_fee:nf('vf-mgmtfee'),other_revenue:nf('vf-otherrev'),costs:nf('vf-costs'),
-    order_received_date:nd('vf-d-ordered'),proposal_sent_date:nd('vf-d-proposal'),order_to_dealer_date:nd('vf-d-todealer'),order_confirmed_date:nd('vf-d-confirmed'),build_date_confirmed:nd('vf-d-build'),expected_delivery_date:nd('vf-d-expdeliv'),delivery_date:nd('vf-d-delivered'),registration_date:nd('vf-d-registered'),contracts_sent_date:nd('vf-d-ctsent'),contracts_signed_date:nd('vf-d-ctsigned'),sent_for_payment_date:nd('vf-d-sentpay'),paid_out_date:nd('vf-d-paidout'),renewal_date:nd('vf-d-renewal'),de_hire_date:nd('vf-d-dehire'),mot_1_due:nd('vf-d-mot1'),mot_2_due:nd('vf-d-mot2'),mot_expiry:nd('vf-d-motexp'),driver_card_sent_date:nd('vf-d-dcsent'),driver_card_received_date:nd('vf-d-dcrecd'),
-    updated_at:new Date().toISOString()
-  };
-}
-async function saveVehicle(){
-  const payload=getVehiclePayload();
-  try{
-    if(editVehicleId){await sbReq(`covase_vehicles?id=eq.${encodeURIComponent(editVehicleId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allVehicles.findIndex(x=>x.id===editVehicleId);if(idx>=0)allVehicles[idx]={...allVehicles[idx],...payload};toast('Vehicle updated','success');}
-    else{const res=await sbReq('covase_vehicles',{method:'POST',body:{...payload,id:'veh-'+Date.now()}});allVehicles.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'veh-'+Date.now()});toast('Vehicle saved','success');}
-    closeVehicleModal();updateVehicleStats();renderVehicles();
-  }catch(e){toast('Save failed: '+e.message,'error');}
-}
-async function deleteVehicle(id){if(!confirm('Remove this vehicle? Cannot be undone.'))return;try{await sbReq(`covase_vehicles?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allVehicles=allVehicles.filter(x=>x.id!==id);updateVehicleStats();renderVehicles();toast('Vehicle removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
-
-// ─── SHARED ───
-function toggleCard(id){document.getElementById(id)?.classList.toggle('expanded');}
-function updateBadges(){
-  // Optional-chain everything so a removed/renamed sidebar badge can't kill rendering downstream
-  const setBadge=(id,n)=>{const el=document.getElementById(id);if(el)el.textContent=String(n||0);};
-  setBadge('badge-pending',(allInvoices||[]).filter(i=>i.status==='pending').length);
-  setBadge('badge-pending-recharge',(allHires||[]).filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id).length);
-  updatePipelineBadge();
-}
-function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
-
-// Close modals on backdrop click
-['hire-modal','account-modal','contact-modal','vehicle-modal','rp-overlay'].forEach(id=>{
-  document.getElementById(id)?.addEventListener('click',e=>{
-    if(e.target===e.currentTarget){
-      if(id==='hire-modal')closeHireModal();
-      else if(id==='account-modal')closeAccountModal();
-      else if(id==='contact-modal')closeContactModal();
-      else if(id==='vehicle-modal')closeVehicleModal();
-      else closeRechargePicker();
-    }
-  });
-});
-
-// Boot — Active hires (Pipeline) is the default landing view
-loadHires();
-// Also load accounts in the background so the client filter dropdown is populated immediately
-loadAccounts();
-</script>
-</body>
-</html>
+    commissions:nf('vf-commissions'),setup_fee:nf('
