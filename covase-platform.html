@@ -374,9 +374,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .kan-card-l2{font-size:12px;color:var(--n700);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kan-card-l3{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
 .kan-card-l4{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
-.kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;}
-.kan-card-r-date{font-size:10px;color:var(--n500);}
-.kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;}
+.kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;}
+.kan-card-r-date{font-size:10px;color:var(--n500);font-weight:400;}
+.kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;}
 .kan-card-r2.profit-pos{color:var(--tl-green-t);}
 .kan-card-r2.profit-neg{color:var(--tl-red-t);}
 .kan-card-r2.profit-zero{color:var(--n500);}
@@ -2208,9 +2208,9 @@ function kanCard(h){
   return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
     <div class="kan-card-grid">
       <div class="kan-card-l1">${esc(h.customer||'—')}</div>
-      <div class="kan-card-r1">${h.start_date?`<div class="kan-card-r-date">Start Date: ${fmtD(h.start_date)}</div>`:''}<div>${days!=null?days+'d on hire':'—'}</div></div>
+      <div class="kan-card-r1">${days!=null?days+'d on hire':'—'}</div>
       <div class="kan-card-l2">${esc(h.driver||'—')}</div>
-      <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${fmtMoney(profit)}</div>
+      <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${h.start_date?`<div class="kan-card-r-date">Start Date: ${fmtD(h.start_date)}</div>`:''}<div>${fmtMoney(profit)}</div></div>
       <div class="kan-card-l3">${esc(regMake)}</div>
       <div class="kan-card-l4">${esc(h.reference||'—')}</div>
     </div>
