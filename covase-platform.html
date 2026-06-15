@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORBIS — Covase</title>
+<title>STAGING · ORBIS — Covase</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -24,7 +24,12 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;font-size:14px}
 
 /* ─── SIDEBAR ─── */
-.sidebar{width:var(--sidebar-w);height:100vh;background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
+/* ─── STAGING banner (only present on covase-platform-staging.html) ─── */
+.staging-banner{position:fixed;top:0;left:0;right:0;height:32px;background:repeating-linear-gradient(45deg,#dc2626,#dc2626 14px,#b91c1c 14px,#b91c1c 28px);color:#fff;font-family:'Outfit',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:14px;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.18);user-select:none;}
+.staging-banner span.dot{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.4);animation:stagingPulse 1.6s ease-in-out infinite;}
+@keyframes stagingPulse{0%,100%{opacity:.85}50%{opacity:.35}}
+body{padding-top:32px}
+.sidebar{width:var(--sidebar-w);height:calc(100vh - 32px);background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:32px;left:0;z-index:50;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
 .sidebar::-webkit-scrollbar{width:6px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
 .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
@@ -375,11 +380,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .kan-card-l3{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
 .kan-card-l4{font-size:11px;color:var(--n500);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;grid-column:1/-1;}
 .kan-card-r1{font-size:11px;color:var(--n600);text-align:right;white-space:nowrap;}
-.kan-card-r-date{font-size:10px;color:var(--n500);font-weight:400;}
-.kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;}
+.kan-card-r2{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;}
 .kan-card-r2.profit-pos{color:var(--tl-green-t);}
 .kan-card-r2.profit-neg{color:var(--tl-red-t);}
 .kan-card-r2.profit-zero{color:var(--n500);}
+.kan-card-replace-row{grid-column:1/-1;font-size:10px;display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;}
+.kan-replace-pill{padding:1px 6px;border-radius:8px;background:var(--n100);color:var(--n600);font-weight:500;border:1px solid var(--n200);white-space:nowrap;}
 .kan-card-bottom{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:5px;}
 .kan-bill-pill{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;padding:2px 7px;border-radius:10px;white-space:nowrap;}
 .kan-bill-pill.pending{background:var(--n100);color:var(--n500);}
@@ -398,6 +404,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 </style>
 </head>
 <body>
+
+<!-- ─── STAGING BANNER ─── -->
+<div class="staging-banner" title="This is the staging build. It writes to the same Supabase project as live — be careful with destructive actions.">
+  <span class="dot"></span>
+  <span>STAGING — same backend as live · changes here are visible to colleagues</span>
+  <span class="dot"></span>
+</div>
 
 <!-- ─── SIDEBAR ─── -->
 <aside class="sidebar">
@@ -430,6 +443,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="sb-item" onclick="showView('hires-recharge',this)">
         <span class="icon">↑</span> Pending recharge
         <span class="sb-badge purple" id="badge-pending-recharge">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Movements</div>
+      <div class="sb-item" onclick="showView('movements',this)">
+        <span class="icon">🚛</span> Movements
+        <span class="sb-badge" id="badge-movements">—</span>
       </div>
     </div>
     <div class="sb-divider"></div>
@@ -477,6 +498,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <input type="text" id="n8n-client-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-client-lookup">
     <label>Contact lookup webhook</label>
     <input type="text" id="n8n-contact-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-contact-lookup">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
+    <label>API key (for mileage lookup)</label>
+    <input type="password" id="ors-key" placeholder="eyJ...">
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
   </div>
 </aside>
@@ -599,6 +623,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   </div>
 
   <!-- ACCOUNTS -->
+  <!-- MOVEMENTS -->
+  <div class="view" id="view-movements">
+    <div class="topbar">
+      <h1>Movements</h1>
+      <input class="search-box" type="text" id="movement-search" placeholder="Search by postcode, customer, reg…" oninput="renderMovements()">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="filter-pill active" onclick="setMovementFilter('all',this)">All</button>
+        <button class="filter-pill" onclick="setMovementFilter('quoted',this)">Quoted</button>
+        <button class="filter-pill" onclick="setMovementFilter('booked',this)">Booked</button>
+        <button class="filter-pill" onclick="setMovementFilter('in_progress',this)">In progress</button>
+        <button class="filter-pill" onclick="setMovementFilter('completed_pending_fuel',this)">Awaiting fuel</button>
+        <button class="filter-pill" onclick="setMovementFilter('invoiced',this)">Invoiced</button>
+        <button class="filter-pill" onclick="setMovementFilter('paid',this)">Paid</button>
+      </div>
+      <button class="topbar-btn" onclick="loadMovements()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="openNewMovement()">+ New Movement</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Total movements</div><div class="stat-val" id="sm-total">—</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Quoted</div><div class="stat-val" id="sm-quoted">—</div></div>
+      <div class="stat-card stat-orange"><div class="stat-label">Active</div><div class="stat-val" id="sm-active">—</div><div class="stat-sub">booked + in progress</div></div>
+      <div class="stat-card stat-green"><div class="stat-label">Open quote value</div><div class="stat-val" id="sm-value">—</div><div class="stat-sub">quoted, booked, in progress</div></div>
+    </div>
+    <div class="content"><div class="card-list" id="movement-list"><div class="loading">Loading movements…</div></div></div>
+  </div>
+
   <div class="view" id="view-accounts">
     <div class="topbar">
       <h1>Accounts</h1>
@@ -788,7 +838,177 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     </div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeHireModal()">Cancel</button>
+      <button class="btn-secondary-modal" id="hf-replace-vehicle-btn" onclick="openReplaceVehicle()" style="display:none">Replace vehicle</button>
       <button class="btn-primary-modal" onclick="saveHire()">Save hire</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── REPLACE VEHICLE MODAL ─── -->
+<div class="modal-overlay" id="replace-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Replace vehicle</div>
+      <button class="modal-close" onclick="closeReplaceModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:10px;line-height:1.4">
+        Booking-level details (customer, driver, delivery address, booking ref) carry over to the new allocation. The current vehicle will be marked off-hired on the changeover date.
+      </div>
+      <div class="form-section-label">Changeover</div>
+      <div class="form-row">
+        <div class="form-field"><label>Changeover date *</label><input type="date" id="rv-changeover-date"></div>
+        <div class="form-field"><label>New end date (blank = ongoing)</label><input type="date" id="rv-end-date"></div>
+      </div>
+      <div class="form-section-label">Replacement vehicle</div>
+      <div class="form-row">
+        <div class="form-field"><label>Registration *</label><input id="rv-reg" placeholder="AB12CDE" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Make / Model</label><input id="rv-makemodel" placeholder="e.g. Ford Focus"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Category</label>
+          <select id="rv-category"><option value="">—</option><option>CAR2</option><option>CAR3</option><option>CAR3A</option><option>CAR3E</option><option>CAR4</option><option>CAR4A</option><option>CAR5</option><option>CAR5A</option><option>CAR5E</option><option>LCV1</option><option>LCV12</option><option>LCV2</option><option>LCV2A</option><option>LCV3</option><option>MPV2</option><option>Other</option></select>
+        </div>
+        <div class="form-field"><label>Fuel</label>
+          <select id="rv-fuel"><option value="">—</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>PHEV</option><option>Electric</option></select>
+        </div>
+        <div class="form-field"><label>Date of registration</label><input type="date" id="rv-reg-date"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>P11d value (£)</label><input type="number" step="0.01" id="rv-p11d" placeholder="0.00"></div>
+        <div class="form-field"><label>CO₂ (g/km)</label><input type="number" step="1" id="rv-co2" placeholder="0"></div>
+        <div class="form-field"><label>Engine (cc)</label><input type="number" step="1" id="rv-engine-cc" placeholder="0"></div>
+      </div>
+      <div class="form-section-label">Rate</div>
+      <div class="form-row">
+        <div class="form-field"><label>Cost/day (supplier)</label><input type="number" step="0.01" id="rv-cost" placeholder="0.00"></div>
+        <div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeReplaceModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveReplacement()">Replace vehicle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MOVEMENT MODAL ─── -->
+<div class="modal-overlay" id="movement-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="movement-modal-title">New movement</div>
+      <button class="modal-close" onclick="closeMovementModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-label">Customer &amp; job</div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Customer account *</label>
+          <select id="mv-account"><option value="">— select —</option></select>
+        </div>
+        <div class="form-field">
+          <label>Customer reference</label>
+          <input id="mv-customer-ref" placeholder="PO / job ref">
+        </div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Movement date</label><input type="date" id="mv-movement-date"></div>
+        <div class="form-field">
+          <label>Status</label>
+          <select id="mv-status">
+            <option value="quoted">Quoted</option>
+            <option value="booked">Booked</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed_pending_fuel">Completed — awaiting fuel</option>
+            <option value="invoiced">Invoiced</option>
+            <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Quote date</label><input type="date" id="mv-quote-date"></div>
+      </div>
+
+      <div class="form-section-label">Pickup</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Postcode</label><input id="mv-pickup-postcode" placeholder="BN2 1TH" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Address line 1</label><input id="mv-pickup-addr1"></div>
+        <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
+      </div>
+
+      <div class="form-section-label">Dropoff</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Postcode</label><input id="mv-dropoff-postcode" placeholder="EH1 2NL" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Address line 1</label><input id="mv-dropoff-addr1"></div>
+        <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
+      </div>
+
+      <div class="form-section-label">Vehicle being moved <span style="font-size:10px;color:var(--n400);font-weight:400">(optional)</span></div>
+      <div class="form-row">
+        <div class="form-field"><label>Registration</label><input id="mv-vehicle-reg" placeholder="AB12CDE" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Make / Model</label><input id="mv-vehicle-makemodel" placeholder="e.g. Ford Focus"></div>
+      </div>
+
+      <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Distance &amp; price</span>
+        <button type="button" class="btn btn-secondary" id="mv-lookup-btn" onclick="lookupMovementMileage()" style="font-size:11px;padding:4px 10px">Look up mileage</button>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Mileage</label><input type="number" step="0.1" id="mv-mileage" placeholder="0.0" oninput="updateMovementCalc()"></div>
+        <div class="form-field"><label>Drive time (mins)</label><input type="number" id="mv-drive-time" placeholder="0"></div>
+        <div class="form-field"><label>Source</label>
+          <select id="mv-mileage-source">
+            <option value="manual">Manual</option>
+            <option value="openrouteservice">OpenRouteService</option>
+            <option value="google">Google</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Markup (£)</label><input type="number" step="0.01" id="mv-markup" placeholder="0.00" oninput="updateMovementCalc()"></div>
+        <div class="form-field"><label>VAT %</label><input type="number" step="0.1" id="mv-vat-pct" value="20" oninput="updateMovementCalc()"></div>
+        <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Base £80 for first 100 mi, then £0.80/mi thereafter.</div></div>
+      </div>
+
+      <div id="mv-pricing-summary" style="background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Base charge</span><strong id="mv-base-display">£0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Markup</span><strong id="mv-markup-display">£0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Supplementaries</span><strong id="mv-supps-display">£0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid var(--n200);margin-top:4px;padding-top:6px"><span>Subtotal ex VAT</span><strong id="mv-subtotal-display">£0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0"><span>VAT</span><strong id="mv-vat-display">£0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0 2px;border-top:2px solid var(--n300);margin-top:4px;padding-top:8px;font-size:14px"><span><strong>Quote total inc VAT</strong></span><strong id="mv-total-display" style="color:var(--covase)">£0.00</strong></div>
+      </div>
+
+      <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Supplementary charges</span>
+        <button type="button" class="btn btn-secondary" onclick="addMovementSupp()" style="font-size:11px;padding:4px 10px">+ Add supplementary</button>
+      </div>
+      <div id="mv-supps"></div>
+
+      <div id="mv-reconciliation" style="display:none">
+        <div class="form-section-label">Fuel reconciliation</div>
+        <div class="form-row trio">
+          <div class="form-field"><label>Actual fuel cost (£)</label><input type="number" step="0.01" id="mv-actual-fuel" placeholder="0.00" oninput="updateMovementCalc()"></div>
+          <div class="form-field"><label>Fuel markup %</label><input type="number" step="0.1" id="mv-fuel-markup-pct" value="20" oninput="updateMovementCalc()"></div>
+          <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Added to quote total to form the final invoice.</div></div>
+        </div>
+        <div style="background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Quote total inc VAT</span><strong id="mv-quote-recap">£0.00</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Fuel cost</span><strong id="mv-fuel-cost-display">£0.00</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Fuel handling charge</span><strong id="mv-fuel-markup-display">£0.00</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span>VAT on fuel</span><strong id="mv-fuel-vat-display">£0.00</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0 2px;border-top:2px solid var(--n300);margin-top:4px;padding-top:8px;font-size:14px"><span><strong>Invoice total inc VAT</strong></span><strong id="mv-invoice-display" style="color:var(--covase)">£0.00</strong></div>
+        </div>
+      </div>
+
+      <div class="form-section-label">Notes</div>
+      <div class="form-field"><label>Customer-facing notes</label><textarea id="mv-notes" placeholder="Anything to include on the quote / invoice…"></textarea></div>
+      <div class="form-field"><label>Internal notes <span style="font-size:10px;color:var(--n400);font-weight:400">(never shown to customer)</span></label><textarea id="mv-internal-notes" placeholder="Internal-only notes…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeMovementModal()">Cancel</button>
+      <button class="btn-secondary-modal" id="mv-delete-btn" onclick="deleteMovementFromModal()" style="display:none;color:var(--tl-red-t)">Delete</button>
+      <button class="btn-primary-modal" onclick="saveMovement()">Save movement</button>
     </div>
   </div>
 </div>
@@ -1160,6 +1380,8 @@ function saveConfig(){
   const nt=document.getElementById('n8n-contact-url').value.trim();
   if(nc)localStorage.setItem('covase_n8n_webhook',nc);else localStorage.removeItem('covase_n8n_webhook');
   if(nt)localStorage.setItem('covase_n8n_contact_webhook',nt);else localStorage.removeItem('covase_n8n_contact_webhook');
+  const orsKey=document.getElementById('ors-key')?.value?.trim();
+  if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   document.getElementById('config-panel').classList.remove('open');
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
@@ -1169,6 +1391,7 @@ function toggleConfig(){
   document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
   document.getElementById('n8n-client-url').value=c.n8nClient===DEFAULT_N8N_CLIENT?'':c.n8nClient;
   document.getElementById('n8n-contact-url').value=c.n8nContact===DEFAULT_N8N_CONTACT?'':c.n8nContact;
+  const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
 }
 
 // ─── DYNAMICS 365 LOOKUP (via n8n) ───
@@ -1435,7 +1658,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
@@ -1937,10 +2160,6 @@ async function loadHires(){
     // Auto-advance: any booked hires whose start_date has arrived become active.
     // Fires once per loadHires() — single PATCH if there are eligible rows, no-op otherwise.
     await autoAdvanceBookedToActive();
-    // Then: any active hires whose end_date has arrived become offhired.
-    await autoAdvanceActiveToOffhired();
-    // Start the periodic + visibilitychange trigger (idempotent).
-    ensureHireAutoAdvanceTimer();
     // Also load accounts for the hire modal dropdown if not loaded
     if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
     updateHireStats();
@@ -1952,15 +2171,6 @@ async function loadHires(){
   }
   catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e2=document.getElementById(id);if(e2)e2.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
 }
-// Parse a YYYY-MM-DD string as a *local* midnight Date. Avoids the BST/UTC
-// gotcha where `new Date("2026-05-18")` is UTC-midnight, which is 01:00 BST and
-// therefore strictly later than the local-midnight `today` we compare against.
-function parseLocalDate(s){
-  if(!s||typeof s!=='string')return null;
-  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return null;
-  const d=new Date(+m[1],+m[2]-1,+m[3]);
-  return isNaN(d)?null:d;
-}
 // Auto-advance: flip hire_status from 'booked' to 'active' for any rows
 // whose start_date has arrived (start_date <= today). Mutates allHires in place
 // and PATCHes Supabase in a single bulk call. Silent no-op if nothing eligible.
@@ -1968,10 +2178,10 @@ async function autoAdvanceBookedToActive(){
   const today=new Date();today.setHours(0,0,0,0);
   const due=(allHires||[]).filter(h=>{
     if(h.hire_status!=='booked'||!h.start_date)return false;
-    const sd=parseLocalDate(h.start_date);
-    return sd!==null&&sd<=today;
+    const sd=new Date(h.start_date);
+    return !isNaN(sd)&&sd<=today;
   });
-  if(!due.length)return 0;
+  if(!due.length)return;
   // Bulk PATCH via PostgREST: one request, IN-list of IDs
   const ids=due.map(h=>h.id);
   const inList=ids.map(id=>`"${id.replace(/"/g,'\\"')}"`).join(',');
@@ -1984,74 +2194,9 @@ async function autoAdvanceBookedToActive(){
     // Reflect locally so the next render shows the new state
     due.forEach(h=>{h.hire_status='active';h.updated_at=new Date().toISOString();});
     if(typeof console!=='undefined')console.log(`[auto-advance] flipped ${due.length} hire(s) booked→active`);
-    return due.length;
   }catch(e){
     if(typeof console!=='undefined')console.warn('[auto-advance] failed',e);
-    return 0;
   }
-}
-// Auto-advance: flip hire_status from 'active' to 'offhired' for any rows
-// whose end_date has arrived (end_date <= today, parsed as a local date).
-// Hires with no end_date are "ongoing" and never auto-flip. Cancelled / already
-// offhired rows are skipped by the status filter. Mirrors booked→active.
-async function autoAdvanceActiveToOffhired(){
-  const today=new Date();today.setHours(0,0,0,0);
-  const due=(allHires||[]).filter(h=>{
-    if(h.hire_status!=='active'||!h.end_date)return false;
-    const ed=parseLocalDate(h.end_date);
-    return ed!==null&&ed<=today;
-  });
-  if(!due.length)return 0;
-  const ids=due.map(h=>h.id);
-  const inList=ids.map(id=>`"${id.replace(/"/g,'\\"')}"`).join(',');
-  try{
-    await sbReq(`covase_hires?id=in.(${encodeURIComponent(inList)})`,{
-      method:'PATCH',
-      body:{hire_status:'offhired',updated_at:new Date().toISOString()},
-      prefer:'return=minimal'
-    });
-    due.forEach(h=>{h.hire_status='offhired';h.updated_at=new Date().toISOString();});
-    if(typeof console!=='undefined')console.log(`[auto-advance] flipped ${due.length} hire(s) active→offhired`);
-    return due.length;
-  }catch(e){
-    if(typeof console!=='undefined')console.warn('[auto-advance offhired] failed',e);
-    return 0;
-  }
-}
-// Wall-clock trigger for the auto-advances. Without this, flips only happen
-// when the user reloads the hires view. With this, a tab left open across
-// midnight will pick up the transition within ~15 minutes, and re-focusing
-// the tab triggers an immediate check.
-let hireAutoAdvanceTimer=null;
-let hireAutoAdvanceInFlight=false;
-async function runHireAutoAdvances(){
-  if(hireAutoAdvanceInFlight)return;
-  if(!Array.isArray(allHires)||!allHires.length)return;
-  hireAutoAdvanceInFlight=true;
-  try{
-    const flipped=(await autoAdvanceBookedToActive()||0)+(await autoAdvanceActiveToOffhired()||0);
-    if(flipped>0){
-      try{
-        updateHireStats();
-        renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));
-        renderHireView('hires-all','all-list',null);
-        renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
-        renderPipeline();
-        updateBadges();
-      }catch(e){
-        if(typeof console!=='undefined')console.warn('[auto-advance] post-flip render failed',e);
-      }
-    }
-  }finally{
-    hireAutoAdvanceInFlight=false;
-  }
-}
-function ensureHireAutoAdvanceTimer(){
-  if(hireAutoAdvanceTimer)return;
-  // 15-minute poll. Worst case lag from midnight to flip is ~15 mins.
-  hireAutoAdvanceTimer=setInterval(runHireAutoAdvances,15*60*1000);
-  // Re-check when the tab regains focus — handles "user comes back in the morning".
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)runHireAutoAdvances();});
 }
 function updateHireStats(){
   const onHire=allHires.filter(h=>h.hire_status==='active');
@@ -2205,14 +2350,21 @@ function kanCard(h){
   const adv=nextAdvance(h);
   const advBtn=adv?`<button class="kan-advance ${adv.cls||''}" onclick="event.stopPropagation();advanceHire('${esc(h.id)}','${adv.action}')" title="${esc(adv.tip||'')}">→ ${esc(adv.label)}</button>`:'';
   const cancelBtn=h.hire_status!=='cancelled'&&h.billing_status!=='paid'?`<button class="kan-cancel" onclick="event.stopPropagation();cancelHire('${esc(h.id)}')" title="Cancel hire">✕</button>`:'';
+  // Replacement chain badges.
+  const successor=(allHires||[]).find(x=>x.replaces_hire_id===h.id);
+  const predecessor=h.replaces_hire_id?(allHires||[]).find(x=>x.id===h.replaces_hire_id):null;
+  const replacedBadge=successor?`<span class="kan-replace-pill" title="Replaced by ${esc(successor.vehicle_reg||'—')} on ${fmtD(successor.start_date)}">Replaced → ${esc(successor.vehicle_reg||'—')}</span>`:'';
+  const replacesBadge=predecessor?`<span class="kan-replace-pill" title="Replaces ${esc(predecessor.vehicle_reg||'—')} (off-hired ${fmtD(predecessor.end_date)})">← Replaces ${esc(predecessor.vehicle_reg||'—')}</span>`:'';
+  const replaceRow=(replacedBadge||replacesBadge)?`<div class="kan-card-replace-row">${replacedBadge}${replacesBadge}</div>`:'';
   return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
     <div class="kan-card-grid">
       <div class="kan-card-l1">${esc(h.customer||'—')}</div>
       <div class="kan-card-r1">${days!=null?days+'d on hire':'—'}</div>
       <div class="kan-card-l2">${esc(h.driver||'—')}</div>
-      <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${h.start_date?`<div class="kan-card-r-date">Start Date: ${fmtD(h.start_date)}</div>`:''}<div>${fmtMoney(profit)}</div></div>
+      <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${fmtMoney(profit)}</div>
       <div class="kan-card-l3">${esc(regMake)}</div>
       <div class="kan-card-l4">${esc(h.reference||'—')}</div>
+      ${replaceRow}
     </div>
     <div class="kan-card-bottom">
       <div class="kan-card-actions" style="margin-left:auto">${advBtn}${cancelBtn}</div>
@@ -2389,7 +2541,7 @@ function rechargeHire(id){
   toast('Opening generator…','success');
 }
 let editHireId=null;
-async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();document.getElementById('hire-modal').classList.add('open');
+async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();const rvBtn=document.getElementById('hf-replace-vehicle-btn');if(rvBtn)rvBtn.style.display='none';document.getElementById('hire-modal').classList.add('open');
   // Ensure contacts are loaded so driver lookup can surface local matches + match by dynamics_id on save-back
   if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
 }
@@ -2407,6 +2559,12 @@ function openEditHire(id){
   window._lastSelectedDriverName=h.driver||'';
   supps=Array.isArray(h.supplementaries)?h.supplementaries.map(s=>({...s})):[];renderSupps();updateHireRatePreview();
   updateHireD365Link('account');updateHireD365Link('driver');
+  // Replace-vehicle button only makes sense on hires that already have a vehicle and aren't done.
+  const rvBtn=document.getElementById('hf-replace-vehicle-btn');
+  if(rvBtn){
+    const eligible=['booked','active'].includes(h.hire_status);
+    rvBtn.style.display=eligible?'':'none';
+  }
   document.getElementById('hire-modal').classList.add('open');
 }
 function populateHireAccountDropdown(){
@@ -2508,7 +2666,488 @@ async function saveHire(){
     closeHireModal();hiresLoaded=false;loadHires();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
+// ─── Vehicle replacement ───
+// State of the replace-vehicle flow. Mirrors editHireId but is scoped to the
+// replacement modal so closing the hire-modal in the middle doesn't lose track.
+let replacingHireId=null;
+function openReplaceVehicle(){
+  if(!editHireId){toast('Open an existing hire first','error');return;}
+  const h=allHires.find(x=>x.id===editHireId);if(!h){toast('Hire not found','error');return;}
+  if(!['booked','active'].includes(h.hire_status)){
+    toast(`Cannot replace vehicle on a ${h.hire_status} hire`,'error');
+    return;
+  }
+  replacingHireId=editHireId;
+  const today=new Date().toISOString().split('T')[0];
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
+  set('rv-changeover-date',today);
+  set('rv-end-date',h.end_date||'');
+  set('rv-reg','');set('rv-makemodel','');set('rv-category','');set('rv-fuel','');set('rv-reg-date','');
+  set('rv-p11d','');set('rv-co2','');set('rv-engine-cc','');
+  set('rv-cost',h.cost_per_day||'');
+  document.getElementById('hire-modal').classList.remove('open');
+  document.getElementById('replace-modal').classList.add('open');
+}
+function closeReplaceModal(){
+  document.getElementById('replace-modal').classList.remove('open');
+  replacingHireId=null;
+}
+async function saveReplacement(){
+  if(!replacingHireId){toast('No hire selected to replace','error');return;}
+  const old=allHires.find(x=>x.id===replacingHireId);
+  if(!old){toast('Original hire not found','error');return;}
+  const changeoverDate=document.getElementById('rv-changeover-date').value;
+  if(!changeoverDate){toast('Changeover date required','error');return;}
+  const newReg=(document.getElementById('rv-reg').value||'').replace(/\s+/g,'').toUpperCase();
+  if(!newReg){toast('Replacement vehicle registration required','error');return;}
+  const newEndDate=document.getElementById('rv-end-date').value||null;
+  const newCost=parseFloat(document.getElementById('rv-cost').value);
+  const nowIso=new Date().toISOString();
+  // PATCH old row → offhired on the changeover date.
+  const oldPatch={hire_status:'offhired',end_date:changeoverDate,updated_at:nowIso};
+  // INSERT new row. Booking-level fields are copied from old; vehicle, dates and rate are new.
+  const newId='hire-'+Date.now();
+  const newRow={
+    id:newId,
+    // Booking-level (copied — stable across the chain)
+    customer:old.customer,client_account_id:old.client_account_id,
+    driver:old.driver,driver_contact_id:old.driver_contact_id,driver_mobile:old.driver_mobile,
+    reference:old.reference,
+    delivery_address_line1:old.delivery_address_line1,delivery_address_line2:old.delivery_address_line2,
+    delivery_town:old.delivery_town,delivery_postcode:old.delivery_postcode,
+    supplier:old.supplier,
+    preferred_start_time:old.preferred_start_time,
+    upsell_per_day:old.upsell_per_day,rft_per_day:old.rft_per_day,
+    vat_status:old.vat_status||'full',
+    // Vehicle-level (new — captured by the form)
+    vehicle_reg:newReg,
+    make_model:document.getElementById('rv-makemodel').value.trim()||null,
+    category:document.getElementById('rv-category').value||null,
+    fuel_type:document.getElementById('rv-fuel').value||null,
+    date_of_registration:document.getElementById('rv-reg-date').value||null,
+    p11d_value:parseFloat(document.getElementById('rv-p11d').value)||null,
+    co2_emissions:parseInt(document.getElementById('rv-co2').value,10)||null,
+    engine_cc:parseInt(document.getElementById('rv-engine-cc').value,10)||null,
+    // Allocation-level (new)
+    start_date:changeoverDate,
+    end_date:newEndDate,
+    cost_per_day:isNaN(newCost)?(old.cost_per_day||null):newCost,
+    hire_status:'active',
+    billing_status:'pending',
+    supplementaries:[],
+    incoming_invoice_id:null,outgoing_invoice_id:null,
+    supplier_ref:null,
+    notes:null,
+    replaces_hire_id:old.id,
+    updated_at:nowIso
+  };
+  try{
+    await sbReq(`covase_hires?id=eq.${encodeURIComponent(old.id)}`,{method:'PATCH',body:oldPatch,prefer:'return=minimal'});
+    const res=await sbReq('covase_hires',{method:'POST',body:newRow});
+    const idx=allHires.findIndex(x=>x.id===old.id);
+    if(idx>=0)Object.assign(allHires[idx],oldPatch);
+    const created=Array.isArray(res)?res[0]:(res||newRow);
+    allHires.unshift(created);
+    toast('Vehicle replaced','success');
+    closeReplaceModal();
+    closeHireModal();
+    hiresLoaded=false;
+    loadHires();
+  }catch(e){toast('Replace failed: '+e.message,'error');}
+}
+
 async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+
+// ─── MOVEMENTS ───
+let allMovements=[],movementsLoaded=false,movementFilter='all',editMovementId=null,movementSupps=[];
+
+async function loadMovements(){
+  const el=document.getElementById('movement-list');if(needsSetup(el))return;
+  el.innerHTML='<div class="loading">Loading movements…</div>';
+  try{
+    allMovements=await sbReq('covase_movements?order=created_at.desc&limit=500');
+    movementsLoaded=true;
+    // Load accounts in background for the dropdown if not loaded
+    if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
+    updateMovementStats();renderMovements();updateBadges();
+  }catch(e){
+    el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;
+  }
+}
+
+function updateMovementStats(){
+  const total=allMovements.length;
+  const quoted=allMovements.filter(m=>m.movement_status==='quoted').length;
+  const active=allMovements.filter(m=>['booked','in_progress'].includes(m.movement_status)).length;
+  const openValue=allMovements
+    .filter(m=>['quoted','booked','in_progress'].includes(m.movement_status))
+    .reduce((s,m)=>s+(parseFloat(m.quote_total)||0),0);
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('sm-total',total);
+  set('sm-quoted',quoted);
+  set('sm-active',active);
+  set('sm-value',fmtMoney(openValue||null));
+  // Sidebar badge — count of anything not yet paid/cancelled
+  const live=allMovements.filter(m=>!['paid','cancelled'].includes(m.movement_status)).length;
+  const badge=document.getElementById('badge-movements');if(badge)badge.textContent=String(live||0);
+}
+
+function setMovementFilter(f,btn){
+  movementFilter=f;
+  document.querySelectorAll('#view-movements .filter-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMovements();
+}
+
+function renderMovements(){
+  const wrap=document.getElementById('movement-list');if(!wrap)return;
+  const q=(document.getElementById('movement-search')?.value||'').toLowerCase().trim();
+  let rows=allMovements.slice();
+  if(movementFilter!=='all')rows=rows.filter(m=>m.movement_status===movementFilter);
+  if(q){
+    rows=rows.filter(m=>{
+      const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.notes]
+        .map(x=>String(x||'').toLowerCase()).join(' ');
+      return hay.includes(q);
+    });
+  }
+  if(!rows.length){
+    wrap.innerHTML='<div class="empty-state"><div class="empty-icon">🚛</div><div class="empty-title">No movements</div><div class="empty-sub">Click + New Movement to start.</div></div>';
+    return;
+  }
+  wrap.innerHTML=rows.map(m=>movementCard(m)).join('');
+}
+
+function movementCard(m){
+  const statusLabels={
+    quoted:'Quoted',booked:'Booked',in_progress:'In progress',
+    completed_pending_fuel:'Awaiting fuel',invoiced:'Invoiced',paid:'Paid',cancelled:'Cancelled'
+  };
+  const total=parseFloat(m.invoice_total)||parseFloat(m.quote_total)||0;
+  const miles=m.mileage!=null?Number(m.mileage).toFixed(1)+' mi':'—';
+  const pickup=esc(m.pickup_postcode||'?');
+  const dropoff=esc(m.dropoff_postcode||'?');
+  const date=m.movement_date?fmtD(m.movement_date):(m.quote_date?fmtD(m.quote_date)+' (quote)':'—');
+  return `<div class="card" onclick="openEditMovement('${esc(m.id)}')">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--n800)">${esc(m.customer||'—')}</div>
+        <div style="font-size:11px;color:var(--n600);margin-top:2px">${pickup} → ${dropoff} · ${miles}</div>
+        <div style="font-size:11px;color:var(--n500);margin-top:2px">${date}${m.customer_reference?' · '+esc(m.customer_reference):''}${m.vehicle_reg?' · '+esc(m.vehicle_reg):''}</div>
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-weight:700;font-size:13px;color:var(--covase)">${fmtMoney(total||null)}</div>
+        <div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(statusLabels[m.movement_status]||m.movement_status)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function populateMovementAccountDropdown(){
+  const sel=document.getElementById('mv-account');if(!sel)return;
+  const cur=sel.value;
+  const clients=(allAccounts||[]).filter(a=>(a.type||'client')==='client').slice().sort((a,b)=>(a.company_name||'').localeCompare(b.company_name||''));
+  sel.innerHTML='<option value="">— select —</option>'+clients.map(a=>`<option value="${esc(a.id)}">${esc(a.company_name)}</option>`).join('');
+  if(cur)sel.value=cur;
+}
+
+function clearMovementForm(){
+  ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town',
+   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-vehicle-reg','mv-vehicle-makemodel',
+   'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
+  ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('mv-account').value='';
+  document.getElementById('mv-status').value='quoted';
+  document.getElementById('mv-mileage-source').value='manual';
+  document.getElementById('mv-vat-pct').value='20';
+  document.getElementById('mv-fuel-markup-pct').value='20';
+  movementSupps=[];renderMovementSupps();
+  document.getElementById('mv-reconciliation').style.display='none';
+  document.getElementById('mv-delete-btn').style.display='none';
+  updateMovementCalc();
+}
+
+async function openNewMovement(){
+  editMovementId=null;
+  document.getElementById('movement-modal-title').textContent='New movement';
+  clearMovementForm();
+  document.getElementById('mv-quote-date').value=new Date().toISOString().split('T')[0];
+  // Load accounts if not already
+  if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
+  populateMovementAccountDropdown();
+  document.getElementById('movement-modal').classList.add('open');
+}
+
+function openEditMovement(id){
+  const m=allMovements.find(x=>x.id===id);if(!m)return;
+  editMovementId=id;
+  document.getElementById('movement-modal-title').textContent='Edit movement';
+  clearMovementForm();
+  populateMovementAccountDropdown();
+  const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
+  f('mv-account',m.client_account_id||'');
+  f('mv-customer-ref',m.customer_reference);
+  f('mv-movement-date',m.movement_date);
+  f('mv-quote-date',m.quote_date);
+  f('mv-status',m.movement_status||'quoted');
+  f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);
+  f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);
+  f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
+  f('mv-mileage',m.mileage);f('mv-drive-time',m.drive_time_minutes);f('mv-mileage-source',m.mileage_source||'manual');
+  f('mv-markup',m.markup_flat);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
+  f('mv-actual-fuel',m.actual_fuel_cost);f('mv-fuel-markup-pct',m.fuel_markup_pct||'20');
+  f('mv-notes',m.notes);f('mv-internal-notes',m.internal_notes);
+  movementSupps=Array.isArray(m.supplementaries)?m.supplementaries.map(x=>({...x})):[];
+  renderMovementSupps();
+  // Show reconciliation section if relevant
+  const showReco=['completed_pending_fuel','invoiced','paid'].includes(m.movement_status);
+  document.getElementById('mv-reconciliation').style.display=showReco?'':'none';
+  document.getElementById('mv-delete-btn').style.display='';
+  updateMovementCalc();
+  document.getElementById('movement-modal').classList.add('open');
+}
+
+function closeMovementModal(){document.getElementById('movement-modal').classList.remove('open');}
+
+// ─── Movement supps repeater (parallel to hire supps but separate state) ───
+const MV_SUPP_TYPES=['Ferry','Hotel','Fuel (pre-arranged)','Toll','Parking','Cleaning','Driver subsistence','Return travel','Other'];
+function mvSuppCost(s){return parseFloat(s.cost_amount!=null?s.cost_amount:s.amount)||0;}
+function mvSuppUpsell(s){return parseFloat(s.upsell_amount)||0;}
+function addMovementSupp(){movementSupps.push({type:'Ferry',cost_amount:null,upsell_amount:null,vat_status:'full',notes:''});renderMovementSupps();updateMovementCalc();}
+function removeMovementSupp(i){movementSupps.splice(i,1);renderMovementSupps();updateMovementCalc();}
+function updateMovementSupp(i,field,val){
+  if(!movementSupps[i])return;
+  if(field==='cost_amount'||field==='upsell_amount')movementSupps[i][field]=val===''?null:parseFloat(val);
+  else movementSupps[i][field]=val;
+  updateMovementCalc();
+}
+function renderMovementSupps(){
+  const wrap=document.getElementById('mv-supps');if(!wrap)return;
+  if(!movementSupps.length){wrap.innerHTML='<div style="font-size:11px;color:#9ca3af;padding:6px 0">No supplementary charges. Click "+ Add supplementary" above.</div>';return;}
+  wrap.innerHTML=movementSupps.map((s,i)=>{
+    const cost=s.cost_amount!=null?s.cost_amount:(s.amount!=null?s.amount:'');
+    const upsell=s.upsell_amount!=null?s.upsell_amount:'';
+    return `
+    <div class="form-row" style="align-items:end;gap:8px;margin-bottom:6px">
+      <div class="form-field" style="flex:0 0 170px">
+        <label>Type</label>
+        <select onchange="updateMovementSupp(${i},'type',this.value)">
+          ${MV_SUPP_TYPES.map(t=>`<option value="${esc(t)}"${s.type===t?' selected':''}>${esc(t)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field" style="flex:0 0 100px">
+        <label>Cost £</label>
+        <input type="number" step="0.01" value="${cost}" placeholder="0.00" onchange="updateMovementSupp(${i},'cost_amount',this.value)">
+      </div>
+      <div class="form-field" style="flex:0 0 100px">
+        <label>Charge £ <span style="font-size:9px;color:var(--n400);font-weight:400">(client)</span></label>
+        <input type="number" step="0.01" value="${upsell}" placeholder="0.00" onchange="updateMovementSupp(${i},'upsell_amount',this.value)">
+      </div>
+      <div class="form-field" style="flex:0 0 140px">
+        <label>VAT status</label>
+        <select onchange="updateMovementSupp(${i},'vat_status',this.value)">
+          <option value="full"${s.vat_status==='full'?' selected':''}>Full</option>
+          <option value="outside_of_scope"${s.vat_status==='outside_of_scope'?' selected':''}>Outside of scope</option>
+        </select>
+      </div>
+      <div class="form-field" style="flex:1">
+        <label>Notes</label>
+        <input value="${esc(s.notes||'')}" placeholder="e.g. Cairnryan-Belfast ferry" onchange="updateMovementSupp(${i},'notes',this.value)">
+      </div>
+      <button type="button" class="btn btn-delete" onclick="removeMovementSupp(${i})" style="flex:0 0 auto;margin-bottom:2px">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ─── Pricing calculator ───
+// Base: £80 first 100 mi + £0.80/mi thereafter. VAT applies to the customer-
+// facing amount on the vatable supps + base + markup. "Outside of scope" supps
+// pass through without VAT. Markup is internal terminology only — never appears
+// on any customer-facing text in this module.
+function calcMovementTotals(){
+  const mileage=parseFloat(document.getElementById('mv-mileage')?.value)||0;
+  const markup=parseFloat(document.getElementById('mv-markup')?.value)||0;
+  const vatPct=parseFloat(document.getElementById('mv-vat-pct')?.value)||20;
+  let base=0;
+  if(mileage>0){
+    if(mileage<=100)base=80;
+    else base=80+(mileage-100)*0.80;
+  }
+  // Use the charge (upsell_amount) for customer-facing total; fall back to cost.
+  const suppsCharge=(s)=>{const v=parseFloat(s.upsell_amount);if(!isNaN(v))return v;return parseFloat(s.cost_amount)||0;};
+  const suppsVatable=movementSupps.filter(s=>(s.vat_status||'full')==='full').reduce((acc,s)=>acc+suppsCharge(s),0);
+  const suppsExempt=movementSupps.filter(s=>s.vat_status==='outside_of_scope').reduce((acc,s)=>acc+suppsCharge(s),0);
+  const suppsTotal=suppsVatable+suppsExempt;
+  const vatableSubtotal=base+markup+suppsVatable;
+  const vatAmount=vatableSubtotal*(vatPct/100);
+  const subtotalExVat=vatableSubtotal+suppsExempt;
+  const quoteTotal=subtotalExVat+vatAmount;
+  return{base,markup,suppsTotal,subtotalExVat,vatAmount,quoteTotal,vatPct};
+}
+
+function calcMovementReconciliation(quoteTotal,vatPct){
+  const fuelCost=parseFloat(document.getElementById('mv-actual-fuel')?.value)||0;
+  const fuelMarkupPct=parseFloat(document.getElementById('mv-fuel-markup-pct')?.value)||0;
+  const fuelMarkupAmount=fuelCost*(fuelMarkupPct/100);
+  const fuelVatableExVat=fuelCost+fuelMarkupAmount;
+  const fuelVat=fuelVatableExVat*(vatPct/100);
+  const invoiceTotal=quoteTotal+fuelVatableExVat+fuelVat;
+  return{fuelCost,fuelMarkupAmount,fuelVat,invoiceTotal};
+}
+
+function updateMovementCalc(){
+  const t=calcMovementTotals();
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('mv-base-display','£'+t.base.toFixed(2));
+  set('mv-markup-display','£'+t.markup.toFixed(2));
+  set('mv-supps-display','£'+t.suppsTotal.toFixed(2));
+  set('mv-subtotal-display','£'+t.subtotalExVat.toFixed(2));
+  set('mv-vat-display','£'+t.vatAmount.toFixed(2));
+  set('mv-total-display','£'+t.quoteTotal.toFixed(2));
+  // Reconciliation block (only relevant when shown, but harmless to update)
+  const r=calcMovementReconciliation(t.quoteTotal,t.vatPct);
+  set('mv-quote-recap','£'+t.quoteTotal.toFixed(2));
+  set('mv-fuel-cost-display','£'+r.fuelCost.toFixed(2));
+  set('mv-fuel-markup-display','£'+r.fuelMarkupAmount.toFixed(2));
+  set('mv-fuel-vat-display','£'+r.fuelVat.toFixed(2));
+  set('mv-invoice-display','£'+r.invoiceTotal.toFixed(2));
+  // Toggle reconciliation section based on status
+  const status=document.getElementById('mv-status')?.value||'quoted';
+  const showReco=['completed_pending_fuel','invoiced','paid'].includes(status);
+  const recoEl=document.getElementById('mv-reconciliation');if(recoEl)recoEl.style.display=showReco?'':'none';
+}
+
+// ─── Mileage lookup via Postcodes.io + OpenRouteService ───
+async function lookupMovementMileage(){
+  const apiKey=localStorage.getItem('covase_ors_api_key');
+  if(!apiKey){toast('Set the OpenRouteService API key in Settings (⚙) first','error');return;}
+  const pickupPc=(document.getElementById('mv-pickup-postcode').value||'').trim();
+  const dropoffPc=(document.getElementById('mv-dropoff-postcode').value||'').trim();
+  if(!pickupPc||!dropoffPc){toast('Both postcodes required','error');return;}
+  const btn=document.getElementById('mv-lookup-btn');
+  if(btn){btn.disabled=true;btn.textContent='Looking up…';}
+  try{
+    // Postcodes.io for lat/lon
+    const [pRes,dRes]=await Promise.all([
+      fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pickupPc)}`),
+      fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(dropoffPc)}`)
+    ]);
+    if(!pRes.ok)throw new Error(`Pickup postcode not recognised (${pickupPc})`);
+    if(!dRes.ok)throw new Error(`Dropoff postcode not recognised (${dropoffPc})`);
+    const pickup=(await pRes.json()).result;
+    const dropoff=(await dRes.json()).result;
+    if(!pickup||!dropoff)throw new Error('Could not resolve one of the postcodes');
+    // OpenRouteService directions (driving-car). Returns distance in metres,
+    // duration in seconds. Response shape can be either {routes:[...]} (json)
+    // or {features:[...]} (geojson) — handle both defensively.
+    const orsRes=await fetch('https://api.openrouteservice.org/v2/directions/driving-car',{
+      method:'POST',
+      headers:{'Authorization':apiKey,'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({coordinates:[[pickup.longitude,pickup.latitude],[dropoff.longitude,dropoff.latitude]]})
+    });
+    if(!orsRes.ok){
+      const txt=await orsRes.text();
+      throw new Error(`OpenRouteService: ${orsRes.status} ${txt.slice(0,120)}`);
+    }
+    const data=await orsRes.json();
+    let distMeters=null,durSeconds=null;
+    if(data.routes&&data.routes[0]&&data.routes[0].summary){
+      distMeters=data.routes[0].summary.distance;
+      durSeconds=data.routes[0].summary.duration;
+    }else if(data.features&&data.features[0]&&data.features[0].properties&&data.features[0].properties.summary){
+      distMeters=data.features[0].properties.summary.distance;
+      durSeconds=data.features[0].properties.summary.duration;
+    }
+    if(distMeters==null)throw new Error('Could not read distance from routing response');
+    const miles=distMeters/1609.344;
+    const minutes=Math.round(durSeconds/60);
+    document.getElementById('mv-mileage').value=miles.toFixed(1);
+    document.getElementById('mv-drive-time').value=String(minutes);
+    document.getElementById('mv-mileage-source').value='openrouteservice';
+    updateMovementCalc();
+    toast(`Looked up: ${miles.toFixed(1)} mi · ${minutes} min`,'success');
+  }catch(e){
+    toast('Mileage lookup failed: '+e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Look up mileage';}
+  }
+}
+
+async function saveMovement(){
+  const accountId=document.getElementById('mv-account').value;
+  if(!accountId){toast('Customer account required','error');return;}
+  const account=(allAccounts||[]).find(a=>a.id===accountId);
+  if(!account){toast('Customer account not found','error');return;}
+  const cleanSupps=movementSupps
+    .filter(s=>(mvSuppCost(s)||mvSuppUpsell(s)))
+    .map(s=>({type:s.type||'Other',cost_amount:mvSuppCost(s),upsell_amount:mvSuppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
+  const t=calcMovementTotals();
+  const status=document.getElementById('mv-status').value;
+  let actualFuel=parseFloat(document.getElementById('mv-actual-fuel').value);if(isNaN(actualFuel))actualFuel=null;
+  let fuelMarkupPct=parseFloat(document.getElementById('mv-fuel-markup-pct').value);if(isNaN(fuelMarkupPct))fuelMarkupPct=null;
+  const r=actualFuel!=null?calcMovementReconciliation(t.quoteTotal,t.vatPct):null;
+  const payload={
+    client_account_id:accountId,
+    customer:account.company_name,
+    customer_reference:document.getElementById('mv-customer-ref').value.trim()||null,
+    pickup_postcode:(document.getElementById('mv-pickup-postcode').value||'').trim().toUpperCase()||null,
+    pickup_address_line1:document.getElementById('mv-pickup-addr1').value.trim()||null,
+    pickup_town:document.getElementById('mv-pickup-town').value.trim()||null,
+    dropoff_postcode:(document.getElementById('mv-dropoff-postcode').value||'').trim().toUpperCase()||null,
+    dropoff_address_line1:document.getElementById('mv-dropoff-addr1').value.trim()||null,
+    dropoff_town:document.getElementById('mv-dropoff-town').value.trim()||null,
+    vehicle_reg:(document.getElementById('mv-vehicle-reg').value||'').replace(/\s+/g,'').toUpperCase()||null,
+    vehicle_makemodel:document.getElementById('mv-vehicle-makemodel').value.trim()||null,
+    mileage:parseFloat(document.getElementById('mv-mileage').value)||null,
+    mileage_source:document.getElementById('mv-mileage-source').value||null,
+    drive_time_minutes:parseInt(document.getElementById('mv-drive-time').value,10)||null,
+    base_charge:t.base,
+    markup_flat:t.markup,
+    supplementaries:cleanSupps,
+    vat_total:t.vatAmount,
+    quote_total:t.quoteTotal,
+    actual_fuel_cost:actualFuel,
+    fuel_markup_pct:fuelMarkupPct,
+    fuel_markup_amount:r?r.fuelMarkupAmount:null,
+    invoice_total:r?r.invoiceTotal:null,
+    movement_status:status,
+    quote_date:document.getElementById('mv-quote-date').value||null,
+    movement_date:document.getElementById('mv-movement-date').value||null,
+    notes:document.getElementById('mv-notes').value.trim()||null,
+    internal_notes:document.getElementById('mv-internal-notes').value.trim()||null,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(editMovementId){
+      await sbReq(`covase_movements?id=eq.${encodeURIComponent(editMovementId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});
+      const idx=allMovements.findIndex(x=>x.id===editMovementId);
+      if(idx>=0)allMovements[idx]={...allMovements[idx],...payload};
+      toast('Movement updated','success');
+    }else{
+      const newId='mov-'+Date.now();
+      const res=await sbReq('covase_movements',{method:'POST',body:{...payload,id:newId}});
+      const created=Array.isArray(res)?res[0]:(res||{...payload,id:newId});
+      allMovements.unshift(created);
+      toast('Movement saved','success');
+    }
+    closeMovementModal();movementsLoaded=false;loadMovements();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+
+async function deleteMovementFromModal(){
+  if(!editMovementId)return;
+  if(!confirm('Delete this movement? Cannot be undone.'))return;
+  try{
+    await sbReq(`covase_movements?id=eq.${encodeURIComponent(editMovementId)}`,{method:'DELETE',prefer:'return=minimal'});
+    allMovements=allMovements.filter(m=>m.id!==editMovementId);
+    toast('Movement deleted','success');
+    closeMovementModal();
+    updateMovementStats();renderMovements();updateBadges();
+  }catch(e){toast('Delete failed: '+e.message,'error');}
+}
+
+// Re-check reconciliation visibility when status changes in the modal
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='mv-status')updateMovementCalc();});
 
 // ─── ACCOUNTS ───
 let allAccounts=[],accountFilter='all';
@@ -2914,7 +3553,7 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','account-modal','contact-modal','vehicle-modal','rp-overlay'].forEach(id=>{
+['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','rp-overlay'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{
     if(e.target===e.currentTarget){
       if(id==='hire-modal')closeHireModal();
