@@ -929,17 +929,19 @@ body{padding-top:32px}
       </div>
 
       <div class="form-section-label">Pickup</div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>Postcode</label><input id="mv-pickup-postcode" placeholder="BN2 1TH" style="text-transform:uppercase"></div>
         <div class="form-field"><label>Address line 1</label><input id="mv-pickup-addr1"></div>
         <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
+        <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
       </div>
 
       <div class="form-section-label">Dropoff</div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>Postcode</label><input id="mv-dropoff-postcode" placeholder="EH1 2NL" style="text-transform:uppercase"></div>
         <div class="form-field"><label>Address line 1</label><input id="mv-dropoff-addr1"></div>
         <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
+        <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
 
       <div class="form-section-label">Vehicle being moved <span style="font-size:10px;color:var(--n400);font-weight:400">(optional)</span></div>
@@ -2855,8 +2857,8 @@ function populateMovementAccountDropdown(){
 }
 
 function clearMovementForm(){
-  ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town',
-   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-vehicle-reg','mv-vehicle-makemodel',
+  ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
+   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel',
    'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mv-account').value='';
@@ -2893,8 +2895,8 @@ function openEditMovement(id){
   f('mv-movement-date',m.movement_date);
   f('mv-quote-date',m.quote_date);
   f('mv-status',m.movement_status||'quoted');
-  f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);
-  f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);
+  f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);f('mv-pickup-county',m.pickup_county);
+  f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
   f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
   f('mv-mileage',m.mileage);f('mv-drive-time',m.drive_time_minutes);f('mv-mileage-source',m.mileage_source||'manual');
   f('mv-markup',m.markup_flat);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
@@ -3040,6 +3042,14 @@ async function lookupMovementMileage(){
     const pickup=(await pRes.json()).result;
     const dropoff=(await dRes.json()).result;
     if(!pickup||!dropoff)throw new Error('Could not resolve one of the postcodes');
+    // Fill town + county from the geocode. admin_district is the usual town
+    // proxy; admin_county is null for unitary authorities (e.g. Brighton & Hove,
+    // City of Edinburgh) so fall back to admin_district then region.
+    const pcTown=p=>p.admin_district||p.parish||'';
+    const pcCounty=p=>p.admin_county||p.admin_district||p.region||'';
+    const setIfEl=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
+    setIfEl('mv-pickup-town',pcTown(pickup));setIfEl('mv-pickup-county',pcCounty(pickup));
+    setIfEl('mv-dropoff-town',pcTown(dropoff));setIfEl('mv-dropoff-county',pcCounty(dropoff));
     // OpenRouteService directions (driving-car). Returns distance in metres,
     // duration in seconds. Response shape can be either {routes:[...]} (json)
     // or {features:[...]} (geojson) — handle both defensively.
@@ -3096,9 +3106,11 @@ async function saveMovement(){
     pickup_postcode:(document.getElementById('mv-pickup-postcode').value||'').trim().toUpperCase()||null,
     pickup_address_line1:document.getElementById('mv-pickup-addr1').value.trim()||null,
     pickup_town:document.getElementById('mv-pickup-town').value.trim()||null,
+    pickup_county:document.getElementById('mv-pickup-county').value.trim()||null,
     dropoff_postcode:(document.getElementById('mv-dropoff-postcode').value||'').trim().toUpperCase()||null,
     dropoff_address_line1:document.getElementById('mv-dropoff-addr1').value.trim()||null,
     dropoff_town:document.getElementById('mv-dropoff-town').value.trim()||null,
+    dropoff_county:document.getElementById('mv-dropoff-county').value.trim()||null,
     vehicle_reg:(document.getElementById('mv-vehicle-reg').value||'').replace(/\s+/g,'').toUpperCase()||null,
     vehicle_makemodel:document.getElementById('mv-vehicle-makemodel').value.trim()||null,
     mileage:parseFloat(document.getElementById('mv-mileage').value)||null,
