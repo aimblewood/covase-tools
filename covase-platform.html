@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STAGING · ORBIS — Covase</title>
+<title>ORBIS — Covase</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -24,12 +24,7 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;font-size:14px}
 
 /* ─── SIDEBAR ─── */
-/* ─── STAGING banner (only present on covase-platform-staging.html) ─── */
-.staging-banner{position:fixed;top:0;left:0;right:0;height:32px;background:repeating-linear-gradient(45deg,#dc2626,#dc2626 14px,#b91c1c 14px,#b91c1c 28px);color:#fff;font-family:'Outfit',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:14px;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.18);user-select:none;}
-.staging-banner span.dot{width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.4);animation:stagingPulse 1.6s ease-in-out infinite;}
-@keyframes stagingPulse{0%,100%{opacity:.85}50%{opacity:.35}}
-body{padding-top:32px}
-.sidebar{width:var(--sidebar-w);height:calc(100vh - 32px);background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:32px;left:0;z-index:50;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
+.sidebar{width:var(--sidebar-w);height:100vh;background:var(--indigo);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:50;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
 .sidebar::-webkit-scrollbar{width:6px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
 .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
@@ -404,13 +399,6 @@ body{padding-top:32px}
 </style>
 </head>
 <body>
-
-<!-- ─── STAGING BANNER ─── -->
-<div class="staging-banner" title="This is the staging build. It writes to the same Supabase project as live — be careful with destructive actions.">
-  <span class="dot"></span>
-  <span>STAGING — same backend as live · changes here are visible to colleagues</span>
-  <span class="dot"></span>
-</div>
 
 <!-- ─── SIDEBAR ─── -->
 <aside class="sidebar">
