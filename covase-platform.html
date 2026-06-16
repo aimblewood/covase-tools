@@ -1386,12 +1386,15 @@ function saveConfig(){
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
 function toggleConfig(){
-  const p=document.getElementById('config-panel');p.classList.toggle('open');
+  const p=document.getElementById('config-panel');
+  const opening=!p.classList.contains('open');
+  p.classList.toggle('open');
   const c=getConfig();
   document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
   document.getElementById('n8n-client-url').value=c.n8nClient===DEFAULT_N8N_CLIENT?'':c.n8nClient;
   document.getElementById('n8n-contact-url').value=c.n8nContact===DEFAULT_N8N_CONTACT?'':c.n8nContact;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
+  if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
 
 // ─── DYNAMICS 365 LOOKUP (via n8n) ───
