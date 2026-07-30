@@ -263,6 +263,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .lookup-item:hover{background:var(--covase-l);color:var(--n800)}
 .lookup-item strong{display:block;color:var(--n800);font-size:13px;font-weight:600}
 .lookup-item .meta{font-size:10px;color:var(--n400);margin-top:2px}
+.et-toolbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px;border:1px solid var(--n200);border-bottom:none;border-radius:8px 8px 0 0;background:var(--n50)}
+.et-toolbar button,.et-fieldbar button{background:#fff;border:1px solid var(--n200);border-radius:5px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--n700);font-family:inherit;line-height:1}
+.et-toolbar button:hover,.et-fieldbar button:hover{background:var(--covase-l)}
+.et-toolbar select,.et-toolbar input[type=color]{border:1px solid var(--n200);border-radius:5px;font-size:12px;padding:2px;cursor:pointer;height:28px;background:#fff}
+.et-fieldbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px;border:1px solid var(--n200);border-bottom:none;background:#fff}
+.et-fieldbar button{font-size:11px;padding:3px 7px;color:var(--covase);border-color:var(--covase-l)}
+.et-editor{border:1px solid var(--n200);border-radius:0 0 8px 8px;min-height:220px;max-height:360px;overflow-y:auto;padding:12px;font-size:14px;line-height:1.5;color:var(--n800);outline:none;font-family:Arial,Helvetica,sans-serif}
+.et-editor:focus{border-color:var(--covase)}
 .lookup-status{font-size:10px;color:var(--n400);padding:8px 11px;font-style:italic}
 .btn-primary-modal{background:var(--covase);color:var(--indigo);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .btn-primary-modal:hover{filter:brightness(1.05)}
@@ -493,6 +501,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 6px">Email templates</div>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Edit supplier booking email</button>
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
   </div>
 </aside>
@@ -1034,6 +1044,44 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeSendSupplier()">Cancel</button>
       <button class="btn-primary-modal" id="ss-send-btn" onclick="doSendSupplier()">Send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── EMAIL TEMPLATE MODAL ─── -->
+<div class="modal-overlay" id="email-template-modal">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <div class="modal-title">Supplier booking email template</div>
+      <button class="modal-close" onclick="closeEmailTemplate()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field"><label>Subject line</label><input id="et-subject" placeholder="Booking request - {{customer}} - {{startDate}}"></div>
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin:12px 0 4px;display:block">Email body</label>
+      <div class="et-toolbar">
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('bold')" title="Bold"><b>B</b></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('italic')" title="Italic"><i>I</i></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('underline')" title="Underline"><u>U</u></button>
+        <select title="Font size" onchange="etSize(this.value);this.selectedIndex=0">
+          <option value="">Size</option><option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">Huge</option>
+        </select>
+        <input type="color" value="#222222" title="Text colour" onchange="etColor(this.value)">
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('insertUnorderedList')" title="Bullet list">• List</button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('insertOrderedList')" title="Numbered list">1. List</button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="etLink()" title="Insert link">Link</button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('removeFormat')" title="Clear formatting">Clear</button>
+      </div>
+      <div class="et-fieldbar" id="et-fieldbar"><span style="font-size:10px;color:var(--n400);margin-right:2px">Insert field:</span></div>
+      <div id="et-body" class="et-editor" contenteditable="true" onkeyup="etSaveRange()" onmouseup="etSaveRange()" onblur="etSaveRange()"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px">
+        <button type="button" class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="etPreview()">Preview with sample data</button>
+        <button type="button" class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="etResetDefault()">Reset to default</button>
+      </div>
+      <div id="et-preview" style="display:none;border:1px solid var(--n200);border-radius:8px;padding:14px;margin-top:10px;background:#fff"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
     </div>
   </div>
 </div>
@@ -2754,7 +2802,11 @@ async function doSendSupplier(){
   const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
   const email=acc&&acc.booking_email;if(!email){toast('No supplier booking email','error');return;}
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
-  const payload={to:email,supplierName:acc.company_name,reference:h.reference||'',customer:h.customer||'',startDate:h.start_date||'',endDate:h.end_date||'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',notes:document.getElementById('ss-notes').value.trim()};
+  const notes=document.getElementById('ss-notes').value.trim();
+  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
+  const tokens={supplierName:acc.company_name||'',customer:h.customer||'',reference:h.reference||'',startDate:h.start_date||'',endDate:h.end_date||'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',address:addr,preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',notes:notes};
+  const rendered=renderBookingTemplate(tokens);
+  const payload={to:email,subject:rendered.subject,bodyHtml:rendered.html,customer:h.customer||''};
   const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -2769,6 +2821,70 @@ async function doSendSupplier(){
   finally{btn.disabled=false;btn.textContent='Send request';}
 }
 function closeSendSupplier(){document.getElementById('send-supplier-modal').classList.remove('open');}
+
+// ─── Supplier booking email template (WYSIWYG; shared via covase_config) ───
+const ET_FIELDS=[
+  {t:'supplierName',l:'Supplier'},{t:'customer',l:'Customer'},{t:'reference',l:'Reference'},
+  {t:'startDate',l:'Start date'},{t:'endDate',l:'End date'},{t:'vehicleReg',l:'Reg'},
+  {t:'vehicleMakeModel',l:'Make/model'},{t:'driver',l:'Driver'},{t:'driverMobile',l:'Driver mobile'},
+  {t:'address',l:'Full address'},{t:'addressLine1',l:'Address line 1'},{t:'town',l:'Town'},{t:'postcode',l:'Postcode'},
+  {t:'preferredStartTime',l:'Preferred time'},{t:'notes',l:'Notes'}
+];
+const DEFAULT_BOOKING_SUBJECT='Booking request - {{customer}} - {{startDate}}';
+const DEFAULT_BOOKING_BODY='<p>Hi {{supplierName}},</p><p>Please could you arrange the following vehicle hire on our behalf:</p><p>Our reference: <strong>{{reference}}</strong><br>Customer: <strong>{{customer}}</strong><br>Hire dates: <strong>{{startDate}} to {{endDate}}</strong><br>Vehicle: <strong>{{vehicleReg}} {{vehicleMakeModel}}</strong><br>Driver: <strong>{{driver}} {{driverMobile}}</strong><br>Deliver to: <strong>{{address}}</strong><br>Preferred delivery time: <strong>{{preferredStartTime}}</strong></p><p>{{notes}}</p><p>Please confirm availability and your reservation number.</p><p>Many thanks,<br>Covase Rentals</p>';
+let bookingTemplate={subject:DEFAULT_BOOKING_SUBJECT,bodyHtml:DEFAULT_BOOKING_BODY};
+let etSavedRange=null;
+async function loadBookingTemplate(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.supplier_booking_template&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    if(v&&(v.subject||v.bodyHtml))bookingTemplate={subject:v.subject||DEFAULT_BOOKING_SUBJECT,bodyHtml:v.bodyHtml||DEFAULT_BOOKING_BODY};
+  }catch(e){/* covase_config may not exist yet — keep defaults */}
+}
+function openEmailTemplate(){
+  document.getElementById('et-subject').value=bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT;
+  document.getElementById('et-body').innerHTML=bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY;
+  const bar=document.getElementById('et-fieldbar');
+  bar.querySelectorAll('button').forEach(b=>b.remove());
+  ET_FIELDS.forEach(f=>{const b=document.createElement('button');b.type='button';b.textContent=f.l;b.title='Insert {{'+f.t+'}}';b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>etField(f.t));bar.appendChild(b);});
+  document.getElementById('et-preview').style.display='none';
+  const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');
+  etSavedRange=null;
+  document.getElementById('email-template-modal').classList.add('open');
+}
+function closeEmailTemplate(){document.getElementById('email-template-modal').classList.remove('open');}
+function etSaveRange(){const s=window.getSelection();if(s&&s.rangeCount){const r=s.getRangeAt(0);const ed=document.getElementById('et-body');if(ed&&ed.contains(r.commonAncestorContainer))etSavedRange=r.cloneRange();}}
+function etRestore(){const ed=document.getElementById('et-body');ed.focus();if(etSavedRange){const s=window.getSelection();s.removeAllRanges();s.addRange(etSavedRange);}}
+function etCmd(cmd){etRestore();document.execCommand(cmd,false,null);etSaveRange();}
+function etSize(v){if(!v)return;etRestore();document.execCommand('fontSize',false,v);etSaveRange();}
+function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSaveRange();}
+function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
+function etField(token){etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
+function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
+function sampleTokens(){return{supplierName:'Fourways',customer:'Woodland Trust',reference:'CV-1042',startDate:'2026-08-03',endDate:'2026-08-10',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',driver:'Jane Doe',driverMobile:'07700 900123',addressLine1:'1 High Street',town:'Brighton',postcode:'BN1 1AA',address:'1 High Street, Brighton, BN1 1AA',preferredStartTime:'09:00',notes:'Tail lift preferred if available.'};}
+function renderBookingTemplate(t){
+  const sub=(bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT).replace(/\{\{(\w+)\}\}/g,(m,k)=>String(t[k]!=null?t[k]:''));
+  const body=(bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY).replace(/\{\{(\w+)\}\}/g,(m,k)=>esc(String(t[k]!=null?t[k]:'')).split('\n').join('<br>'));
+  return{subject:sub,html:body};
+}
+function etPreview(){
+  const prevTpl=bookingTemplate;
+  bookingTemplate={subject:document.getElementById('et-subject').value,bodyHtml:document.getElementById('et-body').innerHTML};
+  const r=renderBookingTemplate(sampleTokens());
+  bookingTemplate=prevTpl;
+  const pv=document.getElementById('et-preview');
+  pv.innerHTML='<div style="font-size:11px;color:var(--n400);margin-bottom:6px">Subject: <strong>'+esc(r.subject)+'</strong></div>'+r.html;
+  pv.style.display='';
+}
+async function saveEmailTemplate(){
+  const subject=document.getElementById('et-subject').value.trim()||DEFAULT_BOOKING_SUBJECT;
+  const bodyHtml=document.getElementById('et-body').innerHTML;
+  bookingTemplate={subject,bodyHtml};
+  try{
+    await sbReq('covase_config',{method:'POST',body:{key:'supplier_booking_template',value:{subject,bodyHtml},updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});
+    toast('Booking email template saved','success');closeEmailTemplate();
+  }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
+}
 
 // ─── Vehicle replacement ───
 // State of the replace-vehicle flow. Mirrors editHireId but is scoped to the
@@ -3745,7 +3861,7 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','rp-overlay'].forEach(id=>{
+['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','email-template-modal','rp-overlay'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{
     if(e.target===e.currentTarget){
       if(id==='hire-modal')closeHireModal();
@@ -3753,6 +3869,7 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
       else if(id==='contact-modal')closeContactModal();
       else if(id==='vehicle-modal')closeVehicleModal();
       else if(id==='send-supplier-modal')closeSendSupplier();
+      else if(id==='email-template-modal')closeEmailTemplate();
       else closeRechargePicker();
     }
   });
@@ -3762,6 +3879,8 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
 loadHires();
 // Also load accounts in the background so the client filter dropdown is populated immediately
 loadAccounts();
+// Load the shared supplier booking email template (falls back to default if unset)
+loadBookingTemplate();
 </script>
 </body>
 </html>
