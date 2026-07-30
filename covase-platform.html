@@ -271,6 +271,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .et-fieldbar button{font-size:11px;padding:3px 7px;color:var(--covase);border-color:var(--covase-l)}
 .et-editor{border:1px solid var(--n200);border-radius:0 0 8px 8px;min-height:220px;max-height:360px;overflow-y:auto;padding:12px;font-size:14px;line-height:1.5;color:var(--n800);outline:none;font-family:Arial,Helvetica,sans-serif}
 .et-editor:focus{border-color:var(--covase)}
+.et-editor p,.et-editor div{margin:0}
 .lookup-status{font-size:10px;color:var(--n400);padding:8px 11px;font-style:italic}
 .btn-primary-modal{background:var(--covase);color:var(--indigo);border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
 .btn-primary-modal:hover{filter:brightness(1.05)}
@@ -2874,10 +2875,23 @@ function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etR
 function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
 function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'2026-08-03',endDate:'2026-08-10',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'2023-03-01',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
+// Email clients add margins around block elements, so the editor's <div>/<p>
+// per-line output comes out double-spaced. Zero the block margins and turn
+// empty blocks into a single <br> so the email renders like the editor.
+function normalizeEmailHtml(html){
+  if(!html)return html;
+  let h=html;
+  h=h.replace(/<(p|div)\b[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi,'<br>');
+  h=h.replace(/<p\b(?![^>]*style=)/gi,'<p style="margin:0;padding:0"');
+  h=h.replace(/<div\b(?![^>]*style=)/gi,'<div style="margin:0;padding:0"');
+  return h;
+}
 function renderBookingTemplate(t){
   const sub=(bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT).replace(/\{\{(\w+)\}\}/g,(m,k)=>String(t[k]!=null?t[k]:''));
-  const body=(bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY).replace(/\{\{(\w+)\}\}/g,(m,k)=>esc(String(t[k]!=null?t[k]:'')).split('\n').join('<br>'));
-  return{subject:sub,html:body};
+  let body=(bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY).replace(/\{\{(\w+)\}\}/g,(m,k)=>esc(String(t[k]!=null?t[k]:'')).split('\n').join('<br>'));
+  body=normalizeEmailHtml(body);
+  const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+body+'</div>';
+  return{subject:sub,html:html};
 }
 function etPreview(){
   const prevTpl=bookingTemplate;
