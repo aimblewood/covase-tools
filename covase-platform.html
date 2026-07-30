@@ -452,6 +452,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
+      <div class="sb-section-label">Supplier replies</div>
+      <div class="sb-item" onclick="showView('supplier-replies',this)">
+        <span class="icon">✉</span> Review queue
+        <span class="sb-badge purple" id="badge-supplier-replies">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
       <div class="sb-section-label">CRM</div>
       <div class="sb-item" onclick="showView('accounts',this)">
         <span class="icon">◉</span> Accounts
@@ -652,6 +660,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="content"><div class="card-list" id="movement-list"><div class="loading">Loading movements…</div></div></div>
   </div>
 
+  <div class="view" id="view-supplier-replies">
+    <div class="topbar">
+      <h1>Supplier replies</h1>
+      <div style="flex:1"></div>
+      <button class="filter-pill" onclick="loadSupplierReplies()">↻ Refresh</button>
+    </div>
+    <div id="supplier-replies-list"></div>
+  </div>
+
   <div class="view" id="view-accounts">
     <div class="topbar">
       <h1>Accounts</h1>
@@ -849,6 +866,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeHireModal()">Cancel</button>
       <button class="btn-secondary-modal" id="hf-replace-vehicle-btn" onclick="openReplaceVehicle()" style="display:none">Replace vehicle</button>
+      <button class="btn-secondary-modal" id="hf-thread-btn" onclick="openThread(editHireId)" style="display:none">✉ Correspondence</button>
       <button class="btn-secondary-modal" id="hf-send-supplier-btn" onclick="openSendSupplier()" style="display:none">✉ Send to supplier</button>
       <button class="btn-primary-modal" onclick="saveHire()">Save hire</button>
     </div>
@@ -1051,6 +1069,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeSendSupplier()">Cancel</button>
       <button class="btn-primary-modal" id="ss-send-btn" onclick="doSendSupplier()">Send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CORRESPONDENCE THREAD MODAL ─── -->
+<div class="modal-overlay" id="thread-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="thread-title">Correspondence</div>
+      <button class="modal-close" onclick="closeThread()">✕</button>
+    </div>
+    <div class="modal-body" id="thread-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeThread()">Close</button>
     </div>
   </div>
 </div>
@@ -1758,7 +1790,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
@@ -2641,7 +2673,7 @@ function rechargeHire(id){
   toast('Opening generator…','success');
 }
 let editHireId=null;
-async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();const rvBtn=document.getElementById('hf-replace-vehicle-btn');if(rvBtn)rvBtn.style.display='none';const ssB=document.getElementById('hf-send-supplier-btn');if(ssB)ssB.style.display='none';const ssS=document.getElementById('hf-supplier-sent');if(ssS)ssS.textContent='';document.getElementById('hire-modal').classList.add('open');
+async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();const rvBtn=document.getElementById('hf-replace-vehicle-btn');if(rvBtn)rvBtn.style.display='none';const ssB=document.getElementById('hf-send-supplier-btn');if(ssB)ssB.style.display='none';const ssS=document.getElementById('hf-supplier-sent');if(ssS)ssS.textContent='';const tB=document.getElementById('hf-thread-btn');if(tB)tB.style.display='none';document.getElementById('hire-modal').classList.add('open');
   // Ensure contacts are loaded so driver lookup can surface local matches + match by dynamics_id on save-back
   if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
 }
@@ -2782,6 +2814,7 @@ function renderSupplierSentState(h){
   else{el.textContent='Not yet sent to supplier';el.style.color='var(--n500)';}
 }
 function updateSendSupplierBtn(){
+  const tb=document.getElementById('hf-thread-btn');if(tb)tb.style.display=editHireId?'':'none';
   const btn=document.getElementById('hf-send-supplier-btn');if(!btn)return;
   if(!editHireId){btn.style.display='none';return;}
   btn.style.display='';
@@ -2816,17 +2849,24 @@ async function doSendSupplier(){
   const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
   const tokens={customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:h.start_date||'',endDate:h.end_date||'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:h.date_of_registration||'',engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc.company_name||'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes};
   const rendered=renderBookingTemplate(tokens);
-  const payload={to:email,subject:rendered.subject,bodyHtml:rendered.html,customer:h.customer||''};
+  // Carry a machine-readable booking code in the subject so the reply agent can
+  // match the supplier's response back to this exact hire.
+  const subjectCoded=rendered.subject+' [CVB:'+editHireId+']';
+  const payload={to:email,subject:subjectCoded,bodyHtml:rendered.html,customer:h.customer||''};
   const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     const now=new Date().toISOString();
-    try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:{supplier_email_sent_at:now},prefer:'return=minimal'});}catch(e){}
-    const idx=(allHires||[]).findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx].supplier_email_sent_at=now;
+    try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:{supplier_email_sent_at:now,hire_status:'requested'},prefer:'return=minimal'});}catch(e){}
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'booking_request',subject:subjectCoded,raw_body:rendered.html,from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
+    const idx=(allHires||[]).findIndex(x=>x.id===editHireId);if(idx>=0){allHires[idx].supplier_email_sent_at=now;allHires[idx].hire_status='requested';}
+    const stSel=document.getElementById('hf-hire-status');if(stSel)stSel.value='requested';
     renderSupplierSentState(idx>=0?allHires[idx]:h);
-    toast('Booking request sent to '+acc.company_name,'success');
+    updateSendSupplierBtn();
+    toast('Booking request sent to '+acc.company_name+' — status set to Requested','success');
     closeSendSupplier();
+    hiresLoaded=false;loadHires();
   }catch(e){toast('Send failed: '+e.message,'error');}
   finally{btn.disabled=false;btn.textContent='Send request';}
 }
@@ -2911,6 +2951,105 @@ async function saveEmailTemplate(){
     toast('Booking email template saved','success');closeEmailTemplate();
   }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
 }
+
+// ─── Supplier replies review queue + correspondence thread ───
+let allSupplierReplies=[];
+async function loadSupplierReplies(){
+  const el=document.getElementById('supplier-replies-list');
+  try{
+    const rows=await sbReq('covase_supplier_replies?status=eq.needs_review&order=received_at.desc&limit=200');
+    allSupplierReplies=Array.isArray(rows)?rows:[];
+    const b=document.getElementById('badge-supplier-replies');if(b)b.textContent=String(allSupplierReplies.length);
+    renderSupplierReplies();
+  }catch(e){if(el)el.innerHTML='<div class="empty-state"><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message)+' (is covase_supplier_replies applied?)</div></div>';}
+}
+function hireLabel(hireId){const h=(allHires||[]).find(x=>x.id===hireId);return h?((h.customer||'?')+' · '+(h.vehicle_reg||'no reg')+' · '+(h.supplier||'?')):(hireId||'—');}
+function renderSupplierReplies(){
+  const el=document.getElementById('supplier-replies-list');if(!el)return;
+  if(!allSupplierReplies.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">✉</div><div class="empty-title">Nothing to review</div><div class="empty-sub">Supplier replies needing action will appear here.</div></div>';return;}
+  const chips={confirmed:'#0a7a72',declined:'var(--tl-red-t)',needs_info:'#b45309',alternative:'#6d28d9',unclear:'var(--n500)'};
+  el.innerHTML=allSupplierReplies.map(r=>{
+    const oc=r.outcome||'unclear';
+    const d=[];
+    if(r.reservation_number)d.push('Ref: '+esc(r.reservation_number));
+    if(r.vehicle_reg)d.push('Reg: '+esc(r.vehicle_reg));
+    if(r.vehicle_makemodel)d.push(esc(r.vehicle_makemodel));
+    if(r.fuel_type)d.push(esc(r.fuel_type));
+    if(r.co2_emissions!=null)d.push('CO2 '+esc(r.co2_emissions));
+    if(r.engine_cc!=null)d.push(esc(r.engine_cc)+'cc');
+    if(r.p11d_value!=null)d.push('P11D £'+esc(r.p11d_value));
+    if(r.date_of_registration)d.push('Reg date '+esc(r.date_of_registration));
+    if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(r.agreed_start_date||'?')+' → '+esc(r.agreed_end_date||'?'));
+    let a='';
+    if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
+    if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
+    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
+    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openHireById(\''+esc(r.hire_id)+'\')">Open hire</button>';
+    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
+    const q=r.questions?('<div style="margin-top:6px;color:var(--tl-red-t);font-size:12px"><strong>Question:</strong> '+esc(r.questions)+'</div>'):'';
+    return '<div style="border:1px solid var(--n200);border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div style="font-weight:600">'+esc(hireLabel(r.hire_id))+'</div><span style="font-size:11px;font-weight:700;color:'+(chips[oc]||'var(--n500)')+';text-transform:uppercase">'+esc(oc)+(r.confidence!=null?' · '+Math.round(r.confidence*100)+'%':'')+'</span></div>'
+      +'<div style="font-size:12px;color:var(--n600);margin-top:4px">'+esc(r.summary||'')+'</div>'
+      +(d.length?'<div style="font-size:12px;color:var(--n700);margin-top:6px">'+d.join(' · ')+'</div>':'')
+      +q
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+a+'</div></div>';
+  }).join('');
+}
+function openHireById(hireId){if((allHires||[]).some(x=>x.id===hireId))openEditHire(hireId);else toast('Open Short Hires first, then retry','error');}
+async function applyReply(id){
+  const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
+  if(!r.hire_id){toast('No hire linked to this reply','error');return;}
+  const now=new Date().toISOString();
+  const patch={hire_status:'booked',updated_at:now};
+  if(r.reservation_number)patch.supplier_ref=r.reservation_number;
+  if(r.vehicle_reg)patch.vehicle_reg=r.vehicle_reg;
+  if(r.vehicle_makemodel)patch.make_model=r.vehicle_makemodel;
+  if(r.p11d_value!=null)patch.p11d_value=r.p11d_value;
+  if(r.fuel_type)patch.fuel_type=r.fuel_type;
+  if(r.co2_emissions!=null)patch.co2_emissions=r.co2_emissions;
+  if(r.engine_cc!=null)patch.engine_cc=r.engine_cc;
+  if(r.date_of_registration)patch.date_of_registration=r.date_of_registration;
+  if(r.agreed_start_date)patch.start_date=r.agreed_start_date;
+  if(r.agreed_end_date)patch.end_date=r.agreed_end_date;
+  try{
+    await sbReq('covase_hires?id=eq.'+encodeURIComponent(r.hire_id),{method:'PATCH',body:patch,prefer:'return=minimal'});
+    await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'applied'},prefer:'return=minimal'});
+    toast('Booking updated from reply — set to Booked','success');
+    hiresLoaded=false;loadHires();loadSupplierReplies();
+  }catch(e){toast('Apply failed: '+e.message,'error');}
+}
+async function resourceReply(id){
+  try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'resourced'},prefer:'return=minimal'});toast('Flagged to re-source — hire kept as Requested','success');loadSupplierReplies();}
+  catch(e){toast('Failed: '+e.message,'error');}
+}
+async function dismissReply(id){
+  try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'dismissed'},prefer:'return=minimal'});loadSupplierReplies();}
+  catch(e){toast('Failed: '+e.message,'error');}
+}
+async function openThread(hireId){
+  if(!hireId){toast('No hire linked','error');return;}
+  document.getElementById('thread-title').textContent='Correspondence — '+hireLabel(hireId);
+  const body=document.getElementById('thread-body');body.innerHTML='<div class="loading">Loading…</div>';
+  document.getElementById('thread-modal').classList.add('open');
+  try{
+    const rows=await sbReq('covase_supplier_replies?hire_id=eq.'+encodeURIComponent(hireId)+'&order=received_at.asc&limit=200');
+    const msgs=Array.isArray(rows)?rows:[];
+    if(!msgs.length){body.innerHTML='<div class="empty-state"><div class="empty-title">No emails yet</div><div class="empty-sub">The booking request and any replies will show here.</div></div>';return;}
+    body.innerHTML=msgs.map(m=>{
+      const outbound=m.direction==='outbound';
+      const who=outbound?'Covase Rentals →':('← '+(m.from_email||'Supplier'));
+      const when=m.received_at?new Date(m.received_at).toLocaleString('en-GB'):'';
+      const label=outbound?(m.outcome==='booking_request'?'Booking request':(m.outcome==='acknowledgement_sent'?'Acknowledgement':'Sent')):(m.outcome||'reply');
+      const content=outbound?(m.raw_body||''):esc(m.raw_body||'');
+      return '<div style="border:1px solid var(--n200);border-radius:10px;padding:12px;margin-bottom:10px;background:'+(outbound?'var(--covase-l)':'#fff')+'">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--n500)"><span><strong>'+esc(who)+'</strong> · '+esc(label)+'</span><span>'+esc(when)+'</span></div>'
+        +'<div style="font-size:12px;color:var(--n700);margin-top:4px;font-weight:600">'+esc(m.subject||'')+'</div>'
+        +(m.summary?'<div style="font-size:12px;color:var(--n600);margin-top:2px">'+esc(m.summary)+'</div>':'')
+        +'<div style="font-size:12px;color:var(--n700);margin-top:8px;white-space:pre-wrap">'+content+'</div></div>';
+    }).join('');
+  }catch(e){body.innerHTML='<div class="empty-state"><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message)+'</div></div>';}
+}
+function closeThread(){document.getElementById('thread-modal').classList.remove('open');}
 
 // ─── Vehicle replacement ───
 // State of the replace-vehicle flow. Mirrors editHireId but is scoped to the
@@ -3887,7 +4026,7 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','email-template-modal','rp-overlay'].forEach(id=>{
+['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','email-template-modal','thread-modal','rp-overlay'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{
     if(e.target===e.currentTarget){
       if(id==='hire-modal')closeHireModal();
@@ -3896,6 +4035,7 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
       else if(id==='vehicle-modal')closeVehicleModal();
       else if(id==='send-supplier-modal')closeSendSupplier();
       else if(id==='email-template-modal')closeEmailTemplate();
+      else if(id==='thread-modal')closeThread();
       else closeRechargePicker();
     }
   });
@@ -3907,6 +4047,8 @@ loadHires();
 loadAccounts();
 // Load the shared supplier booking email template (falls back to default if unset)
 loadBookingTemplate();
+// Prime the supplier-replies review-queue badge
+loadSupplierReplies();
 </script>
 </body>
 </html>
