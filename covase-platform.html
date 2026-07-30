@@ -486,6 +486,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <input type="text" id="n8n-client-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-client-lookup">
     <label>Contact lookup webhook</label>
     <input type="text" id="n8n-contact-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-contact-lookup">
+    <label>Vehicle lookup webhook</label>
+    <input type="text" id="n8n-vehicle-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup">
+    <label>Supplier booking webhook</label>
+    <input type="text" id="n8n-supplier-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
@@ -737,7 +741,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
         <div class="form-field"><label>Hire status</label>
-          <select id="hf-hire-status"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
+          <select id="hf-hire-status" onchange="updateSendSupplierBtn()"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
         </div>
         <div class="form-field"><label>Billing status</label>
           <select id="hf-billing"><option value="pending" selected>Pending</option><option value="invoiced-in">Invoiced in</option><option value="recharged">Recharged</option><option value="paid">Paid</option></select>
@@ -813,10 +817,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-section-label">Invoicing</div>
       <div class="form-row">
         <div class="form-field"><label>Supplier *</label>
-          <select id="hf-supplier"><option value="">— select —</option><option>Fourways</option><option>Ogilvie</option><option>Arval</option><option>Lex</option><option>Ford rental</option><option>FMG</option><option>Enterprise</option><option>Other</option></select>
+          <select id="hf-supplier" onchange="updateSendSupplierBtn()"><option value="">— select —</option><option>Fourways</option><option>Ogilvie</option><option>Arval</option><option>Lex</option><option>Ford rental</option><option>FMG</option><option>Enterprise</option><option>Other</option></select>
         </div>
         <div class="form-field"><label>Supplier invoice ref(s)</label><input id="hf-supplier-ref" placeholder="3318/3336…"></div>
       </div>
+      <div id="hf-supplier-sent" style="font-size:11px;color:var(--n500);margin:-2px 0 8px"></div>
       <div class="form-row">
         <div class="form-field"><label>Incoming invoice ID</label><input id="hf-in-inv" placeholder="from Billing"></div>
         <div class="form-field"><label>Outgoing invoice ID</label><input id="hf-out-inv" placeholder="recharge invoice"></div>
@@ -827,6 +832,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeHireModal()">Cancel</button>
       <button class="btn-secondary-modal" id="hf-replace-vehicle-btn" onclick="openReplaceVehicle()" style="display:none">Replace vehicle</button>
+      <button class="btn-secondary-modal" id="hf-send-supplier-btn" onclick="openSendSupplier()" style="display:none">✉ Send to supplier</button>
       <button class="btn-primary-modal" onclick="saveHire()">Save hire</button>
     </div>
   </div>
@@ -932,10 +938,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
         <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
 
-      <div class="form-section-label">Vehicle being moved <span style="font-size:10px;color:var(--n400);font-weight:400">(optional)</span></div>
-      <div class="form-row">
-        <div class="form-field"><label>Registration</label><input id="mv-vehicle-reg" placeholder="AB12CDE" style="text-transform:uppercase"></div>
+      <div class="form-section-label">Vehicle &amp; driver <span style="font-size:10px;color:var(--n400);font-weight:400">(optional · Dynamics lookup, or type manually)</span></div>
+      <div class="form-row trio">
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Registration</label><span class="dynamics-link" id="mv-vehicle-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <input id="mv-vehicle-reg" placeholder="AB12CDE" style="text-transform:uppercase" oninput="lookupMovementVehicle(this.value)" autocomplete="off">
+          <div id="mv-vehicle-results" class="lookup-results"></div>
+        </div>
         <div class="form-field"><label>Make / Model</label><input id="mv-vehicle-makemodel" placeholder="e.g. Ford Focus"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Driver</label><span class="dynamics-link" id="mv-driver-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <input id="mv-driver-name" placeholder="Start typing driver name…" oninput="lookupMovementDriver(this.value)" autocomplete="off">
+          <input type="hidden" id="mv-driver-dynamics-id">
+          <div id="mv-driver-results" class="lookup-results"></div>
+        </div>
       </div>
 
       <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -1003,6 +1019,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   </div>
 </div>
 
+<!-- ─── SEND TO SUPPLIER MODAL ─── -->
+<div class="modal-overlay" id="send-supplier-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Send booking request</div>
+      <button class="modal-close" onclick="closeSendSupplier()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="ss-summary" style="font-size:13px;color:var(--n700);line-height:1.5;background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin-bottom:12px"></div>
+      <div class="form-field"><label>Notes to supplier (optional)</label><textarea id="ss-notes" placeholder="Anything to add to the request…"></textarea></div>
+      <div id="ss-warn" style="font-size:12px;color:var(--tl-red-t);margin-top:8px;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeSendSupplier()">Cancel</button>
+      <button class="btn-primary-modal" id="ss-send-btn" onclick="doSendSupplier()">Send request</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── ACCOUNT MODAL ─── -->
 <div class="modal-overlay" id="account-modal">
   <div class="modal">
@@ -1015,7 +1050,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-row trio">
         <div class="form-field" style="grid-column:1/3"><label>Company name *</label><input id="acf-company" placeholder="e.g. Woodland Trust"></div>
         <div class="form-field"><label>Account type *</label>
-          <select id="acf-type"><option value="client">Client</option><option value="funder">Funder</option><option value="supplier">Supplier</option><option value="dealer">Dealer</option></select>
+          <select id="acf-type" onchange="toggleAcfBookingEmail()"><option value="client">Client</option><option value="funder">Funder</option><option value="supplier">Supplier</option><option value="dealer">Dealer</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -1023,6 +1058,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
           <select id="acf-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
         </div>
         <div class="form-field"><label>MHA reference</label><input id="acf-mha" placeholder="MHA ref if applicable"></div>
+      </div>
+      <div class="form-row" id="acf-booking-email-wrap" style="display:none">
+        <div class="form-field"><label>Booking request email <span style="font-size:10px;color:var(--n400);font-weight:400">(where supplier booking requests are sent)</span></label><input type="email" id="acf-booking-email" placeholder="bookings@supplier.co.uk"></div>
+        <div></div>
       </div>
       <div class="form-section-label">Primary contact (legacy)</div>
       <div class="form-row">
@@ -1354,12 +1393,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 // ─── CONFIG ───
 const DEFAULT_N8N_CLIENT='https://covase.app.n8n.cloud/webhook/covase-client-lookup';
 const DEFAULT_N8N_CONTACT='https://covase.app.n8n.cloud/webhook/covase-contact-lookup';
+const DEFAULT_N8N_VEHICLE='https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup';
+const DEFAULT_N8N_SUPPLIER='https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request';
 const D365_HOST='https://covase.crm11.dynamics.com';
 function getConfig(){return{
   url:localStorage.getItem('covase_sb_url')||'',
   key:localStorage.getItem('covase_sb_key')||'',
   n8nClient:localStorage.getItem('covase_n8n_webhook')||DEFAULT_N8N_CLIENT,
-  n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT
+  n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT,
+  n8nVehicle:localStorage.getItem('covase_n8n_vehicle_webhook')||DEFAULT_N8N_VEHICLE,
+  n8nSupplierBooking:localStorage.getItem('covase_n8n_supplier_webhook')||DEFAULT_N8N_SUPPLIER
 };}
 function d365Url(entity,id){if(!id)return null;return `${D365_HOST}/main.aspx?pagetype=entityrecord&etn=${entity}&id=${encodeURIComponent(id)}`;}
 function saveConfig(){
@@ -1368,8 +1411,12 @@ function saveConfig(){
   localStorage.setItem('covase_sb_url',url);localStorage.setItem('covase_sb_key',key);
   const nc=document.getElementById('n8n-client-url').value.trim();
   const nt=document.getElementById('n8n-contact-url').value.trim();
+  const nv=document.getElementById('n8n-vehicle-url').value.trim();
+  const nsb=document.getElementById('n8n-supplier-url').value.trim();
   if(nc)localStorage.setItem('covase_n8n_webhook',nc);else localStorage.removeItem('covase_n8n_webhook');
   if(nt)localStorage.setItem('covase_n8n_contact_webhook',nt);else localStorage.removeItem('covase_n8n_contact_webhook');
+  if(nv)localStorage.setItem('covase_n8n_vehicle_webhook',nv);else localStorage.removeItem('covase_n8n_vehicle_webhook');
+  if(nsb)localStorage.setItem('covase_n8n_supplier_webhook',nsb);else localStorage.removeItem('covase_n8n_supplier_webhook');
   const orsKey=document.getElementById('ors-key')?.value?.trim();
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   document.getElementById('config-panel').classList.remove('open');
@@ -1383,6 +1430,8 @@ function toggleConfig(){
   document.getElementById('sb-url').value=c.url;document.getElementById('sb-key').value=c.key;
   document.getElementById('n8n-client-url').value=c.n8nClient===DEFAULT_N8N_CLIENT?'':c.n8nClient;
   document.getElementById('n8n-contact-url').value=c.n8nContact===DEFAULT_N8N_CONTACT?'':c.n8nContact;
+  document.getElementById('n8n-vehicle-url').value=c.n8nVehicle===DEFAULT_N8N_VEHICLE?'':c.n8nVehicle;
+  document.getElementById('n8n-supplier-url').value=c.n8nSupplierBooking===DEFAULT_N8N_SUPPLIER?'':c.n8nSupplierBooking;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
@@ -2534,7 +2583,7 @@ function rechargeHire(id){
   toast('Opening generator…','success');
 }
 let editHireId=null;
-async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();const rvBtn=document.getElementById('hf-replace-vehicle-btn');if(rvBtn)rvBtn.style.display='none';document.getElementById('hire-modal').classList.add('open');
+async function openNewHire(){editHireId=null;document.getElementById('hire-modal-title').textContent='New hire';clearHireForm();document.getElementById('hf-start').value=new Date().toISOString().split('T')[0];populateHireAccountDropdown();const rvBtn=document.getElementById('hf-replace-vehicle-btn');if(rvBtn)rvBtn.style.display='none';const ssB=document.getElementById('hf-send-supplier-btn');if(ssB)ssB.style.display='none';const ssS=document.getElementById('hf-supplier-sent');if(ssS)ssS.textContent='';document.getElementById('hire-modal').classList.add('open');
   // Ensure contacts are loaded so driver lookup can surface local matches + match by dynamics_id on save-back
   if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
 }
@@ -2558,6 +2607,7 @@ function openEditHire(id){
     const eligible=['booked','active'].includes(h.hire_status);
     rvBtn.style.display=eligible?'':'none';
   }
+  updateSendSupplierBtn();renderSupplierSentState(h);
   document.getElementById('hire-modal').classList.add('open');
 }
 function populateHireAccountDropdown(){
@@ -2659,6 +2709,67 @@ async function saveHire(){
     closeHireModal();hiresLoaded=false;loadHires();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
+
+// ─── Send booking request to supplier ───
+// Matches the hire's supplier enum (e.g. "Fourways") to a supplier account by
+// name (contains, either direction) so the booking_email can be looked up.
+function findSupplierAccount(supplierEnum){
+  const s=(supplierEnum||'').toLowerCase().trim();if(!s)return null;
+  return (allAccounts||[]).find(a=>(a.type==='supplier')&&(((a.company_name||'').toLowerCase().includes(s))||(s.includes((a.company_name||'').toLowerCase()))))||null;
+}
+function renderSupplierSentState(h){
+  const el=document.getElementById('hf-supplier-sent');if(!el)return;
+  const ts=h&&h.supplier_email_sent_at;
+  if(ts){const d=new Date(ts);const s=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});el.textContent='✓ Booking request sent '+s;el.style.color='var(--covase)';}
+  else{el.textContent='Not yet sent to supplier';el.style.color='var(--n500)';}
+}
+function updateSendSupplierBtn(){
+  const btn=document.getElementById('hf-send-supplier-btn');if(!btn)return;
+  if(!editHireId){btn.style.display='none';return;}
+  btn.style.display='';
+  const status=document.getElementById('hf-hire-status').value;
+  const supplier=document.getElementById('hf-supplier').value;
+  const eligible=['requested','booked'].includes(status)&&!!supplier;
+  btn.disabled=!eligible;
+  btn.style.opacity=eligible?'':'0.5';
+  btn.title=eligible?'Email this booking request to the supplier':'Enabled when status is Requested or Booked and a supplier is selected';
+}
+function openSendSupplier(){
+  if(!editHireId){toast('Save the hire first, then send','error');return;}
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h){toast('Hire not found','error');return;}
+  const supplierEnum=document.getElementById('hf-supplier').value;
+  const acc=findSupplierAccount(supplierEnum);
+  const email=acc&&acc.booking_email?acc.booking_email:'';
+  const bits=[h.customer,h.vehicle_reg||'no reg yet',h.start_date].filter(Boolean).map(esc).join(' · ');
+  document.getElementById('ss-summary').innerHTML='<strong>To: '+esc(supplierEnum||'—')+(email?' &lt;'+esc(email)+'&gt;':'')+'</strong><br>'+bits;
+  const warn=document.getElementById('ss-warn'),sendBtn=document.getElementById('ss-send-btn');
+  if(!email){warn.style.display='';warn.textContent=acc?('No booking email on the "'+acc.company_name+'" supplier account — add one in CRM → Accounts first.'):('No supplier account matches "'+(supplierEnum||'')+'". Add a supplier account with a booking email in CRM → Accounts.');sendBtn.disabled=true;sendBtn.style.opacity='0.5';}
+  else{warn.style.display='none';sendBtn.disabled=false;sendBtn.style.opacity='';}
+  document.getElementById('ss-notes').value='';
+  document.getElementById('send-supplier-modal').classList.add('open');
+}
+async function doSendSupplier(){
+  if(!editHireId)return;
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h)return;
+  const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
+  const email=acc&&acc.booking_email;if(!email){toast('No supplier booking email','error');return;}
+  const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
+  const payload={to:email,supplierName:acc.company_name,reference:h.reference||'',customer:h.customer||'',startDate:h.start_date||'',endDate:h.end_date||'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',notes:document.getElementById('ss-notes').value.trim()};
+  const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok)throw new Error('Webhook returned '+r.status);
+    const now=new Date().toISOString();
+    try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:{supplier_email_sent_at:now},prefer:'return=minimal'});}catch(e){}
+    const idx=(allHires||[]).findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx].supplier_email_sent_at=now;
+    renderSupplierSentState(idx>=0?allHires[idx]:h);
+    toast('Booking request sent to '+acc.company_name,'success');
+    closeSendSupplier();
+  }catch(e){toast('Send failed: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Send request';}
+}
+function closeSendSupplier(){document.getElementById('send-supplier-modal').classList.remove('open');}
+
 // ─── Vehicle replacement ───
 // State of the replace-vehicle flow. Mirrors editHireId but is scoped to the
 // replacement modal so closing the hire-modal in the middle doesn't lose track.
@@ -2846,7 +2957,7 @@ function populateMovementAccountDropdown(){
 
 function clearMovementForm(){
   ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
-   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel',
+   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
    'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mv-account').value='';
@@ -2886,6 +2997,8 @@ function openEditMovement(id){
   f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);f('mv-pickup-county',m.pickup_county);
   f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
   f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
+  f('mv-driver-name',m.driver_name);f('mv-driver-dynamics-id',m.driver_dynamics_id);
+  window._mvLastDriverName=m.driver_name||'';
   f('mv-mileage',m.mileage);f('mv-drive-time',m.drive_time_minutes);f('mv-mileage-source',m.mileage_source||'manual');
   f('mv-markup',m.markup_flat);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
   f('mv-actual-fuel',m.actual_fuel_cost);f('mv-fuel-markup-pct',m.fuel_markup_pct||'20');
@@ -3074,6 +3187,79 @@ async function lookupMovementMileage(){
   }
 }
 
+// ─── Movement vehicle + driver Dynamics lookups (manual entry always allowed) ───
+let _mvVehicleResults=[], _mvVehicleTimer=null, _mvDriverResults=[], _mvDriverTimer=null;
+
+// Defensive field readers — n8n/Dynamics response shape may vary, so try several
+// common key names and fall back to building make+model from parts.
+function _pick(o,keys){for(const k of keys){if(o&&o[k]!=null&&o[k]!=='')return String(o[k]);}return '';}
+function mvVehReg(v){return _pick(v,['reg','registration','vrm','vehicleReg','regNumber','plate','numberPlate']);}
+function mvVehMakeModel(v){
+  const mm=_pick(v,['makeModel','make_model','makemodel','description','vehicle','model']);
+  if(mm)return mm;
+  return [_pick(v,['make','manufacturer']),_pick(v,['modelName','model'])].filter(Boolean).join(' ');
+}
+function mvDriverName(d){return d.fullName||((d.firstName||d.first_name||'')+' '+(d.lastName||d.last_name||'')).trim();}
+
+async function lookupMovementVehicle(q){
+  clearTimeout(_mvVehicleTimer);
+  const res=document.getElementById('mv-vehicle-results');if(!res)return;
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  const url=getConfig().n8nVehicle;
+  if(!url){res.innerHTML='<div class="lookup-status">⚙ Set vehicle lookup webhook in Settings (you can still type manually)</div>';res.classList.add('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Dynamics…</div>';res.classList.add('open');
+  _mvVehicleTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(`${url}?q=${encodeURIComponent(q)}`,{mode:'cors'});
+      const data=await r.json();
+      if(!Array.isArray(data)||!data.length){res.innerHTML='<div class="lookup-status">No matches in Dynamics — keep typing to enter manually</div>';return;}
+      _mvVehicleResults=data.slice(0,8);
+      res.innerHTML=_mvVehicleResults.map((v,i)=>`<div class="lookup-item" onclick="selectMovementVehicle(${i})"><strong>${esc(mvVehReg(v)||'—')}</strong><div class="meta">${esc(mvVehMakeModel(v))}</div></div>`).join('');
+    }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed — check webhook (you can still type manually)</div>';}
+  },350);
+}
+function selectMovementVehicle(idx){
+  const v=_mvVehicleResults[idx];if(!v)return;
+  document.getElementById('mv-vehicle-results').classList.remove('open');
+  const reg=mvVehReg(v),mm=mvVehMakeModel(v);
+  if(reg)document.getElementById('mv-vehicle-reg').value=reg.toUpperCase();
+  if(mm)document.getElementById('mv-vehicle-makemodel').value=mm;
+  toast('Vehicle filled from Dynamics','success');
+}
+
+async function lookupMovementDriver(q){
+  clearTimeout(_mvDriverTimer);
+  const res=document.getElementById('mv-driver-results');if(!res)return;
+  // Drop the stored Dynamics id if the user edits away from the matched name
+  const hid=document.getElementById('mv-driver-dynamics-id');
+  if(hid&&hid.value&&q!==(window._mvLastDriverName||''))hid.value='';
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  const url=getConfig().n8nContact;
+  if(!url){res.innerHTML='<div class="lookup-status">⚙ Set contact lookup webhook in Settings (you can still type manually)</div>';res.classList.add('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Dynamics…</div>';res.classList.add('open');
+  _mvDriverTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(`${url}?q=${encodeURIComponent(q)}`,{mode:'cors'});
+      const data=await r.json();
+      if(!Array.isArray(data)||!data.length){res.innerHTML='<div class="lookup-status">No matches — keep typing to enter manually</div>';return;}
+      _mvDriverResults=data.slice(0,8);
+      res.innerHTML=_mvDriverResults.map((d,i)=>{
+        const meta=[d.jobTitle,d.accountName,d.email].filter(Boolean).join(' · ');
+        return `<div class="lookup-item" onclick="selectMovementDriver(${i})"><strong>${esc(mvDriverName(d)||'—')}</strong><div class="meta">${esc(meta)}</div></div>`;
+      }).join('');
+    }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed — check webhook (you can still type manually)</div>';}
+  },350);
+}
+function selectMovementDriver(idx){
+  const d=_mvDriverResults[idx];if(!d)return;
+  document.getElementById('mv-driver-results').classList.remove('open');
+  const nm=mvDriverName(d);
+  document.getElementById('mv-driver-name').value=nm;
+  document.getElementById('mv-driver-dynamics-id').value=d.contactId||d.dynamicsId||d.dynamics_id||'';
+  window._mvLastDriverName=nm;
+  toast('Driver filled from Dynamics','success');
+}
+
 async function saveMovement(){
   const accountId=document.getElementById('mv-account').value;
   if(!accountId){toast('Customer account required','error');return;}
@@ -3101,6 +3287,8 @@ async function saveMovement(){
     dropoff_county:document.getElementById('mv-dropoff-county').value.trim()||null,
     vehicle_reg:(document.getElementById('mv-vehicle-reg').value||'').replace(/\s+/g,'').toUpperCase()||null,
     vehicle_makemodel:document.getElementById('mv-vehicle-makemodel').value.trim()||null,
+    driver_name:document.getElementById('mv-driver-name').value.trim()||null,
+    driver_dynamics_id:document.getElementById('mv-driver-dynamics-id').value.trim()||null,
     mileage:parseFloat(document.getElementById('mv-mileage').value)||null,
     mileage_source:document.getElementById('mv-mileage-source').value||null,
     drive_time_minutes:parseInt(document.getElementById('mv-drive-time').value,10)||null,
@@ -3228,15 +3416,16 @@ function openEditAccount(id){
   const a=allAccounts.find(x=>x.id===id);if(!a)return;editAccountId=id;
   document.getElementById('account-modal-title').textContent='Edit account';
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);f('acf-address',a.address);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);
-  updateAccountDynamicsLink();
+  f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);f('acf-address',a.address);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);f('acf-booking-email',a.booking_email);
+  updateAccountDynamicsLink();toggleAcfBookingEmail();
   document.getElementById('account-modal').classList.add('open');
 }
 function closeAccountModal(){document.getElementById('account-modal').classList.remove('open');}
-function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';updateAccountDynamicsLink();}
+function toggleAcfBookingEmail(){const w=document.getElementById('acf-booking-email-wrap');if(w)w.style.display=document.getElementById('acf-type').value==='supplier'?'':'none';}
+function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes','acf-booking-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';updateAccountDynamicsLink();toggleAcfBookingEmail();}
 async function saveAccount(){
   const company=document.getElementById('acf-company').value.trim();if(!company){toast('Company name required','error');return;}
-  const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,booking_email:document.getElementById('acf-booking-email').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editAccountId){await sbReq(`covase_accounts?id=eq.${encodeURIComponent(editAccountId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allAccounts.findIndex(x=>x.id===editAccountId);if(idx>=0)allAccounts[idx]={...allAccounts[idx],...payload};toast('Account updated','success');}
     else{const res=await sbReq('covase_accounts',{method:'POST',body:{...payload,id:'acc-'+Date.now()}});allAccounts.push(Array.isArray(res)?res[0]:res||{...payload,id:'acc-'+Date.now()});allAccounts.sort((a,b)=>a.company_name.localeCompare(b.company_name));toast('Account saved','success');}
@@ -3556,13 +3745,14 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','rp-overlay'].forEach(id=>{
+['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','rp-overlay'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{
     if(e.target===e.currentTarget){
       if(id==='hire-modal')closeHireModal();
       else if(id==='account-modal')closeAccountModal();
       else if(id==='contact-modal')closeContactModal();
       else if(id==='vehicle-modal')closeVehicleModal();
+      else if(id==='send-supplier-modal')closeSendSupplier();
       else closeRechargePicker();
     }
   });
