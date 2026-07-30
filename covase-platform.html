@@ -1071,7 +1071,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
         <button type="button" onmousedown="event.preventDefault()" onclick="etLink()" title="Insert link">Link</button>
         <button type="button" onmousedown="event.preventDefault()" onclick="etCmd('removeFormat')" title="Clear formatting">Clear</button>
       </div>
-      <div class="et-fieldbar" id="et-fieldbar"><span style="font-size:10px;color:var(--n400);margin-right:2px">Insert field:</span></div>
+      <div class="et-fieldbar" id="et-fieldbar"><span style="font-size:10px;color:var(--n400);margin-right:2px">Insert field:</span><select id="et-field-select" onchange="etField(this.value);this.selectedIndex=0" style="border:1px solid var(--n200);border-radius:5px;font-size:12px;padding:4px 6px;background:#fff;cursor:pointer"><option value="">Choose a field…</option></select></div>
       <div id="et-body" class="et-editor" contenteditable="true" onkeyup="etSaveRange()" onmouseup="etSaveRange()" onblur="etSaveRange()"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px">
         <button type="button" class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="etPreview()">Preview with sample data</button>
@@ -2804,7 +2804,7 @@ async function doSendSupplier(){
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
   const notes=document.getElementById('ss-notes').value.trim();
   const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
-  const tokens={supplierName:acc.company_name||'',customer:h.customer||'',reference:h.reference||'',startDate:h.start_date||'',endDate:h.end_date||'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',address:addr,preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',notes:notes};
+  const tokens={customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:h.start_date||'',endDate:h.end_date||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:h.date_of_registration||'',engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc.company_name||'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes};
   const rendered=renderBookingTemplate(tokens);
   const payload={to:email,subject:rendered.subject,bodyHtml:rendered.html,customer:h.customer||''};
   const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
@@ -2823,12 +2823,15 @@ async function doSendSupplier(){
 function closeSendSupplier(){document.getElementById('send-supplier-modal').classList.remove('open');}
 
 // ─── Supplier booking email template (WYSIWYG; shared via covase_config) ───
-const ET_FIELDS=[
-  {t:'supplierName',l:'Supplier'},{t:'customer',l:'Customer'},{t:'reference',l:'Reference'},
-  {t:'startDate',l:'Start date'},{t:'endDate',l:'End date'},{t:'vehicleReg',l:'Reg'},
-  {t:'vehicleMakeModel',l:'Make/model'},{t:'driver',l:'Driver'},{t:'driverMobile',l:'Driver mobile'},
-  {t:'address',l:'Full address'},{t:'addressLine1',l:'Address line 1'},{t:'town',l:'Town'},{t:'postcode',l:'Postcode'},
-  {t:'preferredStartTime',l:'Preferred time'},{t:'notes',l:'Notes'}
+const ET_FIELD_GROUPS=[
+  {g:'Customer & job',f:[['customer','Customer'],['reference','Booking reference'],['hireStatus','Hire status']]},
+  {g:'Driver',f:[['driver','Driver name'],['driverMobile','Driver mobile']]},
+  {g:'Dates',f:[['startDate','Start date'],['endDate','End date'],['preferredStartTime','Preferred delivery time']]},
+  {g:'Vehicle',f:[['vehicleReg','Registration'],['vehicleMakeModel','Make / model'],['category','Category'],['fuelType','Fuel type'],['dateOfRegistration','Date of registration'],['engineCc','Engine (cc)'],['co2','CO2 (g/km)'],['p11d','P11D value']]},
+  {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['postcode','Postcode']]},
+  {g:'Supplier',f:[['supplierName','Supplier name'],['supplierRef','Supplier invoice ref']]},
+  {g:'Rates',f:[['costPerDay','Cost/day (supplier)'],['rftPerDay','RFT/day']]},
+  {g:'Notes',f:[['hireNotes','Hire notes'],['notes','Note added when sending']]}
 ];
 const DEFAULT_BOOKING_SUBJECT='Booking request - {{customer}} - {{startDate}}';
 const DEFAULT_BOOKING_BODY='<p>Hi {{supplierName}},</p><p>Please could you arrange the following vehicle hire on our behalf:</p><p>Our reference: <strong>{{reference}}</strong><br>Customer: <strong>{{customer}}</strong><br>Hire dates: <strong>{{startDate}} to {{endDate}}</strong><br>Vehicle: <strong>{{vehicleReg}} {{vehicleMakeModel}}</strong><br>Driver: <strong>{{driver}} {{driverMobile}}</strong><br>Deliver to: <strong>{{address}}</strong><br>Preferred delivery time: <strong>{{preferredStartTime}}</strong></p><p>{{notes}}</p><p>Please confirm availability and your reservation number.</p><p>Many thanks,<br>Covase Rentals</p>';
@@ -2844,9 +2847,8 @@ async function loadBookingTemplate(){
 function openEmailTemplate(){
   document.getElementById('et-subject').value=bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT;
   document.getElementById('et-body').innerHTML=bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY;
-  const bar=document.getElementById('et-fieldbar');
-  bar.querySelectorAll('button').forEach(b=>b.remove());
-  ET_FIELDS.forEach(f=>{const b=document.createElement('button');b.type='button';b.textContent=f.l;b.title='Insert {{'+f.t+'}}';b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>etField(f.t));bar.appendChild(b);});
+  const sel=document.getElementById('et-field-select');
+  if(sel&&sel.options.length<=1){ET_FIELD_GROUPS.forEach(grp=>{const og=document.createElement('optgroup');og.label=grp.g;grp.f.forEach(pair=>{const o=document.createElement('option');o.value=pair[0];o.textContent=pair[1]+'  {{'+pair[0]+'}}';og.appendChild(o);});sel.appendChild(og);});}
   document.getElementById('et-preview').style.display='none';
   const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');
   etSavedRange=null;
@@ -2859,9 +2861,9 @@ function etCmd(cmd){etRestore();document.execCommand(cmd,false,null);etSaveRange
 function etSize(v){if(!v)return;etRestore();document.execCommand('fontSize',false,v);etSaveRange();}
 function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSaveRange();}
 function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
-function etField(token){etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
+function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
-function sampleTokens(){return{supplierName:'Fourways',customer:'Woodland Trust',reference:'CV-1042',startDate:'2026-08-03',endDate:'2026-08-10',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',driver:'Jane Doe',driverMobile:'07700 900123',addressLine1:'1 High Street',town:'Brighton',postcode:'BN1 1AA',address:'1 High Street, Brighton, BN1 1AA',preferredStartTime:'09:00',notes:'Tail lift preferred if available.'};}
+function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'2026-08-03',endDate:'2026-08-10',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'2023-03-01',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
 function renderBookingTemplate(t){
   const sub=(bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT).replace(/\{\{(\w+)\}\}/g,(m,k)=>String(t[k]!=null?t[k]:''));
   const body=(bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY).replace(/\{\{(\w+)\}\}/g,(m,k)=>esc(String(t[k]!=null?t[k]:'')).split('\n').join('<br>'));
