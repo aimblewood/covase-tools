@@ -512,6 +512,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <input type="password" id="ors-key" placeholder="eyJ...">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 6px">Email templates</div>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Edit supplier booking email</button>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions()">🤖 Edit reply-agent instructions</button>
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
   </div>
 </aside>
@@ -1069,6 +1070,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeSendSupplier()">Cancel</button>
       <button class="btn-primary-modal" id="ss-send-btn" onclick="doSendSupplier()">Send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── AGENT INSTRUCTIONS MODAL ─── -->
+<div class="modal-overlay" id="agent-modal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title">Supplier reply agent — instructions</div>
+      <button class="modal-close" onclick="closeAgentInstructions()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:8px">Objectives, process and reply tone for the agent that reads and acts on supplier replies. This guides how it classifies each reply and drafts its acknowledgement.</div>
+      <textarea id="agent-instructions-text" style="width:100%;min-height:300px;font-size:13px;line-height:1.5;padding:12px;border:1px solid var(--n200);border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box;color:var(--n800);outline:none"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="resetAgentInstructions()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="closeAgentInstructions()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveAgentInstructions()">Save instructions</button>
     </div>
   </div>
 </div>
@@ -2847,7 +2867,7 @@ async function doSendSupplier(){
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
   const notes=document.getElementById('ss-notes').value.trim();
   const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
-  const tokens={customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:h.start_date||'',endDate:h.end_date||'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:h.date_of_registration||'',engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc.company_name||'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes};
+  const tokens={customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc.company_name||'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes};
   const rendered=renderBookingTemplate(tokens);
   // Carry a machine-readable booking code in the subject so the reply agent can
   // match the supplier's response back to this exact hire.
@@ -2914,7 +2934,7 @@ function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSave
 function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
 function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
-function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'2026-08-03',endDate:'2026-08-10',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'2023-03-01',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
+function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
 // Email clients add margins around block elements, so the editor's <div>/<p>
 // per-line output comes out double-spaced. Zero the block margins and turn
 // empty blocks into a single <br> so the email renders like the editor.
@@ -2926,6 +2946,7 @@ function normalizeEmailHtml(html){
   h=h.replace(/<div\b(?![^>]*style=)/gi,'<div style="margin:0;padding:0"');
   return h;
 }
+function fmtUK(v){if(!v)return '';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[3]+'/'+m[2]+'/'+m[1]):String(v);}
 function renderBookingTemplate(t){
   const sub=(bookingTemplate.subject||DEFAULT_BOOKING_SUBJECT).replace(/\{\{(\w+)\}\}/g,(m,k)=>String(t[k]!=null?t[k]:''));
   let body=(bookingTemplate.bodyHtml||DEFAULT_BOOKING_BODY).replace(/\{\{(\w+)\}\}/g,(m,k)=>esc(String(t[k]!=null?t[k]:'')).split('\n').join('<br>'));
@@ -2950,6 +2971,26 @@ async function saveEmailTemplate(){
     await sbReq('covase_config',{method:'POST',body:{key:'supplier_booking_template',value:{subject,bodyHtml},updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});
     toast('Booking email template saved','success');closeEmailTemplate();
   }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
+}
+
+// ─── Supplier reply agent instructions (shared via covase_config) ───
+const DEFAULT_AGENT_INSTRUCTIONS='Objectives: get each vehicle booking confirmed by the supplier and capture the assigned vehicle details.\n\nProcess:\n- If the supplier is only acknowledging or says they are working on it, send a brief thank-you and take no other action.\n- If they ask a question, flag it for the team to answer.\n- When they confirm, capture the reservation reference and the vehicle details (registration, make/model, P11D, fuel type, CO2, engine cc, date of first registration).\n- If they decline, flag it so we can re-source with another supplier.\n\nTone of replies: friendly, concise and professional. British English. Sign off as "Covase Rentals".';
+let agentInstructions=DEFAULT_AGENT_INSTRUCTIONS;
+async function loadAgentInstructions(){
+  try{const rows=await sbReq('covase_config?key=eq.supplier_agent_instructions&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(typeof v==='string'&&v.trim())agentInstructions=v;}catch(e){}
+}
+function openAgentInstructions(){
+  document.getElementById('agent-instructions-text').value=agentInstructions||DEFAULT_AGENT_INSTRUCTIONS;
+  const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');
+  document.getElementById('agent-modal').classList.add('open');
+}
+function closeAgentInstructions(){document.getElementById('agent-modal').classList.remove('open');}
+function resetAgentInstructions(){document.getElementById('agent-instructions-text').value=DEFAULT_AGENT_INSTRUCTIONS;}
+async function saveAgentInstructions(){
+  const text=document.getElementById('agent-instructions-text').value.trim()||DEFAULT_AGENT_INSTRUCTIONS;
+  agentInstructions=text;
+  try{await sbReq('covase_config',{method:'POST',body:{key:'supplier_agent_instructions',value:text,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Agent instructions saved — they apply on the next reply the agent reads','success');closeAgentInstructions();}
+  catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
 }
 
 // ─── Supplier replies review queue + correspondence thread ───
@@ -2978,8 +3019,8 @@ function renderSupplierReplies(){
     if(r.co2_emissions!=null)d.push('CO2 '+esc(r.co2_emissions));
     if(r.engine_cc!=null)d.push(esc(r.engine_cc)+'cc');
     if(r.p11d_value!=null)d.push('P11D £'+esc(r.p11d_value));
-    if(r.date_of_registration)d.push('Reg date '+esc(r.date_of_registration));
-    if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(r.agreed_start_date||'?')+' → '+esc(r.agreed_end_date||'?'));
+    if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
+    if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
     let a='';
     if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
     if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
@@ -4036,6 +4077,7 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
       else if(id==='send-supplier-modal')closeSendSupplier();
       else if(id==='email-template-modal')closeEmailTemplate();
       else if(id==='thread-modal')closeThread();
+      else if(id==='agent-modal')closeAgentInstructions();
       else closeRechargePicker();
     }
   });
@@ -4049,6 +4091,8 @@ loadAccounts();
 loadBookingTemplate();
 // Prime the supplier-replies review-queue badge
 loadSupplierReplies();
+// Load the reply-agent instructions (for the Settings editor)
+loadAgentInstructions();
 </script>
 </body>
 </html>
