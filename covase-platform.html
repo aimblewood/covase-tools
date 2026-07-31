@@ -507,6 +507,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <input type="text" id="n8n-vehicle-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup">
     <label>Supplier booking webhook</label>
     <input type="text" id="n8n-supplier-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request">
+    <label>Manual reply webhook</label>
+    <input type="text" id="n8n-manual-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-manual-reply">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
@@ -1093,6 +1095,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   </div>
 </div>
 
+<!-- ─── MANUAL REPLY MODAL ─── -->
+<div class="modal-overlay" id="reply-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Reply to supplier</div>
+      <button class="modal-close" onclick="closeReplyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reply-context" style="font-size:12px;color:var(--n500);margin-bottom:8px"></div>
+      <div class="form-field"><label>Your reply (sent from rentals@covase.co.uk, in-thread)</label><textarea id="reply-text" style="min-height:170px" placeholder="Type your reply to the supplier…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeReplyModal()">Cancel</button>
+      <button class="btn-primary-modal" id="reply-send-btn" onclick="doManualReply()">Send reply</button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── CORRESPONDENCE THREAD MODAL ─── -->
 <div class="modal-overlay" id="thread-modal">
   <div class="modal" style="max-width:640px">
@@ -1103,6 +1123,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-body" id="thread-body"></div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeThread()">Close</button>
+      <button class="btn-primary-modal" onclick="replyFromThread()">Reply to supplier</button>
     </div>
   </div>
 </div>
@@ -1505,6 +1526,7 @@ const DEFAULT_N8N_CLIENT='https://covase.app.n8n.cloud/webhook/covase-client-loo
 const DEFAULT_N8N_CONTACT='https://covase.app.n8n.cloud/webhook/covase-contact-lookup';
 const DEFAULT_N8N_VEHICLE='https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup';
 const DEFAULT_N8N_SUPPLIER='https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request';
+const DEFAULT_N8N_MANUAL_REPLY='https://covase.app.n8n.cloud/webhook/covase-supplier-manual-reply';
 const D365_HOST='https://covase.crm11.dynamics.com';
 function getConfig(){return{
   url:localStorage.getItem('covase_sb_url')||'',
@@ -1512,7 +1534,8 @@ function getConfig(){return{
   n8nClient:localStorage.getItem('covase_n8n_webhook')||DEFAULT_N8N_CLIENT,
   n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT,
   n8nVehicle:localStorage.getItem('covase_n8n_vehicle_webhook')||DEFAULT_N8N_VEHICLE,
-  n8nSupplierBooking:localStorage.getItem('covase_n8n_supplier_webhook')||DEFAULT_N8N_SUPPLIER
+  n8nSupplierBooking:localStorage.getItem('covase_n8n_supplier_webhook')||DEFAULT_N8N_SUPPLIER,
+  n8nManualReply:localStorage.getItem('covase_n8n_manual_webhook')||DEFAULT_N8N_MANUAL_REPLY
 };}
 function d365Url(entity,id){if(!id)return null;return `${D365_HOST}/main.aspx?pagetype=entityrecord&etn=${entity}&id=${encodeURIComponent(id)}`;}
 function saveConfig(){
@@ -1527,6 +1550,8 @@ function saveConfig(){
   if(nt)localStorage.setItem('covase_n8n_contact_webhook',nt);else localStorage.removeItem('covase_n8n_contact_webhook');
   if(nv)localStorage.setItem('covase_n8n_vehicle_webhook',nv);else localStorage.removeItem('covase_n8n_vehicle_webhook');
   if(nsb)localStorage.setItem('covase_n8n_supplier_webhook',nsb);else localStorage.removeItem('covase_n8n_supplier_webhook');
+  const nmr=document.getElementById('n8n-manual-url').value.trim();
+  if(nmr)localStorage.setItem('covase_n8n_manual_webhook',nmr);else localStorage.removeItem('covase_n8n_manual_webhook');
   const orsKey=document.getElementById('ors-key')?.value?.trim();
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   document.getElementById('config-panel').classList.remove('open');
@@ -1542,6 +1567,7 @@ function toggleConfig(){
   document.getElementById('n8n-contact-url').value=c.n8nContact===DEFAULT_N8N_CONTACT?'':c.n8nContact;
   document.getElementById('n8n-vehicle-url').value=c.n8nVehicle===DEFAULT_N8N_VEHICLE?'':c.n8nVehicle;
   document.getElementById('n8n-supplier-url').value=c.n8nSupplierBooking===DEFAULT_N8N_SUPPLIER?'':c.n8nSupplierBooking;
+  document.getElementById('n8n-manual-url').value=c.n8nManualReply===DEFAULT_N8N_MANUAL_REPLY?'':c.n8nManualReply;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
@@ -2311,7 +2337,7 @@ async function loadHires(){
     hiresLoaded=true;
     // Auto-advance: any booked hires whose start_date has arrived become active.
     // Fires once per loadHires() — single PATCH if there are eligible rows, no-op otherwise.
-    await autoAdvanceBookedToActive();
+    await autoAdvanceHireStatuses();
     // Also load accounts for the hire modal dropdown if not loaded
     if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
     updateHireStats();
@@ -2323,32 +2349,26 @@ async function loadHires(){
   }
   catch(e){['hires-active-list','hires-all-list','hires-recharge-list'].forEach(id=>{const e2=document.getElementById(id);if(e2)e2.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;});}
 }
-// Auto-advance: flip hire_status from 'booked' to 'active' for any rows
-// whose start_date has arrived (start_date <= today). Mutates allHires in place
-// and PATCHes Supabase in a single bulk call. Silent no-op if nothing eligible.
-async function autoAdvanceBookedToActive(){
-  const today=new Date();today.setHours(0,0,0,0);
-  const due=(allHires||[]).filter(h=>{
-    if(h.hire_status!=='booked'||!h.start_date)return false;
-    const sd=new Date(h.start_date);
-    return !isNaN(sd)&&sd<=today;
-  });
-  if(!due.length)return;
-  // Bulk PATCH via PostgREST: one request, IN-list of IDs
-  const ids=due.map(h=>h.id);
-  const inList=ids.map(id=>`"${id.replace(/"/g,'\\"')}"`).join(',');
+// Auto-advance hire statuses on load: booked -> active once the start date has
+// arrived, and active -> offhired the day AFTER the end date has passed. Uses
+// local date-string comparison (timezone-safe). A blank end_date means ongoing
+// and is never auto-offhired. One bulk PATCH per transition; no-op if nothing due.
+async function autoAdvanceHireStatuses(){
+  const now=new Date();
+  const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const toActivate=(allHires||[]).filter(h=>h.hire_status==='booked'&&h.start_date&&String(h.start_date).slice(0,10)<=todayStr);
+  const toOffhire=(allHires||[]).filter(h=>h.hire_status==='active'&&h.end_date&&String(h.end_date).slice(0,10)<todayStr);
+  await bulkSetHireStatus(toActivate,'active');
+  await bulkSetHireStatus(toOffhire,'offhired');
+}
+async function bulkSetHireStatus(rows,status){
+  if(!rows||!rows.length)return;
+  const inList=rows.map(h=>`"${String(h.id).replace(/"/g,'\\"')}"`).join(',');
   try{
-    await sbReq(`covase_hires?id=in.(${encodeURIComponent(inList)})`,{
-      method:'PATCH',
-      body:{hire_status:'active',updated_at:new Date().toISOString()},
-      prefer:'return=minimal'
-    });
-    // Reflect locally so the next render shows the new state
-    due.forEach(h=>{h.hire_status='active';h.updated_at=new Date().toISOString();});
-    if(typeof console!=='undefined')console.log(`[auto-advance] flipped ${due.length} hire(s) booked→active`);
-  }catch(e){
-    if(typeof console!=='undefined')console.warn('[auto-advance] failed',e);
-  }
+    await sbReq(`covase_hires?id=in.(${encodeURIComponent(inList)})`,{method:'PATCH',body:{hire_status:status,updated_at:new Date().toISOString()},prefer:'return=minimal'});
+    rows.forEach(h=>{h.hire_status=status;h.updated_at=new Date().toISOString();});
+    if(typeof console!=='undefined')console.log('[auto-advance] set '+rows.length+' hire(s) -> '+status);
+  }catch(e){if(typeof console!=='undefined')console.warn('[auto-advance] failed for '+status,e);}
 }
 function updateHireStats(){
   const onHire=allHires.filter(h=>h.hire_status==='active');
@@ -3024,6 +3044,7 @@ function renderSupplierReplies(){
     let a='';
     if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
     if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
+    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
     a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
     a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openHireById(\''+esc(r.hire_id)+'\')">Open hire</button>';
     a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
@@ -3077,6 +3098,7 @@ async function openThread(hireId){
   try{
     const rows=await sbReq('covase_supplier_replies?hire_id=eq.'+encodeURIComponent(hireId)+'&order=received_at.asc&limit=200');
     const msgs=Array.isArray(rows)?rows:[];
+    window._threadMsgs=msgs;window._threadHireId=hireId;
     if(!msgs.length){body.innerHTML='<div class="empty-state"><div class="empty-title">No emails yet</div><div class="empty-sub">The booking request and any replies will show here.</div></div>';return;}
     const last=msgs.length-1;
     body.innerHTML=msgs.map((m,i)=>{
@@ -3104,6 +3126,40 @@ async function openThread(hireId){
   }catch(e){body.innerHTML='<div class="empty-state"><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message)+'</div></div>';}
 }
 function closeThread(){document.getElementById('thread-modal').classList.remove('open');}
+
+// ─── Manual human reply to a supplier (sent from rentals@) ───
+let replyCtx=null;
+function openReplyModal(messageId,hireId,sourceReplyId,contextLabel){
+  if(!messageId){toast('That message has no email id to reply to','error');return;}
+  replyCtx={messageId:messageId,hireId:hireId,sourceReplyId:sourceReplyId||null};
+  document.getElementById('reply-context').textContent=contextLabel||('Reply for '+hireLabel(hireId));
+  document.getElementById('reply-text').value='';
+  document.getElementById('reply-modal').classList.add('open');
+}
+function openReplyFromQueue(id){const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;openReplyModal(r.message_id,r.hire_id,r.id,'Reply to '+(r.from_email||'supplier')+' · '+hireLabel(r.hire_id));}
+function replyFromThread(){
+  const msgs=window._threadMsgs||[];const hireId=window._threadHireId;
+  const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
+  const latest=inbound.length?inbound[inbound.length-1]:null;
+  if(!latest){toast('No supplier email in this thread to reply to yet','error');return;}
+  openReplyModal(latest.message_id,hireId,null,'Reply to '+(latest.from_email||'supplier'));
+}
+function closeReplyModal(){document.getElementById('reply-modal').classList.remove('open');}
+async function doManualReply(){
+  if(!replyCtx)return;
+  const text=document.getElementById('reply-text').value.trim();
+  if(!text){toast('Type a reply first','error');return;}
+  const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
+  const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,replyText:text})});
+    if(!r.ok)throw new Error('Webhook returned '+r.status);
+    if(replyCtx.sourceReplyId){try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(replyCtx.sourceReplyId),{method:'PATCH',body:{status:'replied'},prefer:'return=minimal'});}catch(e){}}
+    toast('Reply sent from Covase Rentals','success');
+    closeReplyModal();loadSupplierReplies();
+  }catch(e){toast('Send failed: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Send reply';}
+}
 
 // ─── Vehicle replacement ───
 // State of the replace-vehicle flow. Mirrors editHireId but is scoped to the
@@ -4080,7 +4136,7 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
 // Close modals on backdrop click
-['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','email-template-modal','thread-modal','rp-overlay'].forEach(id=>{
+['hire-modal','movement-modal','account-modal','contact-modal','vehicle-modal','send-supplier-modal','email-template-modal','thread-modal','agent-modal','reply-modal','rp-overlay'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{
     if(e.target===e.currentTarget){
       if(id==='hire-modal')closeHireModal();
@@ -4091,6 +4147,7 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
       else if(id==='email-template-modal')closeEmailTemplate();
       else if(id==='thread-modal')closeThread();
       else if(id==='agent-modal')closeAgentInstructions();
+      else if(id==='reply-modal')closeReplyModal();
       else closeRechargePicker();
     }
   });
