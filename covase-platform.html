@@ -509,6 +509,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <input type="text" id="n8n-supplier-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request">
     <label>Manual reply webhook</label>
     <input type="text" id="n8n-manual-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-manual-reply">
+    <label>Reply check-now webhook</label>
+    <input type="text" id="n8n-replycheck-url" placeholder="https://covase.app.n8n.cloud/webhook/covase-supplier-reply-check">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
@@ -667,6 +669,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="topbar">
       <h1>Supplier replies</h1>
       <div style="flex:1"></div>
+      <button class="filter-pill" onclick="checkRepliesNow()">⚡ Check replies now</button>
       <button class="filter-pill" onclick="loadSupplierReplies()">↻ Refresh</button>
     </div>
     <div id="supplier-replies-list"></div>
@@ -1527,6 +1530,7 @@ const DEFAULT_N8N_CONTACT='https://covase.app.n8n.cloud/webhook/covase-contact-l
 const DEFAULT_N8N_VEHICLE='https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup';
 const DEFAULT_N8N_SUPPLIER='https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request';
 const DEFAULT_N8N_MANUAL_REPLY='https://covase.app.n8n.cloud/webhook/covase-supplier-manual-reply';
+const DEFAULT_N8N_REPLY_CHECK='https://covase.app.n8n.cloud/webhook/covase-supplier-reply-check';
 const D365_HOST='https://covase.crm11.dynamics.com';
 function getConfig(){return{
   url:localStorage.getItem('covase_sb_url')||'',
@@ -1535,7 +1539,8 @@ function getConfig(){return{
   n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT,
   n8nVehicle:localStorage.getItem('covase_n8n_vehicle_webhook')||DEFAULT_N8N_VEHICLE,
   n8nSupplierBooking:localStorage.getItem('covase_n8n_supplier_webhook')||DEFAULT_N8N_SUPPLIER,
-  n8nManualReply:localStorage.getItem('covase_n8n_manual_webhook')||DEFAULT_N8N_MANUAL_REPLY
+  n8nManualReply:localStorage.getItem('covase_n8n_manual_webhook')||DEFAULT_N8N_MANUAL_REPLY,
+  n8nReplyCheck:localStorage.getItem('covase_n8n_replycheck_webhook')||DEFAULT_N8N_REPLY_CHECK
 };}
 function d365Url(entity,id){if(!id)return null;return `${D365_HOST}/main.aspx?pagetype=entityrecord&etn=${entity}&id=${encodeURIComponent(id)}`;}
 function saveConfig(){
@@ -1552,6 +1557,8 @@ function saveConfig(){
   if(nsb)localStorage.setItem('covase_n8n_supplier_webhook',nsb);else localStorage.removeItem('covase_n8n_supplier_webhook');
   const nmr=document.getElementById('n8n-manual-url').value.trim();
   if(nmr)localStorage.setItem('covase_n8n_manual_webhook',nmr);else localStorage.removeItem('covase_n8n_manual_webhook');
+  const nrc=document.getElementById('n8n-replycheck-url').value.trim();
+  if(nrc)localStorage.setItem('covase_n8n_replycheck_webhook',nrc);else localStorage.removeItem('covase_n8n_replycheck_webhook');
   const orsKey=document.getElementById('ors-key')?.value?.trim();
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   document.getElementById('config-panel').classList.remove('open');
@@ -1568,6 +1575,7 @@ function toggleConfig(){
   document.getElementById('n8n-vehicle-url').value=c.n8nVehicle===DEFAULT_N8N_VEHICLE?'':c.n8nVehicle;
   document.getElementById('n8n-supplier-url').value=c.n8nSupplierBooking===DEFAULT_N8N_SUPPLIER?'':c.n8nSupplierBooking;
   document.getElementById('n8n-manual-url').value=c.n8nManualReply===DEFAULT_N8N_MANUAL_REPLY?'':c.n8nManualReply;
+  document.getElementById('n8n-replycheck-url').value=c.n8nReplyCheck===DEFAULT_N8N_REPLY_CHECK?'':c.n8nReplyCheck;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
@@ -3042,6 +3050,12 @@ async function loadSupplierReplies(){
     renderSupplierReplies();
   }catch(e){if(el)el.innerHTML='<div class="empty-state"><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message)+' (is covase_supplier_replies applied?)</div></div>';}
 }
+async function checkRepliesNow(){
+  const url=getConfig().n8nReplyCheck;if(!url){toast('Set the reply check-now webhook in Settings','error');return;}
+  toast('Checking rentals@ for new replies…','success');
+  try{await fetch(url,{method:'GET',mode:'cors'});}catch(e){/* fire-and-forget; the run still triggers */}
+  setTimeout(loadSupplierReplies,6000);
+}
 function hireLabel(hireId){const h=(allHires||[]).find(x=>x.id===hireId);return h?((h.customer||'?')+' · '+(h.vehicle_reg||'no reg')+' · '+(h.supplier||'?')):(hireId||'—');}
 function renderSupplierReplies(){
   const el=document.getElementById('supplier-replies-list');if(!el)return;
@@ -3081,7 +3095,7 @@ async function applyReply(id){
   if(!r.hire_id){toast('No hire linked to this reply','error');return;}
   const now=new Date().toISOString();
   const patch={hire_status:'booked',updated_at:now};
-  if(r.reservation_number)patch.supplier_ref=r.reservation_number;
+  if(r.reservation_number)patch.reference=r.reservation_number;
   if(r.vehicle_reg)patch.vehicle_reg=r.vehicle_reg;
   if(r.vehicle_makemodel)patch.make_model=r.vehicle_makemodel;
   if(r.p11d_value!=null)patch.p11d_value=r.p11d_value;
