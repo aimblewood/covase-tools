@@ -1672,6 +1672,7 @@ async function lookupDynamicsDriver(q){
   if(hiddenName&&q!==(window._lastSelectedDriverName||'')){
     document.getElementById('hf-driver-contact-id').value='';
     document.getElementById('hf-driver-dynamics-id').value='';
+    window._pendingDriverContact=null;
     updateHireD365Link('driver');
   }
   if(!q||q.length<2){res.classList.remove('open');return;}
@@ -1731,9 +1732,46 @@ function prefillDeliveryFromDynamics(d){
   const tag=document.getElementById('hf-delivery-source');
   if(tag&&(line1||town||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
 }
+// Resolve the account a Dynamics-matched driver should belong to: prefer the
+// Dynamics parent account (if it exists in Covase), else the customer picked on
+// the form. covase_contacts.account_id is NOT NULL so we need a value.
+function resolveDriverAccountId(d,accountSelectId){
+  let accId=null;
+  if(d&&d.accountId){const a=(allAccounts||[]).find(x=>x.dynamics_id===d.accountId);if(a)accId=a.id;}
+  if(!accId)accId=document.getElementById(accountSelectId||'hf-account')?.value||null;
+  return accId;
+}
+// Create (or return existing) covase_contacts row from a Dynamics contact payload.
+async function createContactFromDynamics(d,accId){
+  if(!d||!accId)return null;
+  const existing=(allContacts||[]).find(ct=>ct.dynamics_id===d.contactId);
+  if(existing)return existing;
+  const fn=d.fullName||((d.firstName||'')+' '+(d.lastName||'')).trim();
+  const payload={
+    id:'ct-'+Date.now(),
+    first_name:d.firstName||fn.split(' ')[0]||fn,
+    last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,
+    account_id:accId,
+    email:d.email||null,
+    mobile:d.mobile||null,
+    job_description:d.jobTitle||null,
+    contact_type:'driver',
+    employee_status:'employed',
+    address_type:'home',
+    dynamics_id:d.contactId,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    const res=await sbReq('covase_contacts',{method:'POST',body:payload});
+    const row=Array.isArray(res)?res[0]:res||payload;
+    allContacts.push(row);
+    return row;
+  }catch(e){toast('Contact save failed: '+e.message,'error');return null;}
+}
 async function selectDynamicsDriver(idx){
   const m=_dynDriverResults[idx];if(!m)return;
   document.getElementById('hf-driver-results').classList.remove('open');
+  window._pendingDriverContact=null;
   if(m.src==='local'){
     const ct=m.d;const fn=((ct.first_name||'')+' '+(ct.last_name||'')).trim();
     document.getElementById('hf-driver').value=fn;
@@ -1744,13 +1782,13 @@ async function selectDynamicsDriver(idx){
     updateHireD365Link('driver');
     return;
   }
-  // src=dyn — match or create covase_contacts
+  // src=dyn — match to an existing contact, create now, or stash for hire-save.
   const d=m.d;const fn=d.fullName||((d.firstName||'')+' '+(d.lastName||'')).trim();
   document.getElementById('hf-driver').value=fn;
+  document.getElementById('hf-driver-dynamics-id').value=d.contactId||'';
   window._lastSelectedDriverName=fn;
-  // Prefill delivery address fields from the Dynamics record
   prefillDeliveryFromDynamics(d);
-  let local=(allContacts||[]).find(ct=>ct.dynamics_id===d.contactId);
+  const local=(allContacts||[]).find(ct=>ct.dynamics_id===d.contactId);
   if(local){
     document.getElementById('hf-driver-contact-id').value=local.id;
     document.getElementById('hf-driver-dynamics-id').value=local.dynamics_id||d.contactId;
@@ -1758,42 +1796,16 @@ async function selectDynamicsDriver(idx){
     toast('Matched to existing Covase contact','success');
     return;
   }
-  // Resolve account_id: prefer the Dynamics parent account (if matched locally),
-  // otherwise fall back to whatever customer the user has picked on the hire form.
-  // covase_contacts.account_id is NOT NULL so we must always have a value.
-  let accId=null;
-  if(d.accountId){
-    const accMatch=(allAccounts||[]).find(a=>a.dynamics_id===d.accountId);
-    if(accMatch)accId=accMatch.id;
-  }
-  if(!accId)accId=document.getElementById('hf-account')?.value||null;
-  if(!accId){
-    toast('Pick a customer account first — driver can\'t be saved without one','error');
-    return;
-  }
-  try{
-    const payload={
-      id:'ct-'+Date.now(),
-      first_name:d.firstName||fn.split(' ')[0]||fn,
-      last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,
-      account_id:accId,
-      email:d.email||null,
-      mobile:d.mobile||null,
-      job_description:d.jobTitle||null,
-      contact_type:'driver',
-      employee_status:'employed',
-      address_type:'home',
-      dynamics_id:d.contactId,
-      updated_at:new Date().toISOString()
-    };
-    const res=await sbReq('covase_contacts',{method:'POST',body:payload});
-    const row=Array.isArray(res)?res[0]:res||payload;
-    allContacts.push(row);
-    document.getElementById('hf-driver-contact-id').value=row.id;
-    document.getElementById('hf-driver-dynamics-id').value=row.dynamics_id;
+  const accId=resolveDriverAccountId(d,'hf-account');
+  if(accId){
+    const row=await createContactFromDynamics(d,accId);
+    if(row){document.getElementById('hf-driver-contact-id').value=row.id;document.getElementById('hf-driver-dynamics-id').value=row.dynamics_id||d.contactId;updateHireD365Link('driver');toast('Contact created from Dynamics','success');}
+  }else{
+    // No account yet — remember the driver and save the contact when the hire is saved.
+    window._pendingDriverContact=d;
     updateHireD365Link('driver');
-    toast('Contact created from Dynamics','success');
-  }catch(e){toast('Contact create failed: '+e.message,'error');}
+    toast('Driver captured — saved to Contacts when you save the hire','success');
+  }
 }
 
 // Close any open lookup dropdown on outside click
@@ -2753,7 +2765,7 @@ function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
   ['hf-account-d365','hf-driver-d365'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.removeAttribute('href');}});
-  window._lastSelectedDriverName='';
+  window._lastSelectedDriverName='';window._pendingDriverContact=null;
 }
 
 // ─── Supplementary charges repeater ───
@@ -2826,6 +2838,12 @@ function updateHireRatePreview(){
 async function saveHire(){
   const accountId=document.getElementById('hf-account').value;if(!accountId){toast('Customer account required','error');return;}
   const account=(allAccounts||[]).find(a=>a.id===accountId);if(!account){toast('Customer account not found','error');return;}
+  // Persist a Dynamics-matched driver that couldn't be saved at match time (no
+  // account chosen yet) now that we have the account.
+  if(!document.getElementById('hf-driver-contact-id').value&&window._pendingDriverContact){
+    const _row=await createContactFromDynamics(window._pendingDriverContact,accountId);
+    if(_row){document.getElementById('hf-driver-contact-id').value=_row.id;window._pendingDriverContact=null;}
+  }
   // Clean supplementaries: drop rows with no cost AND no upsell
   const cleanSupps=supps
     .filter(s=>{const c=suppCost(s),u=suppUpsell(s);return (c||u);})
@@ -3347,6 +3365,7 @@ function populateMovementAccountDropdown(){
 }
 
 function clearMovementForm(){
+  window._pendingMvDriverContact=null;
   ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
    'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
    'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
@@ -3648,6 +3667,7 @@ function selectMovementDriver(idx){
   document.getElementById('mv-driver-name').value=nm;
   document.getElementById('mv-driver-dynamics-id').value=d.contactId||d.dynamicsId||d.dynamics_id||'';
   window._mvLastDriverName=nm;
+  window._pendingMvDriverContact=d;
   toast('Driver filled from Dynamics','success');
 }
 
@@ -3656,6 +3676,8 @@ async function saveMovement(){
   if(!accountId){toast('Customer account required','error');return;}
   const account=(allAccounts||[]).find(a=>a.id===accountId);
   if(!account){toast('Customer account not found','error');return;}
+  // Save a Dynamics-matched movement driver into Contacts (linked to this customer).
+  if(window._pendingMvDriverContact){const _r=await createContactFromDynamics(window._pendingMvDriverContact,accountId);if(_r)window._pendingMvDriverContact=null;}
   const cleanSupps=movementSupps
     .filter(s=>(mvSuppCost(s)||mvSuppUpsell(s)))
     .map(s=>({type:s.type||'Other',cost_amount:mvSuppCost(s),upsell_amount:mvSuppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
