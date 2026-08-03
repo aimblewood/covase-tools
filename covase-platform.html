@@ -3075,7 +3075,7 @@ function renderSupplierReplies(){
     if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
     if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
     const unmatched=(r.status==='unmatched'||!r.hire_id);
-    const hireOpts=(allHires||[]).filter(h=>['requested','booked','active'].includes(h.hire_status)).map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.vehicle_reg||h.reference||'no reg')+' · '+(h.driver||'?'))+'</option>').join('');
+    const hireOpts=(allHires||[]).filter(h=>h.hire_status!=='cancelled').map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.driver||'?')+' · '+(h.vehicle_reg||'no reg')+(h.reference?' · '+h.reference:'')+(h.start_date?' · '+fmtUK(h.start_date):'')+' ['+(h.hire_status||'')+']')+'</option>').join('');
     let a='';
     if(unmatched){
       a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire —</option>'+hireOpts+'</select>';
