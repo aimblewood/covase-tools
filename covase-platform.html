@@ -3044,7 +3044,8 @@ let allSupplierReplies=[];
 async function loadSupplierReplies(){
   const el=document.getElementById('supplier-replies-list');
   try{
-    const rows=await sbReq('covase_supplier_replies?status=eq.needs_review&order=received_at.desc&limit=200');
+    if(!hiresLoaded){try{allHires=await sbReq('covase_hires?order=start_date.desc&limit=500');hiresLoaded=true;}catch(e){}}
+    const rows=await sbReq('covase_supplier_replies?status=in.(needs_review,unmatched)&order=received_at.desc&limit=200');
     allSupplierReplies=Array.isArray(rows)?rows:[];
     const b=document.getElementById('badge-supplier-replies');if(b)b.textContent=String(allSupplierReplies.length);
     renderSupplierReplies();
@@ -3073,20 +3074,31 @@ function renderSupplierReplies(){
     if(r.p11d_value!=null)d.push('P11D £'+esc(r.p11d_value));
     if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
     if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
+    const unmatched=(r.status==='unmatched'||!r.hire_id);
     let a='';
-    if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
-    if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
-    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
-    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
-    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openHireById(\''+esc(r.hire_id)+'\')">Open hire</button>';
-    a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
+    if(unmatched){
+      const opts=(allHires||[]).filter(h=>['requested','booked','active'].includes(h.hire_status)).map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.vehicle_reg||h.reference||'no reg')+' · '+(h.driver||'?'))+'</option>').join('');
+      a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire —</option>'+opts+'</select>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Link</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
+    }else{
+      if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
+      if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openHireById(\''+esc(r.hire_id)+'\')">Open hire</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
+    }
     const q=r.questions?('<div style="margin-top:6px;color:var(--tl-red-t);font-size:12px"><strong>Question:</strong> '+esc(r.questions)+'</div>'):'';
-    return '<div style="border:1px solid var(--n200);border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">'
-      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div style="font-weight:600">'+esc(hireLabel(r.hire_id))+'</div><span style="font-size:11px;font-weight:700;color:'+(chips[oc]||'var(--n500)')+';text-transform:uppercase">'+esc(oc)+(r.confidence!=null?' · '+Math.round(r.confidence*100)+'%':'')+'</span></div>'
+    const headerLeft=unmatched?('<div style="font-weight:600;color:var(--tl-red-t)">⚠ Unmatched · '+esc(r.from_email||'supplier')+'</div>'):('<div style="font-weight:600">'+esc(hireLabel(r.hire_id))+'</div>');
+    return '<div style="border:1px solid '+(unmatched?'var(--tl-red-t)':'var(--n200)')+';border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">'+headerLeft+'<span style="font-size:11px;font-weight:700;color:'+(chips[oc]||'var(--n500)')+';text-transform:uppercase">'+esc(oc)+(r.confidence!=null?' · '+Math.round(r.confidence*100)+'%':'')+'</span></div>'
+      +(unmatched&&r.subject?'<div style="font-size:11px;color:var(--n500);margin-top:2px">Subject: '+esc(r.subject)+'</div>':'')
       +'<div style="font-size:12px;color:var(--n600);margin-top:4px">'+esc(r.summary||'')+'</div>'
       +(d.length?'<div style="font-size:12px;color:var(--n700);margin-top:6px">'+d.join(' · ')+'</div>':'')
       +q
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+a+'</div></div>';
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">'+a+'</div></div>';
   }).join('');
 }
 function openHireById(hireId){if((allHires||[]).some(x=>x.id===hireId))openEditHire(hireId);else toast('Open Short Hires first, then retry','error');}
@@ -3119,6 +3131,14 @@ async function resourceReply(id){
 async function dismissReply(id){
   try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'dismissed'},prefer:'return=minimal'});loadSupplierReplies();}
   catch(e){toast('Failed: '+e.message,'error');}
+}
+async function linkUnmatched(id){
+  const sel=document.getElementById('link-sel-'+id);const hireId=sel?sel.value:'';
+  if(!hireId){toast('Pick a hire to link this email to','error');return;}
+  try{
+    await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{hire_id:hireId,status:'needs_review'},prefer:'return=minimal'});
+    toast('Linked to booking — now in the review queue','success');loadSupplierReplies();
+  }catch(e){toast('Link failed: '+e.message,'error');}
 }
 function cleanReplyText(t){if(!t)return '';const s=String(t);const cut=s.search(/\bFrom:\s/);return (cut>20?s.slice(0,cut):s).trim();}
 function toggleThreadMsg(i){const b=document.getElementById('thread-body-'+i);const c=document.getElementById('thread-chev-'+i);if(!b)return;const open=b.style.display==='none';b.style.display=open?'block':'none';if(c)c.textContent=open?'▾':'▸';}
