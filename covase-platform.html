@@ -3075,10 +3075,10 @@ function renderSupplierReplies(){
     if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
     if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
     const unmatched=(r.status==='unmatched'||!r.hire_id);
+    const hireOpts=(allHires||[]).filter(h=>['requested','booked','active'].includes(h.hire_status)).map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.vehicle_reg||h.reference||'no reg')+' · '+(h.driver||'?'))+'</option>').join('');
     let a='';
     if(unmatched){
-      const opts=(allHires||[]).filter(h=>['requested','booked','active'].includes(h.hire_status)).map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.vehicle_reg||h.reference||'no reg')+' · '+(h.driver||'?'))+'</option>').join('');
-      a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire —</option>'+opts+'</select>';
+      a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire —</option>'+hireOpts+'</select>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
@@ -3088,6 +3088,7 @@ function renderSupplierReplies(){
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openHireById(\''+esc(r.hire_id)+'\')">Open hire</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="toggleRelink(\''+r.id+'\')">Re-link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }
     const q=r.questions?('<div style="margin-top:6px;color:var(--tl-red-t);font-size:12px"><strong>Question:</strong> '+esc(r.questions)+'</div>'):'';
@@ -3098,7 +3099,9 @@ function renderSupplierReplies(){
       +'<div style="font-size:12px;color:var(--n600);margin-top:4px">'+esc(r.summary||'')+'</div>'
       +(d.length?'<div style="font-size:12px;color:var(--n700);margin-top:6px">'+d.join(' · ')+'</div>':'')
       +q
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">'+a+'</div></div>';
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">'+a+'</div>'
+      +(!unmatched?'<div id="relink-'+r.id+'" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11px;color:var(--n500)">Wrong booking? Link to:</span><select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— choose hire —</option>'+hireOpts+'</select><button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Re-link</button></div>':'')
+      +'</div>';
   }).join('');
 }
 function openHireById(hireId){if((allHires||[]).some(x=>x.id===hireId))openEditHire(hireId);else toast('Open Short Hires first, then retry','error');}
@@ -3132,6 +3135,7 @@ async function dismissReply(id){
   try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'dismissed'},prefer:'return=minimal'});loadSupplierReplies();}
   catch(e){toast('Failed: '+e.message,'error');}
 }
+function toggleRelink(id){const el=document.getElementById('relink-'+id);if(el)el.style.display=el.style.display==='none'?'flex':'none';}
 async function linkUnmatched(id){
   const sel=document.getElementById('link-sel-'+id);const hireId=sel?sel.value:'';
   if(!hireId){toast('Pick a hire to link this email to','error');return;}
