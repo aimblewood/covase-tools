@@ -362,7 +362,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .reconcile-line.rec-warn{color:var(--tl-orange-t);font-weight:600;}
 
 /* Kanban pipeline */
-.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:start;}
+.kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:start;}
 .kan-col{background:var(--n50);border:1px solid var(--n100);border-radius:var(--radius);display:flex;flex-direction:column;min-height:320px;max-height:calc(100vh - 170px);overflow:hidden;}
 .kan-col-header{padding:10px 12px;border-bottom:1px solid var(--n100);display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--card);border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);}
 .kan-col-title{font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n700);}
@@ -775,7 +775,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="form-row trio">
         <div class="form-field"><label>Booking reference</label><input id="hf-reference" placeholder="Fourways reservation / Ogilvie agreement"></div>
         <div class="form-field"><label>Hire status</label>
-          <select id="hf-hire-status" onchange="updateSendSupplierBtn()"><option value="requested">Requested</option><option value="booked" selected>Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
+          <select id="hf-hire-status" onchange="updateSendSupplierBtn()"><option value="pending" selected>Pending</option><option value="requested">Requested</option><option value="booked">Booked</option><option value="active">Active</option><option value="offhired">Off-hired</option><option value="cancelled">Cancelled</option></select>
         </div>
         <div class="form-field"><label>Billing status</label>
           <select id="hf-billing"><option value="pending" selected>Pending</option><option value="invoiced-in">Invoiced in</option><option value="recharged">Recharged</option><option value="paid">Paid</option></select>
@@ -2361,7 +2361,7 @@ async function loadHires(){
     // Also load accounts for the hire modal dropdown if not loaded
     if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
     updateHireStats();
-    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));
+    renderHireView('hires-active','active-list',h=>['pending','requested','booked','active'].includes(h.hire_status));
     renderHireView('hires-all','all-list',null);
     renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
     renderPipeline();
@@ -2415,6 +2415,7 @@ function setHireFilter(f,btn){hireStatusFilter=f;document.querySelectorAll('#vie
 
 // ─── Pipeline (Kanban) ───
 const PIPELINE_COLS=[
+  {key:'pending',   label:'Pending'},
   {key:'requested', label:'Requested'},
   {key:'booked',    label:'Booked'},
   {key:'active',    label:'Active'},
@@ -2437,7 +2438,7 @@ function renderPipeline(){
   // Populate client dropdown from current hires (unique customer strings)
   populatePipeClientFilter();
   // Bucket hires by column, applying the client + search filters first
-  const buckets={requested:[],booked:[],active:[],offhired:[],paid:[],cancelled:[]};
+  const buckets={pending:[],requested:[],booked:[],active:[],offhired:[],paid:[],cancelled:[]};
   (allHires||[]).forEach(h=>{
     if(clientFilter){
       // Match by client_account_id if set, else fall back to customer text
@@ -2567,6 +2568,9 @@ function kanCard(h){
 function nextAdvance(h){
   if(h.hire_status==='cancelled')return null;
   if(h.billing_status==='paid')return null;
+  // Pending leaves the lane by sending the supplier request (which sets Requested),
+  // not by a plain status flip. Button opens the booking so the request can be sent.
+  if(h.hire_status==='pending')return {action:'send',label:'Send to supplier',cls:'',tip:'Open booking to send the supplier request'};
   // Operational progression first
   if(HIRE_NEXT[h.hire_status]){
     const lbl={requested:'Book',booked:'On hire',active:'Off-hire'}[h.hire_status];
@@ -2583,6 +2587,7 @@ function nextAdvance(h){
 async function advanceHire(id,action){
   const h=allHires.find(x=>x.id===id);if(!h)return;
   if(action==='recharge'){rechargeHire(id);return;}
+  if(action==='send'){openEditHire(id);return;}
   const patch={updated_at:new Date().toISOString()};
   if(action.startsWith('hire:')){
     patch.hire_status=action.split(':')[1];
@@ -2634,7 +2639,7 @@ function buildHireCard(h){
   const totalUpsell=days?days*upd+suppU:null;
   const totalSell=totalCost!=null&&totalUpsell!=null?totalCost+totalUpsell:null;
   const margin=totalUpsell;
-  const lcLabels={requested:'Requested',booked:'Booked',active:'Active',offhired:'Off-hired',cancelled:'Cancelled'};
+  const lcLabels={pending:'Pending',requested:'Requested',booked:'Booked',active:'Active',offhired:'Off-hired',cancelled:'Cancelled'};
   const blLabels={'pending':'Pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'};
   const lc=h.hire_status||'booked',bl=h.billing_status||'pending';
   const pClass=margin!=null?(margin>=0?'profit-pos':'profit-neg'):'';
@@ -2699,7 +2704,7 @@ async function doCloseHire(id){
     await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{end_date:d,hire_status:'offhired'},prefer:'return=minimal'});
     const h=allHires.find(x=>x.id===id);if(h){h.end_date=d;h.hire_status='offhired';}
     updateHireStats();
-    renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));
+    renderHireView('hires-active','active-list',h=>['pending','requested','booked','active'].includes(h.hire_status));
     renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);
     renderHireView('hires-all','all-list',null);
     updateBadges();
@@ -2768,7 +2773,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='booked';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -2886,10 +2891,10 @@ function updateSendSupplierBtn(){
   btn.style.display='';
   const status=document.getElementById('hf-hire-status').value;
   const supplier=document.getElementById('hf-supplier').value;
-  const eligible=['requested','booked'].includes(status)&&!!supplier;
+  const eligible=['pending','requested','booked'].includes(status)&&!!supplier;
   btn.disabled=!eligible;
   btn.style.opacity=eligible?'':'0.5';
-  btn.title=eligible?'Email this booking request to the supplier':'Enabled when status is Requested or Booked and a supplier is selected';
+  btn.title=eligible?'Email this booking request to the supplier':'Enabled when status is Pending, Requested or Booked and a supplier is selected';
 }
 function openSendSupplier(){
   if(!editHireId){toast('Save the hire first, then send','error');return;}
@@ -3307,7 +3312,7 @@ async function saveReplacement(){
   }catch(e){toast('Replace failed: '+e.message,'error');}
 }
 
-async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['requested','booked','active'].includes(h.hire_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
+async function deleteHire(id){if(!confirm('Remove this hire? Cannot be undone.'))return;try{await sbReq(`covase_hires?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});allHires=allHires.filter(x=>x.id!==id);updateHireStats();renderHireView('hires-active','active-list',h=>['pending','requested','booked','active'].includes(h.hire_status));renderHireView('hires-all','all-list',null);renderHireView('hires-recharge','recharge-list',h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id);updateBadges();toast('Hire removed','success');}catch(e){toast('Delete failed: '+e.message,'error');}}
 
 // ─── MOVEMENTS ───
 let allMovements=[],movementsLoaded=false,movementFilter='all',editMovementId=null,movementSupps=[];
