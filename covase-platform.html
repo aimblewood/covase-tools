@@ -361,6 +361,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .reconcile-line.rec-ok{color:var(--tl-green-t);}
 .reconcile-line.rec-warn{color:var(--tl-orange-t);font-weight:600;}
 
+/* Movement card designer (drag-and-drop) */
+.mvcd-zone-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin-bottom:6px}
+.mvcd-palette{border:1px solid var(--n200);border-radius:8px;padding:8px;min-height:120px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;background:var(--n50)}
+.mvcd-cardframe{border:1px dashed var(--n300);border-radius:10px;padding:12px;background:#fff}
+.mvcd-zone{min-height:26px;border:1px dashed var(--n200);border-radius:6px;padding:4px;margin:3px 0;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.mvcd-zone-title{min-height:30px}
+.mvcd-zone-right{flex-direction:column;align-items:flex-end;min-width:120px}
+.mvcd-zone.mvcd-over{border-color:var(--covase);background:var(--covase-l)}
+.mvcd-zone-empty{font-size:10px;color:var(--n300);font-style:italic}
+.mvcd-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--n300);border-radius:14px;padding:3px 9px;font-size:11px;color:var(--n700);cursor:grab;user-select:none}
+.mvcd-chip.pal{background:var(--covase-l);border-color:var(--covase)}
+.mvcd-chip .x{cursor:pointer;color:var(--n400);font-weight:700;font-size:10px}
+.mvcd-chip .x:hover{color:var(--tl-red-t)}
+
 /* Kanban pipeline */
 .kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:start;}
 .kan-col{background:var(--n50);border:1px solid var(--n100);border-radius:var(--radius);display:flex;flex-direction:column;min-height:320px;max-height:calc(100vh - 170px);overflow:hidden;}
@@ -653,6 +667,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
         <button class="filter-pill" onclick="setMovementFilter('invoiced',this)">Invoiced</button>
         <button class="filter-pill" onclick="setMovementFilter('paid',this)">Paid</button>
       </div>
+      <button class="topbar-btn" onclick="openMvCardDesigner()">🎨 Design card</button>
       <button class="topbar-btn" onclick="loadMovements()">↻ Refresh</button>
       <button class="topbar-btn primary" onclick="openNewMovement()">+ New Movement</button>
     </div>
@@ -1168,6 +1183,46 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MOVEMENT CARD DESIGNER ─── -->
+<div class="modal-overlay" id="mv-card-designer-modal">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-header">
+      <div class="modal-title">Design movement card</div>
+      <button class="modal-close" onclick="closeMvCardDesigner()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Fields on the same line show separated by “ · ”.</div>
+      <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="mvcd-zone-label">Available fields</div>
+          <div id="mvcd-palette" class="mvcd-palette" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'palette')"></div>
+        </div>
+        <div>
+          <div class="mvcd-zone-label">Card layout</div>
+          <div class="mvcd-cardframe">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div class="mvcd-zone mvcd-zone-title" data-zone="title" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'title')"></div>
+                <div class="mvcd-zone" data-zone="line1" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line1')"></div>
+                <div class="mvcd-zone" data-zone="line2" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line2')"></div>
+                <div class="mvcd-zone" data-zone="line3" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line3')"></div>
+              </div>
+              <div class="mvcd-zone mvcd-zone-right" data-zone="right" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'right')"></div>
+            </div>
+          </div>
+          <div class="mvcd-zone-label" style="margin-top:16px">Live preview</div>
+          <div id="mvcd-preview" class="card-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="resetMvCardDesigner()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="closeMvCardDesigner()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveMvCardDesigner()">Save layout</button>
     </div>
   </div>
 </div>
@@ -3374,30 +3429,104 @@ function renderMovements(){
   wrap.innerHTML=rows.map(m=>movementCard(m)).join('');
 }
 
+// ─── Movement card designer (drag-and-drop; layout shared via covase_config) ───
+function mvStatusLabel(s){const L={quoted:'Quoted',booked:'Booked',in_progress:'In progress',completed_pending_fuel:'Awaiting fuel',invoiced:'Invoiced',paid:'Paid',cancelled:'Cancelled'};return L[s]||s||'';}
+const MV_CARD_FIELDS=[
+  {key:'customer',label:'Customer',get:m=>m.customer||'—'},
+  {key:'customer_reference',label:'Customer ref',get:m=>m.customer_reference||''},
+  {key:'status',label:'Status',get:m=>mvStatusLabel(m.movement_status)},
+  {key:'route',label:'Route (postcodes)',get:m=>(m.pickup_postcode||'?')+' → '+(m.dropoff_postcode||'?')},
+  {key:'route_towns',label:'Route (towns)',get:m=>(m.pickup_town||'?')+' → '+(m.dropoff_town||'?')},
+  {key:'pickup_postcode',label:'Pickup postcode',get:m=>m.pickup_postcode||''},
+  {key:'dropoff_postcode',label:'Dropoff postcode',get:m=>m.dropoff_postcode||''},
+  {key:'pickup_town',label:'Pickup town',get:m=>m.pickup_town||''},
+  {key:'dropoff_town',label:'Dropoff town',get:m=>m.dropoff_town||''},
+  {key:'pickup_county',label:'Pickup county',get:m=>m.pickup_county||''},
+  {key:'dropoff_county',label:'Dropoff county',get:m=>m.dropoff_county||''},
+  {key:'miles',label:'Mileage',get:m=>m.mileage!=null?Number(m.mileage).toFixed(1)+' mi':''},
+  {key:'drive_time',label:'Drive time',get:m=>m.drive_time_minutes!=null?m.drive_time_minutes+' min':''},
+  {key:'vehicle_reg',label:'Vehicle reg',get:m=>m.vehicle_reg||''},
+  {key:'vehicle_makemodel',label:'Make / model',get:m=>m.vehicle_makemodel||''},
+  {key:'driver_name',label:'Driver',get:m=>m.driver_name||''},
+  {key:'date',label:'Date',get:m=>m.movement_date?fmtD(m.movement_date):(m.quote_date?fmtD(m.quote_date)+' (quote)':'')},
+  {key:'movement_date',label:'Movement date',get:m=>m.movement_date?fmtD(m.movement_date):''},
+  {key:'quote_date',label:'Quote date',get:m=>m.quote_date?fmtD(m.quote_date):''},
+  {key:'total',label:'Total (£)',money:true,get:m=>fmtMoney((parseFloat(m.invoice_total)||parseFloat(m.quote_total)||0)||null)},
+  {key:'quote_total',label:'Quote total (£)',money:true,get:m=>fmtMoney(parseFloat(m.quote_total)||null)},
+  {key:'invoice_total',label:'Invoice total (£)',money:true,get:m=>fmtMoney(parseFloat(m.invoice_total)||null)},
+  {key:'actual_fuel',label:'Actual fuel (£)',money:true,get:m=>fmtMoney(parseFloat(m.actual_fuel_cost)||null)},
+  {key:'notes',label:'Notes',get:m=>m.notes||''}
+];
+const MV_FIELD_MAP=Object.fromEntries(MV_CARD_FIELDS.map(f=>[f.key,f]));
+const DEFAULT_MV_CARD_LAYOUT={title:['customer'],line1:['route','miles'],line2:['date','customer_reference','vehicle_reg'],line3:[],right:['total','status']};
+const MVCD_ZONES=['title','line1','line2','line3','right'];
+function mvcdCloneLayout(src){const o={};MVCD_ZONES.forEach(z=>{o[z]=Array.isArray(src&&src[z])?src[z].slice():[];});return o;}
+let movementCardLayout=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);
+async function loadMovementCardLayout(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.movement_card_layout&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    if(v&&typeof v==='object'){
+      const L=mvcdCloneLayout(v);
+      MVCD_ZONES.forEach(z=>{L[z]=L[z].filter(k=>MV_FIELD_MAP[k]);});
+      movementCardLayout=L;
+    }
+  }catch(e){/* covase_config may not exist yet — keep default */}
+  if(Array.isArray(allMovements)&&allMovements.length)renderMovements();
+}
 function movementCard(m){
-  const statusLabels={
-    quoted:'Quoted',booked:'Booked',in_progress:'In progress',
-    completed_pending_fuel:'Awaiting fuel',invoiced:'Invoiced',paid:'Paid',cancelled:'Cancelled'
-  };
-  const total=parseFloat(m.invoice_total)||parseFloat(m.quote_total)||0;
-  const miles=m.mileage!=null?Number(m.mileage).toFixed(1)+' mi':'—';
-  const pickup=esc(m.pickup_postcode||'?');
-  const dropoff=esc(m.dropoff_postcode||'?');
-  const date=m.movement_date?fmtD(m.movement_date):(m.quote_date?fmtD(m.quote_date)+' (quote)':'—');
+  const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
+  const parts=keys=>(keys||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);return v?esc(String(v)):'';}).filter(Boolean);
+  const titleParts=parts(L.title);
+  const title=titleParts.length?titleParts.join(' · '):'—';
+  const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' · ')}</div>`:'';};
+  const l1=lineHtml(L.line1,'font-size:11px;color:var(--n600);margin-top:2px');
+  const l2=lineHtml(L.line2,'font-size:11px;color:var(--n500);margin-top:2px');
+  const l3=lineHtml(L.line3,'font-size:11px;color:var(--n500);margin-top:2px');
+  const rightParts=(L.right||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);if(!v)return '';
+    if(k==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(String(v))}</div>`;
+    if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase)">${esc(String(v))}</div>`;
+    return `<div style="font-size:11px;color:var(--n600);margin-top:2px">${esc(String(v))}</div>`;
+  }).filter(Boolean).join('');
+  const right=rightParts?`<div style="text-align:right;white-space:nowrap">${rightParts}</div>`:'';
   return `<div class="card" onclick="openEditMovement('${esc(m.id)}')">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:13px;color:var(--n800)">${esc(m.customer||'—')}</div>
-        <div style="font-size:11px;color:var(--n600);margin-top:2px">${pickup} → ${dropoff} · ${miles}</div>
-        <div style="font-size:11px;color:var(--n500);margin-top:2px">${date}${m.customer_reference?' · '+esc(m.customer_reference):''}${m.vehicle_reg?' · '+esc(m.vehicle_reg):''}</div>
+        <div style="font-weight:600;font-size:13px;color:var(--n800)">${title}</div>
+        ${l1}${l2}${l3}
       </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-weight:700;font-size:13px;color:var(--covase)">${fmtMoney(total||null)}</div>
-        <div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(statusLabels[m.movement_status]||m.movement_status)}</div>
-      </div>
+      ${right}
     </div>
   </div>`;
 }
+// ─── Designer modal state + drag-and-drop interactions ───
+const MVCD_SAMPLE={id:'sample',customer:'Woodland Trust',customer_reference:'PO-4471',pickup_postcode:'BN1 1AA',dropoff_postcode:'M1 2AB',pickup_town:'Brighton',dropoff_town:'Manchester',pickup_county:'East Sussex',dropoff_county:'Greater Manchester',mileage:264.3,drive_time_minutes:290,vehicle_reg:'AB12 CDE',vehicle_makemodel:'Ford Transit',driver_name:'Jane Doe',movement_date:'2026-08-20',quote_date:'2026-08-14',quote_total:512.4,invoice_total:0,actual_fuel_cost:0,movement_status:'booked'};
+let mvcdDraft=null,mvcdDrag=null;
+function openMvCardDesigner(){mvcdDraft=mvcdCloneLayout(movementCardLayout);mvcdRender();document.getElementById('mv-card-designer-modal').classList.add('open');}
+function closeMvCardDesigner(){document.getElementById('mv-card-designer-modal').classList.remove('open');}
+function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);mvcdRender();}
+function mvcdUsedKeys(){return MVCD_ZONES.reduce((a,z)=>a.concat(mvcdDraft[z]),[]);}
+function mvcdChip(key,zone){const f=MV_FIELD_MAP[key];if(!f)return '';const inZone=zone&&zone!=='palette';
+  return `<span class="mvcd-chip${inZone?'':' pal'}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}>${esc(f.label)}${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
+function mvcdZonePlaceholder(z){return {title:'Title',line1:'Line 1',line2:'Line 2',line3:'Line 3',right:'Right column'}[z]||z;}
+function mvcdRender(){
+  const used=new Set(mvcdUsedKeys());
+  const pal=document.getElementById('mvcd-palette');
+  if(pal){const rest=MV_CARD_FIELDS.filter(f=>!used.has(f.key));pal.innerHTML=rest.length?rest.map(f=>mvcdChip(f.key,'palette')).join(''):'<span class="mvcd-zone-empty">All fields placed — drag one back here to remove it</span>';}
+  MVCD_ZONES.forEach(z=>{const el=document.querySelector('.mvcd-zone[data-zone="'+z+'"]');if(!el)return;const keys=mvcdDraft[z]||[];el.innerHTML=keys.length?keys.map(k=>mvcdChip(k,z)).join(''):'<span class="mvcd-zone-empty">'+mvcdZonePlaceholder(z)+'</span>';});
+  mvcdPreview();
+}
+function mvcdPreview(){const sample=(Array.isArray(allMovements)&&allMovements[0])?allMovements[0]:MVCD_SAMPLE;const prev=movementCardLayout;movementCardLayout=mvcdDraft;let html='';try{html=movementCard(sample);}catch(e){html='';}movementCardLayout=prev;const pv=document.getElementById('mvcd-preview');if(pv)pv.innerHTML=html;}
+function mvcdDragStart(e,key,zone){mvcdDrag={key,zone};try{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';}catch(_){}}
+function mvcdAllowDrop(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('mvcd-over');}
+function mvcdDragLeave(e){if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.remove('mvcd-over');}
+function mvcdChipOver(e){e.preventDefault();e.stopPropagation();}
+function mvcdStripKey(key){MVCD_ZONES.forEach(z=>{const a=mvcdDraft[z];const i=a.indexOf(key);if(i>=0)a.splice(i,1);});}
+function mvcdClearOver(){document.querySelectorAll('.mvcd-over').forEach(el=>el.classList.remove('mvcd-over'));}
+function mvcdDrop(e,zone){e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;mvcdStripKey(key);if(zone!=='palette')mvcdDraft[zone].push(key);mvcdRender();}
+function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;if(key===targetKey)return;mvcdStripKey(key);const arr=mvcdDraft[zone];const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);mvcdRender();}
+function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdDraft[zone];const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
+async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovements();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
 
 function populateMovementAccountDropdown(){
   const sel=document.getElementById('mv-account');if(!sel)return;
@@ -4224,6 +4353,8 @@ loadHires();
 loadAccounts();
 // Load the shared supplier booking email template (falls back to default if unset)
 loadBookingTemplate();
+// Load the shared movement-card layout (drag-and-drop designer; falls back to default)
+loadMovementCardLayout();
 // Prime the supplier-replies review-queue badge
 loadSupplierReplies();
 // Load the reply-agent instructions (for the Settings editor)
