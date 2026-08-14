@@ -375,6 +375,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .mvcd-chip .x{cursor:pointer;color:var(--n400);font-weight:700;font-size:10px}
 .mvcd-chip .x:hover{color:var(--tl-red-t)}
 
+/* Movements: view switcher + kanban wrapper + calendar */
+.seg{display:inline-flex;border:1px solid var(--n200);border-radius:8px;overflow:hidden}
+.seg-btn{border:none;background:#fff;color:var(--n600);font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit}
+.seg-btn+.seg-btn{border-left:1px solid var(--n200)}
+.seg-btn.active{background:var(--covase);color:#fff}
+.mv-kan-wrap{position:relative;margin-bottom:8px;cursor:grab}
+.mv-kan-wrap .card{margin:0}
+.mv-kan-actions{display:flex;justify-content:flex-end;margin-top:4px}
+.kan-col.mvkan-over{outline:2px dashed var(--covase);outline-offset:-2px}
+.mvcal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mvcal-title{font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--n800);min-width:150px}
+.mvcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.mvcal-dow{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--n400);font-weight:700;text-align:center;padding:2px 0}
+.mvcal-cell{min-height:92px;border:1px solid var(--n100);border-radius:8px;padding:5px;background:var(--card);display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.mvcal-empty{background:transparent;border:none}
+.mvcal-today{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase)}
+.mvcal-daynum{font-size:11px;font-weight:600;color:var(--n500)}
+.mvcal-chip{font-size:10px;padding:2px 5px;border-radius:5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--n100);color:var(--n700)}
+.mvcal-quoted{background:var(--tl-yellow-l);color:var(--tl-yellow-t)}
+.mvcal-booked{background:var(--covase-l);color:#0a7a72}
+.mvcal-in_progress{background:#e8f4fd;color:#1a6dab}
+.mvcal-completed_pending_fuel{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.mvcal-invoiced{background:var(--purple-l);color:var(--purple)}
+.mvcal-paid{background:var(--tl-green-l);color:var(--tl-green-t)}
+.mvcal-cancelled{background:var(--tl-red-l);color:var(--tl-red-t)}
+
 /* Kanban pipeline */
 .kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:start;}
 .kan-col{background:var(--n50);border:1px solid var(--n100);border-radius:var(--radius);display:flex;flex-direction:column;min-height:320px;max-height:calc(100vh - 170px);overflow:hidden;}
@@ -657,8 +683,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
   <div class="view" id="view-movements">
     <div class="topbar">
       <h1>Movements</h1>
-      <input class="search-box" type="text" id="movement-search" placeholder="Search by postcode, customer, reg…" oninput="renderMovements()">
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input class="search-box" type="text" id="movement-search" placeholder="Search by postcode, customer, reg…" oninput="renderMovementsView()">
+      <div class="seg" id="movement-view-seg">
+        <button class="seg-btn" data-mv="list" onclick="setMovementView('list')">List</button>
+        <button class="seg-btn active" data-mv="kanban" onclick="setMovementView('kanban')">Kanban</button>
+        <button class="seg-btn" data-mv="calendar" onclick="setMovementView('calendar')">Calendar</button>
+      </div>
+      <div id="movement-filter-pills" style="display:none;gap:6px;flex-wrap:wrap">
         <button class="filter-pill active" onclick="setMovementFilter('all',this)">All</button>
         <button class="filter-pill" onclick="setMovementFilter('quoted',this)">Quoted</button>
         <button class="filter-pill" onclick="setMovementFilter('booked',this)">Booked</button>
@@ -677,7 +708,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="stat-card stat-orange"><div class="stat-label">Active</div><div class="stat-val" id="sm-active">—</div><div class="stat-sub">booked + in progress</div></div>
       <div class="stat-card stat-green"><div class="stat-label">Open quote value</div><div class="stat-val" id="sm-value">—</div><div class="stat-sub">quoted, booked, in progress</div></div>
     </div>
-    <div class="content"><div class="card-list" id="movement-list"><div class="loading">Loading movements…</div></div></div>
+    <div class="content">
+      <div class="card-list" id="movement-list" style="display:none"><div class="loading">Loading movements…</div></div>
+      <div id="movement-kanban" class="kanban"></div>
+      <div id="movement-calendar" style="display:none"></div>
+    </div>
   </div>
 
   <div class="view" id="view-supplier-replies">
@@ -3380,7 +3415,7 @@ async function loadMovements(){
     movementsLoaded=true;
     // Load accounts in background for the dropdown if not loaded
     if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
-    updateMovementStats();renderMovements();updateBadges();
+    updateMovementStats();applyMovementViewVis();renderMovementsView();updateBadges();
   }catch(e){
     el.innerHTML=`<div class="empty-state"><div class="empty-icon">✗</div><div class="empty-title">Load failed</div><div class="empty-sub">${esc(e.message||'')}</div></div>`;
   }
@@ -3407,8 +3442,104 @@ function setMovementFilter(f,btn){
   movementFilter=f;
   document.querySelectorAll('#view-movements .filter-pill').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  renderMovements();
+  renderMovementsView();
 }
+
+// ─── Movements: List / Kanban / Calendar views ───
+let movementView='kanban',mvCalMonth=null,mvKanDragId=null;
+function movementRowsFiltered(applyStatus){
+  const q=(document.getElementById('movement-search')?.value||'').toLowerCase().trim();
+  let rows=(allMovements||[]).slice();
+  if(applyStatus&&movementFilter!=='all')rows=rows.filter(m=>m.movement_status===movementFilter);
+  if(q){rows=rows.filter(m=>{const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.notes].map(x=>String(x||'').toLowerCase()).join(' ');return hay.includes(q);});}
+  return rows;
+}
+function applyMovementViewVis(){
+  const setD=(id,d)=>{const e=document.getElementById(id);if(e)e.style.display=d;};
+  setD('movement-list',movementView==='list'?'':'none');
+  setD('movement-kanban',movementView==='kanban'?'':'none');
+  setD('movement-calendar',movementView==='calendar'?'':'none');
+  const pills=document.getElementById('movement-filter-pills');if(pills)pills.style.display=(movementView==='list')?'flex':'none';
+}
+function setMovementView(v){
+  movementView=v;
+  document.querySelectorAll('#movement-view-seg .seg-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-mv')===v));
+  applyMovementViewVis();
+  renderMovementsView();
+}
+function renderMovementsView(){
+  if(movementView==='kanban')renderMovementKanban();
+  else if(movementView==='calendar')renderMovementCalendar();
+  else renderMovements();
+}
+// ── Kanban (status lanes; drag to change status + per-card advance) ──
+const MV_KANBAN_COLS=[
+  {key:'quoted',label:'Quoted'},
+  {key:'booked',label:'Booked'},
+  {key:'in_progress',label:'In progress'},
+  {key:'completed_pending_fuel',label:'Awaiting fuel'},
+  {key:'invoiced',label:'Invoiced'},
+  {key:'paid',label:'Paid'}
+];
+const MV_NEXT={quoted:'booked',booked:'in_progress',in_progress:'completed_pending_fuel',completed_pending_fuel:'invoiced',invoiced:'paid'};
+function renderMovementKanban(){
+  const wrap=document.getElementById('movement-kanban');if(!wrap)return;
+  const rows=movementRowsFiltered(false);
+  const buckets={};MV_KANBAN_COLS.forEach(c=>buckets[c.key]=[]);const cancelled=[];
+  rows.forEach(m=>{if(m.movement_status==='cancelled'){cancelled.push(m);return;}(buckets[m.movement_status]||(buckets[m.movement_status]=[])).push(m);});
+  let cols=MV_KANBAN_COLS.map(c=>{
+    const items=buckets[c.key]||[];
+    const body=items.length?items.map(m=>mvKanCard(m)).join(''):'<div class="kan-col-empty">Nothing here</div>';
+    return `<div class="kan-col" ondragover="mvKanAllow(event)" ondragleave="mvKanLeave(event)" ondrop="mvKanDrop(event,'${c.key}')">
+      <div class="kan-col-header"><span class="kan-col-title">${esc(c.label)}</span><span class="kan-col-count">${items.length}</span></div>
+      <div class="kan-col-body">${body}</div>
+    </div>`;
+  }).join('');
+  let out=cols;
+  if(cancelled.length){out+=`<div class="kan-col" style="grid-column:1/-1;margin-top:14px"><div class="kan-col-header"><span class="kan-col-title" style="color:var(--tl-red-t)">Cancelled</span><span class="kan-col-count">${cancelled.length}</span></div><div class="kan-col-body" style="max-height:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px">${cancelled.map(m=>mvKanCard(m)).join('')}</div></div>`;}
+  wrap.innerHTML=out;
+}
+function mvKanCard(m){
+  const next=MV_NEXT[m.movement_status];
+  const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();mvAdvance('${esc(m.id)}')" title="Move to ${esc(mvStatusLabel(next))}">→ ${esc(mvStatusLabel(next))}</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="mvKanDragStart(event,'${esc(m.id)}')" ondragend="mvKanDragEnd(event)">${movementCard(m)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+}
+function mvKanDragStart(e,id){mvKanDragId=id;try{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';}catch(_){}}
+function mvKanDragEnd(e){mvKanDragId=null;document.querySelectorAll('.kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));}
+function mvKanAllow(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}const c=e.currentTarget;if(c&&c.classList)c.classList.add('mvkan-over');}
+function mvKanLeave(e){const c=e.currentTarget;if(c&&c.classList)c.classList.remove('mvkan-over');}
+async function mvKanDrop(e,status){e.preventDefault();document.querySelectorAll('.kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));const id=mvKanDragId;mvKanDragId=null;if(!id)return;await mvSetStatus(id,status);}
+function mvAdvance(id){const m=(allMovements||[]).find(x=>x.id===id);if(!m)return;const next=MV_NEXT[m.movement_status];if(next)mvSetStatus(id,next);}
+async function mvSetStatus(id,status){
+  const m=(allMovements||[]).find(x=>x.id===id);if(!m||m.movement_status===status)return;
+  const prev=m.movement_status;m.movement_status=status;m.updated_at=new Date().toISOString();
+  renderMovementsView();updateMovementStats();updateBadges();
+  try{await sbReq(`covase_movements?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',body:{movement_status:status,updated_at:m.updated_at},prefer:'return=minimal'});toast('Moved to '+mvStatusLabel(status),'success');}
+  catch(e){m.movement_status=prev;renderMovementsView();updateMovementStats();updateBadges();toast('Update failed: '+e.message,'error');}
+}
+// ── Calendar (month grid by movement date) ──
+function renderMovementCalendar(){
+  const wrap=document.getElementById('movement-calendar');if(!wrap)return;
+  if(!mvCalMonth){const t=new Date();mvCalMonth=new Date(t.getFullYear(),t.getMonth(),1);}
+  const year=mvCalMonth.getFullYear(),month=mvCalMonth.getMonth();
+  const rows=movementRowsFiltered(false);
+  const byDate={};rows.forEach(m=>{if(!m.movement_date)return;const key=String(m.movement_date).slice(0,10);(byDate[key]=byDate[key]||[]).push(m);});
+  const first=new Date(year,month,1);const startDow=(first.getDay()+6)%7;const daysInMonth=new Date(year,month+1,0).getDate();
+  const monthName=first.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const pad=n=>String(n).padStart(2,'0');const t=new Date();const todayKey=t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate());
+  let cells='';
+  for(let i=0;i<startDow;i++)cells+='<div class="mvcal-cell mvcal-empty"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const key=year+'-'+pad(month+1)+'-'+pad(d);
+    const items=byDate[key]||[];
+    const chips=items.map(m=>`<div class="mvcal-chip mvcal-${esc(m.movement_status)}" title="${esc((m.customer||'—')+' · '+mvStatusLabel(m.movement_status))}" onclick="openEditMovement('${esc(m.id)}')">${esc(m.customer||'—')}</div>`).join('');
+    cells+=`<div class="mvcal-cell${key===todayKey?' mvcal-today':''}"><div class="mvcal-daynum">${d}</div>${chips}</div>`;
+  }
+  const dow=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>`<div class="mvcal-dow">${x}</div>`).join('');
+  wrap.innerHTML=`<div class="mvcal-head"><button class="topbar-btn" onclick="mvCalNav(-1)">‹ Prev</button><div class="mvcal-title">${esc(monthName)}</div><button class="topbar-btn" onclick="mvCalNav(1)">Next ›</button><button class="topbar-btn" onclick="mvCalToday()">Today</button></div><div class="mvcal-grid">${dow}${cells}</div><div style="font-size:11px;color:var(--n400);margin-top:8px">Movements appear on their movement date. Quotes without a date don't show here.</div>`;
+}
+function mvCalNav(delta){if(!mvCalMonth){const t=new Date();mvCalMonth=new Date(t.getFullYear(),t.getMonth(),1);}mvCalMonth=new Date(mvCalMonth.getFullYear(),mvCalMonth.getMonth()+delta,1);renderMovementCalendar();}
+function mvCalToday(){const t=new Date();mvCalMonth=new Date(t.getFullYear(),t.getMonth(),1);renderMovementCalendar();}
 
 function renderMovements(){
   const wrap=document.getElementById('movement-list');if(!wrap)return;
@@ -3472,7 +3603,7 @@ async function loadMovementCardLayout(){
       movementCardLayout=L;
     }
   }catch(e){/* covase_config may not exist yet — keep default */}
-  if(Array.isArray(allMovements)&&allMovements.length)renderMovements();
+  if(Array.isArray(allMovements)&&allMovements.length)renderMovementsView();
 }
 function movementCard(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
@@ -3526,7 +3657,7 @@ function mvcdClearOver(){document.querySelectorAll('.mvcd-over').forEach(el=>el.
 function mvcdDrop(e,zone){e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;mvcdStripKey(key);if(zone!=='palette')mvcdDraft[zone].push(key);mvcdRender();}
 function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;if(key===targetKey)return;mvcdStripKey(key);const arr=mvcdDraft[zone];const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);mvcdRender();}
 function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdDraft[zone];const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
-async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovements();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
+async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovementsView();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
 
 function populateMovementAccountDropdown(){
   const sel=document.getElementById('mv-account');if(!sel)return;
@@ -3918,7 +4049,7 @@ async function deleteMovementFromModal(){
     allMovements=allMovements.filter(m=>m.id!==editMovementId);
     toast('Movement deleted','success');
     closeMovementModal();
-    updateMovementStats();renderMovements();updateBadges();
+    updateMovementStats();renderMovementsView();updateBadges();
   }catch(e){toast('Delete failed: '+e.message,'error');}
 }
 
