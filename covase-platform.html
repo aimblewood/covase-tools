@@ -4717,20 +4717,17 @@ async function openClaimDetail(id){
   const alerts=claimAlerts(c).map(a=>'<span class="clm-alert '+a.cls+'">'+esc(a.label)+'</span>').join(' ');
   let html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'+links+'</div>';
   if(alerts)html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'+alerts+'</div>';
-  // Manual matching — type to filter; pick from the datalist; Save applies.
-  const maps={acc:new Map(),drv:new Map(),veh:new Map()};
-  const accOpts=(allAccounts||[]).map(a=>{const l=(a.company_name||a.id);maps.acc.set(l,a.id);return '<option value="'+esc(l)+'">';}).join('');
-  const drvOpts=(allContacts||[]).map(ct=>{const l=((ct.first_name||'')+' '+(ct.last_name||'')).trim()+(ct.employee_number?' · '+ct.employee_number:'');maps.drv.set(l,ct.id);return '<option value="'+esc(l)+'">';}).join('');
-  const vehOpts=(allVehicles||[]).map(v=>{const l='FLEET · '+(v.reg||'no reg')+(v.name?' · '+v.name:'');maps.veh.set(l,{vehicle_id:v.id});return '<option value="'+esc(l)+'">';}).join('')
-    +(allHires||[]).filter(h=>h.hire_status!=='cancelled'&&h.vehicle_reg).map(h=>{const l='HIRE · '+(h.vehicle_reg||'')+' · '+(h.customer||'?')+(h.start_date?' · '+fmtUK(h.start_date):'');maps.veh.set(l,{hire_id:h.id});return '<option value="'+esc(l)+'">';}).join('');
-  window._clmLinkMaps=maps;
-  const inp=(fid,listId,ph,opts)=>'<input id="'+fid+'" list="'+listId+'" placeholder="'+esc(ph)+'" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:6px"><datalist id="'+listId+'">'+opts+'</datalist>';
+  // Manual matching — live typeahead over Covase AND Dynamics (same behaviour
+  // as the hire/movement lookups). Picking a Dynamics hit creates the local row.
+  window._clmStaged={acc:null,drv:null,veh:null};
+  window._clmClaimId=c.id;
+  const inp=(kind,ph)=>'<div style="position:relative"><input id="clm-link-'+kind+'" placeholder="'+esc(ph)+'" autocomplete="off" oninput="clmLookup(\''+kind+'\',this.value)" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:6px"><div id="clm-link-'+kind+'-results" class="lookup-results"></div></div>';
   html+='<div style="border:1px solid var(--n200);border-radius:8px;padding:10px;margin-bottom:6px;background:var(--n50)">'
-    +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin-bottom:6px">Manual matching — type to search, pick, then Save</div>'
+    +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin-bottom:6px">Manual matching — searches Covase + Dynamics; pick a result, then Save</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">'
-    +'<div><label style="font-size:10px;color:var(--n500)">Account</label>'+inp('clm-link-acc','clm-dl-acc','FMG says: '+(c.company||c.client_group||'—'),accOpts)+'</div>'
-    +'<div><label style="font-size:10px;color:var(--n500)">Driver</label>'+inp('clm-link-drv','clm-dl-drv','FMG says: '+(c.driver_name||'—'),drvOpts)+'</div>'
-    +'<div><label style="font-size:10px;color:var(--n500)">Vehicle (fleet or hire)</label>'+inp('clm-link-veh','clm-dl-veh','FMG says: '+(c.vehicle_reg||'—'),vehOpts)+'</div>'
+    +'<div><label style="font-size:10px;color:var(--n500)">Account</label>'+inp('acc','FMG says: '+(c.company||c.client_group||'—'))+'</div>'
+    +'<div><label style="font-size:10px;color:var(--n500)">Driver</label>'+inp('drv','FMG says: '+(c.driver_name||'—'))+'</div>'
+    +'<div><label style="font-size:10px;color:var(--n500)">Vehicle (fleet or hire)</label>'+inp('veh','FMG says: '+(c.vehicle_reg||'—'))+'</div>'
     +'<button class="btn btn-secondary" style="font-size:12px;padding:7px 14px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="saveClaimLinks(\''+esc(c.id)+'\')">Save links</button>'
     +'</div><div style="font-size:10px;color:var(--n400);margin-top:5px">Leave a box blank to keep the current link. Links are Covase-side only — FMG data is untouched.</div></div>';
   html+=CLAIM_DETAIL_SECTIONS.map(sec=>{
@@ -4747,15 +4744,15 @@ async function openClaimDetail(id){
 function closeClaimModal(){document.getElementById('claim-modal').classList.remove('open');}
 async function saveClaimLinks(id){
   const c=(allClaims||[]).find(x=>x.id===id);if(!c)return;
-  const maps=window._clmLinkMaps||{};
+  const st=window._clmStaged||{};
   const patch={};
-  const accL=(document.getElementById('clm-link-acc')?.value||'').trim();
-  const drvL=(document.getElementById('clm-link-drv')?.value||'').trim();
-  const vehL=(document.getElementById('clm-link-veh')?.value||'').trim();
-  if(accL){const aid=maps.acc&&maps.acc.get(accL);if(!aid){toast('Pick the account from the list (type to filter)','error');return;}patch.client_account_id=aid;patch.account_matched_via='manual';}
-  if(drvL){const did=maps.drv&&maps.drv.get(drvL);if(!did){toast('Pick the driver from the list (type to filter)','error');return;}patch.driver_contact_id=did;}
-  if(vehL){const v=maps.veh&&maps.veh.get(vehL);if(!v){toast('Pick the vehicle from the list (type to filter)','error');return;}
-    if(v.vehicle_id){patch.vehicle_id=v.vehicle_id;}else{patch.hire_id=v.hire_id;}patch.vehicle_matched_via='manual';}
+  const typed=k=>(document.getElementById('clm-link-'+k)?.value||'').trim();
+  if(st.acc){patch.client_account_id=st.acc;patch.account_matched_via='manual';}
+  else if(typed('acc')){toast('Pick the account from the search results','error');return;}
+  if(st.drv){patch.driver_contact_id=st.drv;}
+  else if(typed('drv')){toast('Pick the driver from the search results','error');return;}
+  if(st.veh){if(st.veh.vehicle_id)patch.vehicle_id=st.veh.vehicle_id;else patch.hire_id=st.veh.hire_id;patch.vehicle_matched_via='manual';}
+  else if(typed('veh')){toast('Pick the vehicle from the search results','error');return;}
   if(!Object.keys(patch).length){toast('Nothing selected to link','error');return;}
   patch.updated_at=new Date().toISOString();
   try{
@@ -4765,6 +4762,68 @@ async function saveClaimLinks(id){
     updateClaimStats();renderClaimsView();
     openClaimDetail(id); // refresh the modal with the new match chips
   }catch(e){toast('Save failed: '+e.message,'error');}
+}
+// Live Covase + Dynamics typeahead for the manual-match panel
+let _clmLookupTimers={},_clmLookupResults={};
+async function clmLookup(kind,q){
+  window._clmStaged[kind]=null; // editing invalidates any previous pick
+  clearTimeout(_clmLookupTimers[kind]);
+  const res=document.getElementById('clm-link-'+kind+'-results');if(!res)return;
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Covase + Dynamics…</div>';res.classList.add('open');
+  _clmLookupTimers[kind]=setTimeout(async()=>{
+    const ql=q.toLowerCase();const items=[];const cfg=getConfig();
+    const dyn=async url=>{try{const r=await fetch(url+'?q='+encodeURIComponent(q),{mode:'cors'});const j=await r.json();return Array.isArray(j)?j:[];}catch(e){return [];}};
+    if(kind==='acc'){
+      (allAccounts||[]).filter(a=>(a.company_name||'').toLowerCase().includes(ql)).slice(0,5)
+        .forEach(a=>items.push({label:a.company_name,meta:'Covase account',pick:a.id}));
+      if(cfg.n8nClient)(await dyn(cfg.n8nClient)).slice(0,5).forEach(a=>{
+        if(!(allAccounts||[]).some(x=>x.dynamics_id===a.accountId))items.push({label:a.name,meta:'Dynamics — will create Covase account',dyn:{type:'acc',d:a}});});
+    }else if(kind==='drv'){
+      (allContacts||[]).filter(ct=>((ct.first_name||'')+' '+(ct.last_name||'')).toLowerCase().includes(ql)).slice(0,5)
+        .forEach(ct=>items.push({label:((ct.first_name||'')+' '+(ct.last_name||'')).trim(),meta:'Covase contact',pick:ct.id}));
+      if(cfg.n8nContact)(await dyn(cfg.n8nContact)).slice(0,5).forEach(d=>{
+        if(!(allContacts||[]).some(x=>x.dynamics_id===d.contactId))items.push({label:mvDriverName(d),meta:'Dynamics — will create Covase contact'+(d.accountName?' · '+d.accountName:''),dyn:{type:'drv',d:d}});});
+    }else{
+      const rq=normReg(q);
+      (allVehicles||[]).filter(v=>(rq&&normReg(v.reg).includes(rq))||String(v.name||'').toLowerCase().includes(ql)).slice(0,4)
+        .forEach(v=>items.push({label:(v.reg||'no reg')+(v.name?' · '+v.name:''),meta:'Covase fleet vehicle',pick:{vehicle_id:v.id}}));
+      (allHires||[]).filter(h=>h.hire_status!=='cancelled'&&h.vehicle_reg&&rq&&normReg(h.vehicle_reg).includes(rq)).slice(0,4)
+        .forEach(h=>items.push({label:(h.vehicle_reg||'')+' · '+(h.customer||'?'),meta:'Rental booking'+(h.start_date?' · '+fmtUK(h.start_date):''),pick:{hire_id:h.id}}));
+      if(cfg.n8nVehicle)(await dyn(cfg.n8nVehicle)).slice(0,5).forEach(v=>{
+        if(!(allVehicles||[]).some(x=>x.dynamics_id===v.vehicleId))items.push({label:(v.reg||'')+(v.makeModel?' · '+v.makeModel:''),meta:'Dynamics — will create Covase vehicle',dyn:{type:'veh',d:v}});});
+    }
+    if(!items.length){res.innerHTML='<div class="lookup-status">No matches in Covase or Dynamics</div>';return;}
+    _clmLookupResults[kind]=items;
+    res.innerHTML=items.map((it,i)=>'<div class="lookup-item" onclick="clmPick(\''+kind+'\','+i+')"><strong>'+esc(it.label)+'</strong><div class="meta">'+esc(it.meta)+'</div></div>').join('');
+  },350);
+}
+async function clmPick(kind,idx){
+  const it=(_clmLookupResults[kind]||[])[idx];if(!it)return;
+  const res=document.getElementById('clm-link-'+kind+'-results');
+  const input=document.getElementById('clm-link-'+kind);
+  const now=new Date().toISOString();
+  let staged=it.pick||null;
+  if(!staged&&it.dyn){
+    const d=it.dyn.d;const claim=(allClaims||[]).find(x=>x.id===window._clmClaimId);
+    try{
+      if(it.dyn.type==='acc'){
+        const np={id:'acc-'+Date.now(),company_name:d.name,type:'client',status:'active',address:d.address||null,contact_email:d.email||null,contact_phone:d.phone||null,payment_terms:d.paymentTerms||'28 days',payment_method:'BACS',account_manager:'Simon Homer',dynamics_id:d.accountId,updated_at:now};
+        await sbReq('covase_accounts',{method:'POST',body:np,prefer:'return=minimal'});(allAccounts=allAccounts||[]).push(np);staged=np.id;toast('Account created from Dynamics','success');
+      }else if(it.dyn.type==='drv'){
+        const fn=mvDriverName(d);
+        const np={id:'ct-'+Date.now(),first_name:d.firstName||fn.split(' ')[0]||fn,last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,account_id:(window._clmStaged&&window._clmStaged.acc)||(claim&&claim.client_account_id)||null,email:d.email||null,mobile:d.mobile||null,job_description:d.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:d.contactId,updated_at:now};
+        await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});(allContacts=allContacts||[]).push(np);staged=np.id;toast('Contact created from Dynamics','success');
+      }else{
+        const np={id:'veh-'+Date.now(),reg:d.reg||null,name:d.makeModel||d.name||null,status:'active',source:'Dynamics (claims match)',dynamics_id:d.vehicleId,updated_at:now};
+        await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});(allVehicles=allVehicles||[]).push(np);staged={vehicle_id:np.id};toast('Vehicle created from Dynamics','success');
+      }
+    }catch(e){toast('Create failed: '+e.message,'error');return;}
+  }
+  if(kind==='veh'&&typeof staged==='string')staged={vehicle_id:staged};
+  window._clmStaged[kind]=staged;
+  if(input)input.value=it.label;
+  if(res)res.classList.remove('open');
 }
 // ── Dashboard ──
 function clmBar(label,val,max,valTxt){const pct=max?Math.max(2,Math.round(val/max*100)):0;return '<div class="clm-bar-row"><div class="clm-bar-label" title="'+esc(label)+'">'+esc(label)+'</div><div class="clm-bar-track"><div class="clm-bar-fill" style="width:'+pct+'%"></div></div><div class="clm-bar-val">'+esc(valTxt!=null?valTxt:String(val))+'</div></div>';}
@@ -4868,6 +4927,14 @@ async function importClaimsFile(file){
       rec.vehicle_id=vid||null;
       rec.hire_id=hs.length?hs[0].id:null;
       rec.vehicle_matched_via=vid&&hs.length?'both':(vid?'fleet':(hs.length?'hire':null));
+      // Preserve links already on the stored claim (incl. manual ones): an
+      // import may FILL a missing link but never clears or replaces one.
+      const prev=existingLinks.get(rec.claim_reference);
+      if(prev){
+        if(prev.client_account_id){rec.client_account_id=prev.client_account_id;rec.account_matched_via=prev.account_matched_via;}
+        if(prev.driver_contact_id)rec.driver_contact_id=prev.driver_contact_id;
+        if(prev.vehicle_id||prev.hire_id){rec.vehicle_id=prev.vehicle_id;rec.hire_id=prev.hire_id;rec.vehicle_matched_via=prev.vehicle_matched_via;}
+      }
       payload.push(rec);
     }
     if(!payload.length){toast('No claim rows found in that file','error');return;}
