@@ -85,6 +85,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .stat-green .stat-val{color:var(--tl-green-t)}
 .stat-purple .stat-val{color:var(--purple)}
 .stat-covase .stat-val{color:#0a7a72}
+.stat-red .stat-val{color:var(--tl-red-t)}
+
+/* Accident claims module */
+.clm-alert{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;background:var(--tl-red-l);color:var(--tl-red-t);text-transform:uppercase;letter-spacing:.3px}
+.clm-alert.warn{background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.clm-alert.info{background:var(--n100);color:var(--n500)}
+.clm-match{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--n200);background:var(--n50);color:var(--n600)}
+.clm-match.ok{border-color:#0a7a72;background:var(--covase-l);color:#0a7a72}
+.clm-match.miss{border-color:var(--tl-orange);background:var(--tl-orange-l);color:var(--tl-orange-t)}
+.clm-bar-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.clm-bar-label{font-size:11px;color:var(--n600);width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.clm-bar-track{flex:1;background:var(--n100);border-radius:5px;height:14px;overflow:hidden}
+.clm-bar-fill{height:100%;border-radius:5px;background:var(--covase)}
+.clm-bar-val{font-size:11px;color:var(--n500);min-width:60px}
+.clm-dash-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.clm-dash-title{font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:var(--n700);margin-bottom:10px}
+.clm-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 14px}
 
 /* ─── CONTENT ─── */
 .content{flex:1;padding:0 28px 40px}
@@ -492,6 +509,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
+      <div class="sb-section-label">Accident management</div>
+      <div class="sb-item" onclick="showView('claims',this)">
+        <span class="icon">🚨</span> Claims
+        <span class="sb-badge" id="badge-claims">—</span>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
       <div class="sb-section-label">Supplier replies</div>
       <div class="sb-item" onclick="showView('supplier-replies',this)">
         <span class="icon">✉</span> Review queue
@@ -712,6 +737,36 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="card-list" id="movement-list" style="display:none"><div class="loading">Loading movements…</div></div>
       <div id="movement-kanban" class="kanban"></div>
       <div id="movement-calendar" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ACCIDENT MANAGEMENT (FMG claims) -->
+  <div class="view" id="view-claims">
+    <div class="topbar">
+      <h1>Accident claims</h1>
+      <input class="search-box" type="text" id="claim-search" placeholder="Search reg, driver, claim ref, client…" oninput="renderClaimsView()">
+      <select id="claim-type-sel" onchange="renderClaimsView()" style="font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:8px;background:#fff">
+        <option value="damage">Vehicle damage</option>
+        <option value="glass">Glass only</option>
+        <option value="reference">Reference claims</option>
+      </select>
+      <div class="seg" id="claim-view-seg">
+        <button class="seg-btn active" data-cv="kanban" onclick="setClaimView('kanban')">Kanban</button>
+        <button class="seg-btn" data-cv="dashboard" onclick="setClaimView('dashboard')">Dashboard</button>
+      </div>
+      <input type="file" id="claim-file-input" accept=".xlsx,.xls" style="display:none" onchange="importClaimsFile(this.files[0]);this.value=''">
+      <button class="topbar-btn" onclick="loadClaims()">↻ Refresh</button>
+      <button class="topbar-btn primary" onclick="document.getElementById('claim-file-input').click()">⬆ Import FMG file</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Open claims</div><div class="stat-val" id="sc-open">—</div><div class="stat-sub">not yet closed</div></div>
+      <div class="stat-card stat-orange"><div class="stat-label">Off road now</div><div class="stat-val" id="sc-offroad">—</div><div class="stat-sub">vehicles unavailable</div></div>
+      <div class="stat-card stat-red"><div class="stat-label">Alerts</div><div class="stat-val" id="sc-alerts">—</div><div class="stat-sub">need escalation</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Net cost (all)</div><div class="stat-val" id="sc-cost">—</div><div class="stat-sub" id="sc-cost-sub">client share —</div></div>
+    </div>
+    <div class="content">
+      <div id="claims-kanban" class="kanban" style="grid-template-columns:repeat(5,1fr)"></div>
+      <div id="claims-dashboard" style="display:none"></div>
     </div>
   </div>
 
@@ -1218,6 +1273,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CLAIM DETAIL MODAL ─── -->
+<div class="modal-overlay" id="claim-modal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title" id="claim-modal-title">Claim</div>
+      <button class="modal-close" onclick="closeClaimModal()">✕</button>
+    </div>
+    <div class="modal-body" id="claim-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeClaimModal()">Close</button>
     </div>
   </div>
 </div>
@@ -1946,7 +2015,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'claims':loadClaims,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
@@ -4487,6 +4556,276 @@ function toast(msg,type=''){const t=document.getElementById('toast');t.textConte
   });
 });
 
+// ─── ACCIDENT MANAGEMENT (FMG claims) ───
+// FMG is the system of record: we import their nightly DataSummary export,
+// upsert by claim reference, match to our accounts/contacts/vehicles/hires,
+// and monitor with alerts. No platform-side editing of FMG data.
+let allClaims=[],claimsLoaded=false,claimView='kanban';
+// FMG header → our column. type: s=string, i=int, n=numeric, d=datetime
+const FMG_CLAIM_MAP=[
+  ['Claim Reference','claim_reference','s'],['Incident Date','incident_date','d'],['Reported Date','reported_date','d'],
+  ['Days To Report','days_to_report','i'],['Vehicle Registration','vehicle_reg','s'],['Vehicle Make','vehicle_make','s'],
+  ['Vehicle Model','vehicle_model','s'],['Vehicle Mileage','vehicle_mileage','i'],['Vehicle Type','vehicle_type','s'],
+  ['Insurer Reference','insurer_reference','s'],['Driver Name','driver_name','s'],['Driver Type','driver_type','s'],
+  ['Fault Type','fault_type','s'],['Driveable?','driveable','s'],['Incident Type','incident_type','s'],
+  ['Incident Category','incident_category','s'],['Incident Location','incident_location','s'],
+  ['Incident Circumstances','incident_circumstances','s'],['Purpose Of Use','purpose_of_use','s'],['Speed','speed','i'],
+  ['Weather Conditions','weather_conditions','s'],['Damage Notes','damage_notes','s'],['Injuries Sustained','injuries_sustained','s'],
+  ['Third Party Involved','third_party_involved','s'],['Replacement Type','replacement_type','s'],
+  ['Booking In Date','booking_in_date','d'],['Estimated Completion Date','estimated_completion_date','d'],
+  ['Actual Completion Date','actual_completion_date','d'],['Vehicle Off Road Time','vehicle_off_road_days','i'],
+  ['Repair Status','repair_status','s'],['ULR Quantified','ulr_quantified','n'],['ULR Total','ulr_total','n'],
+  ['ULR Status','ulr_status','s'],['Repairs Supplier','repairs_supplier','s'],['Original Estimate','original_estimate','n'],
+  ['Agreed Estimate','agreed_estimate','n'],['Body Repairs Total','body_repairs_total','n'],['Salvage Total','salvage_total','n'],
+  ['Hire Total','hire_total','n'],['Glass Total','glass_total','n'],['Recovery Total','recovery_total','n'],
+  ['Other Total','other_total','n'],['Total Net Costs','total_net_costs','n'],['Client Net Total','client_net_total','n'],
+  ['Insurer Net Total','insurer_net_total','n'],['Client VAT Total','client_vat_total','n'],['AD Paid','ad_paid','n'],
+  ['AD Outstanding','ad_outstanding','n'],['AD Total','ad_total','n'],['TP Paid','tp_paid','n'],['TP Outstanding','tp_outstanding','n'],
+  ['TP Total','tp_total','n'],['Total Insurer Cost','total_insurer_cost','n'],['Group','client_group','s'],['Company','company','s'],
+  ['Branch','branch','s'],['Cost Centre','cost_centre','s'],['Vehicle Sparefield 1','spare_1','s'],['Vehicle Sparefield 2','spare_2','s'],
+  ['Vehicle Sparefield 3','spare_3','s'],['Vehicle Sparefield 4','spare_4','s'],['Vehicle Sparefield 5','spare_5','s']
+];
+// Alert thresholds (days). Tune here — surfaced in card chips + dashboard.
+const CLAIM_ALERT_CFG={notBookedInDays:7,vorDays:14,ulrOpenDays:45,lateReportDays:3};
+function claimType(c){const t=(c.incident_type||'').toLowerCase();if(t==='glass only')return 'glass';if(t==='reference claim')return 'reference';return 'damage';}
+function claimUlrOpen(c){return !!(c.ulr_status&&c.ulr_status!=='File Closed');}
+function claimStage(c){
+  const ty=claimType(c);
+  if(ty==='glass')return c.actual_completion_date?'completed':(c.booking_in_date?'booked':'reported');
+  if(ty==='reference')return claimUlrOpen(c)?'open':'closed';
+  const rs=c.repair_status||'';
+  if(rs.indexOf('Closed')===0)return 'closed';
+  if(c.actual_completion_date)return 'completed';
+  if(rs==='Off Road')return 'offroad';
+  if(rs==='Booked In'||c.booking_in_date)return 'booked';
+  return 'reported';
+}
+function claimOpen(c){return !['closed','completed'].includes(claimStage(c))||(claimType(c)==='damage'&&claimStage(c)==='completed');}
+const CLAIM_LANES={
+  damage:[{key:'reported',label:'Reported'},{key:'booked',label:'Booked in'},{key:'offroad',label:'Off road'},{key:'completed',label:'Completed'},{key:'closed',label:'Closed'}],
+  glass:[{key:'reported',label:'Reported'},{key:'booked',label:'Booked'},{key:'completed',label:'Completed'}],
+  reference:[{key:'open',label:'ULR open'},{key:'closed',label:'Closed'}]
+};
+function daysSince(v){if(!v)return null;const d=new Date(v);if(isNaN(d))return null;return Math.floor((Date.now()-d.getTime())/86400000);}
+function claimAlerts(c){
+  const out=[];const st=claimStage(c);const ty=claimType(c);const closed=['closed','completed'].includes(st);
+  if(ty==='damage'&&st==='reported'){const n=daysSince(c.reported_date);if(n!=null&&n>CLAIM_ALERT_CFG.notBookedInDays)out.push({key:'slow',label:'Not booked in '+n+'d',cls:''});}
+  if(ty==='damage'&&st==='offroad'){const n=c.vehicle_off_road_days!=null?c.vehicle_off_road_days:daysSince(c.booking_in_date||c.reported_date);if(n!=null&&n>CLAIM_ALERT_CFG.vorDays)out.push({key:'vor',label:'Off road '+n+'d',cls:''});}
+  if(!closed&&c.estimated_completion_date&&!c.actual_completion_date&&new Date(c.estimated_completion_date)<new Date())out.push({key:'overdue',label:'Overdue completion',cls:''});
+  if(c.fault_type==='Third Party'&&claimUlrOpen(c)){const n=daysSince(c.incident_date);if(n!=null&&n>CLAIM_ALERT_CFG.ulrOpenDays)out.push({key:'ulr',label:'ULR open '+n+'d',cls:'warn'});}
+  if((c.days_to_report||0)>=CLAIM_ALERT_CFG.lateReportDays)out.push({key:'late',label:'Reported +'+c.days_to_report+'d late',cls:'info'});
+  return out;
+}
+function claimEscalations(c){return claimAlerts(c).filter(a=>a.key!=='late');}
+async function loadClaims(){
+  const kb=document.getElementById('claims-kanban');
+  try{
+    allClaims=await sbReq('covase_claims?order=incident_date.desc&limit=1000');
+    claimsLoaded=true;
+    if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
+    updateClaimStats();applyClaimViewVis();renderClaimsView();
+  }catch(e){if(kb)kb.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚨</div><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message||'')+' (is phase-accident-claims.sql applied?)</div></div>';}
+}
+function updateClaimStats(){
+  const open=(allClaims||[]).filter(claimOpen);
+  const offroad=(allClaims||[]).filter(c=>claimStage(c)==='offroad');
+  const alerts=(allClaims||[]).reduce((s,c)=>s+claimEscalations(c).length,0);
+  const cost=(allClaims||[]).reduce((s,c)=>s+(parseFloat(c.total_net_costs)||0),0);
+  const clientCost=(allClaims||[]).reduce((s,c)=>s+(parseFloat(c.client_net_total)||0),0);
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('sc-open',open.length);set('sc-offroad',offroad.length);set('sc-alerts',alerts);set('sc-cost',fmtMoney(cost||null));
+  const sub=document.getElementById('sc-cost-sub');if(sub)sub.textContent='client share '+fmtMoney(clientCost||0);
+  const b=document.getElementById('badge-claims');if(b)b.textContent=String(open.length||0);
+}
+function applyClaimViewVis(){
+  const kb=document.getElementById('claims-kanban'),db=document.getElementById('claims-dashboard');
+  if(kb)kb.style.display=claimView==='kanban'?'':'none';
+  if(db)db.style.display=claimView==='dashboard'?'':'none';
+  const ts=document.getElementById('claim-type-sel');if(ts)ts.style.display=claimView==='kanban'?'':'none';
+}
+function setClaimView(v){claimView=v;document.querySelectorAll('#claim-view-seg .seg-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-cv')===v));applyClaimViewVis();renderClaimsView();}
+function claimsFiltered(){
+  const q=(document.getElementById('claim-search')?.value||'').toLowerCase().trim();
+  let rows=(allClaims||[]).slice();
+  if(q)rows=rows.filter(c=>[c.claim_reference,c.vehicle_reg,c.driver_name,c.client_group,c.company,c.vehicle_make,c.vehicle_model,c.insurer_reference,c.repairs_supplier].map(x=>String(x||'').toLowerCase()).join(' ').includes(q));
+  return rows;
+}
+function renderClaimsView(){if(claimView==='dashboard')renderClaimsDashboard();else renderClaimsKanban();}
+function claimAccountName(c){if(c.client_account_id){const a=(allAccounts||[]).find(x=>x.id===c.client_account_id);if(a)return a.company_name;}return c.company||c.client_group||'—';}
+function renderClaimsKanban(){
+  const wrap=document.getElementById('claims-kanban');if(!wrap)return;
+  const ty=document.getElementById('claim-type-sel')?.value||'damage';
+  const lanes=CLAIM_LANES[ty];
+  wrap.style.gridTemplateColumns='repeat('+lanes.length+',1fr)';
+  const rows=claimsFiltered().filter(c=>claimType(c)===ty);
+  const buckets={};lanes.forEach(l=>buckets[l.key]=[]);
+  rows.forEach(c=>{const s=claimStage(c);(buckets[s]||(buckets[s]=[])).push(c);});
+  wrap.innerHTML=lanes.map(l=>{
+    const items=buckets[l.key]||[];
+    const body=items.length?items.map(c=>claimCard(c)).join(''):'<div class="kan-col-empty">Nothing here</div>';
+    return '<div class="kan-col"><div class="kan-col-header"><span class="kan-col-title">'+esc(l.label)+'</span><span class="kan-col-count">'+items.length+'</span></div><div class="kan-col-body">'+body+'</div></div>';
+  }).join('');
+  if(!rows.length&&!(allClaims||[]).length)wrap.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚨</div><div class="empty-title">No claims yet</div><div class="empty-sub">Import the FMG DataSummary file to get started.</div></div>';
+}
+function claimCard(c){
+  const alerts=claimAlerts(c);
+  const chips=alerts.map(a=>'<span class="clm-alert '+a.cls+'">'+esc(a.label)+'</span>').join(' ');
+  const cost=parseFloat(c.total_net_costs)||0;
+  const unmatched=!c.client_account_id;
+  return '<div class="kan-card" onclick="openClaimDetail(\''+esc(c.id)+'\')">'
+    +'<div class="kan-card-grid">'
+    +'<div class="kan-card-l1">'+esc(claimAccountName(c))+'</div>'
+    +'<div class="kan-card-r1">'+esc(c.claim_reference||'')+'</div>'
+    +'<div class="kan-card-l2">'+esc(c.driver_name||'—')+'</div>'
+    +'<div class="kan-card-r2">'+(cost?fmtMoney(cost):'')+'</div>'
+    +'<div class="kan-card-l3">'+esc([c.vehicle_reg,[c.vehicle_make,c.vehicle_model].filter(Boolean).join(' ')].filter(Boolean).join(' · ')||'—')+'</div>'
+    +'<div class="kan-card-l4">'+esc((c.incident_date?fmtUK(String(c.incident_date).slice(0,10)):'—')+(c.incident_category?' · '+c.incident_category:''))+'</div>'
+    +(chips?'<div style="grid-column:1/-1;margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">'+chips+'</div>':'')
+    +(unmatched?'<div style="grid-column:1/-1;margin-top:3px"><span class="clm-match miss">⚠ no account match</span></div>':'')
+    +'</div></div>';
+}
+// ── Detail modal: every FMG field, grouped ──
+const CLAIM_DETAIL_SECTIONS=[
+  {t:'Incident',f:[['claim_reference','Claim reference','s'],['incident_date','Incident date','dt'],['reported_date','Reported date','dt'],['days_to_report','Days to report','s'],['incident_type','Incident type','s'],['incident_category','Category','s'],['fault_type','Fault','s'],['driveable','Driveable?','s'],['third_party_involved','Third party involved','s'],['injuries_sustained','Injuries','s'],['purpose_of_use','Purpose of use','s'],['speed','Speed (mph)','s'],['weather_conditions','Weather','s'],['incident_location','Location','wide'],['incident_circumstances','Circumstances','wide'],['damage_notes','Damage notes','wide']]},
+  {t:'Vehicle & driver',f:[['vehicle_reg','Registration','s'],['vehicle_make','Make','s'],['vehicle_model','Model','s'],['vehicle_type','Vehicle type','s'],['vehicle_mileage','Mileage','s'],['driver_name','Driver','s'],['driver_type','Driver type','s']]},
+  {t:'Repair pipeline',f:[['repair_status','Repair status','s'],['repairs_supplier','Repairer','s'],['replacement_type','Replacement vehicle','s'],['booking_in_date','Booked in','dt'],['estimated_completion_date','Est. completion','dt'],['actual_completion_date','Actual completion','dt'],['vehicle_off_road_days','Days off road','s'],['insurer_reference','Insurer ref','s']]},
+  {t:'ULR (uninsured loss recovery)',f:[['ulr_status','ULR status','s'],['ulr_quantified','ULR quantified','m'],['ulr_total','ULR total','m']]},
+  {t:'Costs',f:[['original_estimate','Original estimate','m'],['agreed_estimate','Agreed estimate','m'],['body_repairs_total','Body repairs','m'],['glass_total','Glass','m'],['hire_total','Hire','m'],['recovery_total','Recovery','m'],['salvage_total','Salvage','m'],['other_total','Other','m'],['total_net_costs','Total net costs','m'],['client_net_total','Client net','m'],['insurer_net_total','Insurer net','m'],['client_vat_total','Client VAT','m'],['ad_paid','AD paid','m'],['ad_outstanding','AD outstanding','m'],['ad_total','AD total','m'],['tp_paid','TP paid','m'],['tp_outstanding','TP outstanding','m'],['tp_total','TP total','m'],['total_insurer_cost','Total insurer cost','m']]},
+  {t:'Organisation',f:[['client_group','Group','s'],['company','Company','s'],['branch','Branch','s'],['cost_centre','Cost centre','s']]}
+];
+function fmtClaimVal(v,kind){
+  if(v==null||v==='')return '—';
+  if(kind==='dt'){const d=new Date(v);return isNaN(d)?String(v):d.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+  if(kind==='m')return fmtMoney(parseFloat(v)||0);
+  return String(v);
+}
+function openClaimDetail(id){
+  const c=(allClaims||[]).find(x=>x.id===id);if(!c)return;
+  document.getElementById('claim-modal-title').textContent='Claim '+(c.claim_reference||'');
+  const acc=c.client_account_id?(allAccounts||[]).find(a=>a.id===c.client_account_id):null;
+  const drv=c.driver_contact_id?(allContacts||[]).find(x=>x.id===c.driver_contact_id):null;
+  const links=[
+    acc?'<span class="clm-match ok">✓ Account: '+esc(acc.company_name)+'</span>':'<span class="clm-match miss">Account: unmatched'+(c.client_group||c.company?' ('+esc(c.company||c.client_group)+')':'')+'</span>',
+    c.driver_contact_id?'<span class="clm-match ok">✓ Driver: '+esc(drv?(drv.first_name+' '+drv.last_name):'linked')+'</span>':'<span class="clm-match miss">Driver: unmatched</span>',
+    c.vehicle_id?'<span class="clm-match ok">✓ Fleet vehicle</span>':(c.hire_id?'<span class="clm-match ok">✓ Rental booking</span>':'<span class="clm-match miss">Vehicle: unmatched</span>')
+  ].join(' ');
+  const alerts=claimAlerts(c).map(a=>'<span class="clm-alert '+a.cls+'">'+esc(a.label)+'</span>').join(' ');
+  let html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'+links+'</div>';
+  if(alerts)html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'+alerts+'</div>';
+  html+=CLAIM_DETAIL_SECTIONS.map(sec=>{
+    const cells=sec.f.map(([k,label,kind])=>{
+      const wide=kind==='wide';
+      return '<div class="detail-field"'+(wide?' style="grid-column:1/-1"':'')+'><div class="detail-label">'+esc(label)+'</div><div class="detail-val" style="white-space:pre-wrap">'+esc(fmtClaimVal(c[k],kind))+'</div></div>';
+    }).join('');
+    return '<div class="form-section-label" style="margin-top:14px">'+esc(sec.t)+'</div><div class="clm-detail-grid">'+cells+'</div>';
+  }).join('');
+  html+='<div style="font-size:10px;color:var(--n400);margin-top:14px">Last synced from FMG: '+(c.last_synced_at?new Date(c.last_synced_at).toLocaleString('en-GB'):'—')+' · Data is read-only (FMG is the system of record)</div>';
+  document.getElementById('claim-modal-body').innerHTML=html;
+  document.getElementById('claim-modal').classList.add('open');
+}
+function closeClaimModal(){document.getElementById('claim-modal').classList.remove('open');}
+// ── Dashboard ──
+function clmBar(label,val,max,valTxt){const pct=max?Math.max(2,Math.round(val/max*100)):0;return '<div class="clm-bar-row"><div class="clm-bar-label" title="'+esc(label)+'">'+esc(label)+'</div><div class="clm-bar-track"><div class="clm-bar-fill" style="width:'+pct+'%"></div></div><div class="clm-bar-val">'+esc(valTxt!=null?valTxt:String(val))+'</div></div>';}
+function renderClaimsDashboard(){
+  const wrap=document.getElementById('claims-dashboard');if(!wrap)return;
+  const rows=claimsFiltered();
+  if(!rows.length){wrap.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">No claim data</div><div class="empty-sub">Import the FMG DataSummary file first.</div></div>';return;}
+  // Escalations
+  const escal=[];rows.forEach(c=>claimEscalations(c).forEach(a=>escal.push({c,a})));
+  const escHtml=escal.length?escal.map(e=>'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--n100);cursor:pointer" onclick="openClaimDetail(\''+esc(e.c.id)+'\')"><div style="font-size:12px"><strong>'+esc(e.c.claim_reference||'')+'</strong> · '+esc(claimAccountName(e.c))+' · '+esc(e.c.vehicle_reg||'')+'</div><span class="clm-alert '+e.a.cls+'">'+esc(e.a.label)+'</span></div>').join(''):'<div style="font-size:12px;color:var(--n400)">No escalations — all claims progressing normally.</div>';
+  // Averages
+  const avg=a=>a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length*10)/10:null;
+  const avgReport=avg(rows.map(c=>c.days_to_report).filter(v=>v!=null));
+  const avgVor=avg(rows.filter(c=>claimType(c)==='damage'&&claimStage(c)==='closed'&&c.vehicle_off_road_days!=null).map(c=>c.vehicle_off_road_days));
+  // Fault split
+  const faults={};rows.forEach(c=>{const f=c.fault_type||'Unknown';faults[f]=(faults[f]||0)+1;});
+  // By category
+  const cats={};rows.forEach(c=>{const k=c.incident_category||'Unknown';cats[k]=(cats[k]||0)+1;});
+  const catTop=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  // Cost by client
+  const byClient={};rows.forEach(c=>{const k=claimAccountName(c);byClient[k]=(byClient[k]||0)+(parseFloat(c.total_net_costs)||0);});
+  const cliTop=Object.entries(byClient).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  // Monthly trend (last 12 months)
+  const months={};rows.forEach(c=>{if(!c.incident_date)return;const k=String(c.incident_date).slice(0,7);months[k]=(months[k]||0)+1;});
+  const mKeys=Object.keys(months).sort().slice(-12);
+  // Late reporters
+  const late=rows.filter(c=>(c.days_to_report||0)>=CLAIM_ALERT_CFG.lateReportDays).sort((a,b)=>(b.days_to_report||0)-(a.days_to_report||0)).slice(0,8);
+  const maxCat=Math.max(...catTop.map(x=>x[1]),1),maxCli=Math.max(...cliTop.map(x=>x[1]),1),maxM=Math.max(...mKeys.map(k=>months[k]),1),maxF=Math.max(...Object.values(faults),1);
+  wrap.innerHTML=
+    '<div class="clm-dash-card" style="margin-bottom:12px"><div class="clm-dash-title">🚩 Escalations ('+escal.length+')</div>'+escHtml+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    +'<div class="clm-dash-card"><div class="clm-dash-title">Incidents by category</div>'+catTop.map(([k,v])=>clmBar(k,v,maxCat)).join('')+'</div>'
+    +'<div class="clm-dash-card"><div class="clm-dash-title">Net cost by client</div>'+cliTop.map(([k,v])=>clmBar(k,v,maxCli,fmtMoney(v))).join('')+'</div>'
+    +'<div class="clm-dash-card"><div class="clm-dash-title">Incidents by month</div>'+mKeys.map(k=>clmBar(k.slice(5)+'/'+k.slice(2,4),months[k],maxM)).join('')+'</div>'
+    +'<div class="clm-dash-card"><div class="clm-dash-title">Fault split · averages</div>'
+      +Object.entries(faults).map(([k,v])=>clmBar(k,v,maxF)).join('')
+      +'<div style="font-size:12px;color:var(--n600);margin-top:10px">Avg days to report: <strong>'+(avgReport!=null?avgReport:'—')+'</strong> · Avg days off road (closed repairs): <strong>'+(avgVor!=null?avgVor:'—')+'</strong></div>'
+      +(late.length?'<div style="font-size:11px;color:var(--n500);margin-top:8px"><strong>Late reporters:</strong> '+late.map(c=>esc((c.driver_name||'?')+' ('+c.days_to_report+'d)')).join(', ')+'</div>':'')
+    +'</div>'
+    +'</div>';
+}
+// ── Import (xlsx via SheetJS, lazy-loaded) + matching + upsert ──
+function loadSheetJS(){return new Promise((res,rej)=>{if(window.XLSX)return res();const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=()=>rej(new Error('Could not load spreadsheet library'));document.head.appendChild(s);});}
+function normStr(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}
+function normReg(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+function claimVal(v,ty){
+  if(v==null||v==='')return null;
+  if(ty==='d'){if(v instanceof Date&&!isNaN(v))return v.toISOString();const d=new Date(v);return isNaN(d)?null:d.toISOString();}
+  if(ty==='i'){const n=parseInt(v,10);return isNaN(n)?null:n;}
+  if(ty==='n'){const n=parseFloat(v);return isNaN(n)?null:n;}
+  return String(v).trim()||null;
+}
+async function importClaimsFile(file){
+  if(!file)return;
+  toast('Reading '+file.name+'…','success');
+  try{
+    await loadSheetJS();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const src=XLSX.utils.sheet_to_json(ws,{defval:null});
+    // Reference data for matching (fresh)
+    let accounts=[],contacts=[],vehicles=[],hires=[];
+    try{accounts=await sbReq('covase_accounts?select=id,company_name&limit=1000');}catch(e){}
+    try{contacts=await sbReq('covase_contacts?select=id,first_name,last_name&limit=3000');}catch(e){}
+    try{vehicles=await sbReq('covase_vehicles?select=id,reg&limit=2000');}catch(e){}
+    try{hires=await sbReq('covase_hires?select=id,vehicle_reg,start_date,hire_status&limit=1000');}catch(e){}
+    const accByName=new Map(accounts.map(a=>[normStr(a.company_name),a.id]));
+    const ctByName=new Map();contacts.forEach(ct=>{const k=normStr((ct.first_name||'')+' '+(ct.last_name||''));if(!ctByName.has(k))ctByName.set(k,ct.id);else ctByName.set(k,null);/* ambiguous → no match */});
+    const vehByReg=new Map(vehicles.filter(v=>v.reg).map(v=>[normReg(v.reg),v.id]));
+    const hiresByReg={};hires.filter(h=>h.vehicle_reg&&h.hire_status!=='cancelled').forEach(h=>{const k=normReg(h.vehicle_reg);(hiresByReg[k]=hiresByReg[k]||[]).push(h);});
+    const existing=new Set(((await sbReq('covase_claims?select=claim_reference&limit=5000').catch(()=>[]))||[]).map(r=>r.claim_reference));
+    const now=new Date().toISOString();
+    const payload=[];let skipped=0;
+    for(const row of src){
+      const ref=row['Claim Reference'];
+      if(typeof ref!=='string'||!ref.trim()){skipped++;continue;} // totals/footer rows
+      const rec={id:'clm-'+ref.trim(),claim_reference:ref.trim(),raw:row,last_synced_at:now,updated_at:now};
+      FMG_CLAIM_MAP.forEach(([hdr,col,ty])=>{if(col!=='claim_reference')rec[col]=claimVal(row[hdr],ty);});
+      // Account: Company first (more specific), else Group
+      const co=normStr(rec.company),gr=normStr(rec.client_group);
+      if(co&&accByName.get(co)){rec.client_account_id=accByName.get(co);rec.account_matched_via='company';}
+      else if(gr&&accByName.get(gr)){rec.client_account_id=accByName.get(gr);rec.account_matched_via='group';}
+      else{rec.client_account_id=null;rec.account_matched_via=null;}
+      // Driver: exact full-name match, unambiguous only
+      const dn=normStr(rec.driver_name);
+      rec.driver_contact_id=(dn&&ctByName.get(dn))||null;
+      // Vehicle: fleet first, then rental bookings (most recent hire wins)
+      const rg=normReg(rec.vehicle_reg);
+      const vid=rg?vehByReg.get(rg):null;
+      const hs=(rg&&hiresByReg[rg])?hiresByReg[rg].slice().sort((a,b)=>String(b.start_date||'').localeCompare(String(a.start_date||''))):[];
+      rec.vehicle_id=vid||null;
+      rec.hire_id=hs.length?hs[0].id:null;
+      rec.vehicle_matched_via=vid&&hs.length?'both':(vid?'fleet':(hs.length?'hire':null));
+      payload.push(rec);
+    }
+    if(!payload.length){toast('No claim rows found in that file','error');return;}
+    await sbReq('covase_claims?on_conflict=claim_reference',{method:'POST',body:payload,prefer:'resolution=merge-duplicates,return=minimal'});
+    const added=payload.filter(r=>!existing.has(r.claim_reference)).length;
+    toast('Synced '+payload.length+' claims — '+added+' new, '+(payload.length-added)+' updated'+(skipped?' ('+skipped+' non-claim rows skipped)':''),'success');
+    loadClaims();
+  }catch(e){toast('Import failed: '+e.message,'error');}
+}
+
 // Boot — Active hires (Pipeline) is the default landing view
 loadHires();
 // Also load accounts in the background so the client filter dropdown is populated immediately
@@ -4497,6 +4836,8 @@ loadBookingTemplate();
 loadMovementCardLayout();
 // Prime the supplier-replies review-queue badge
 loadSupplierReplies();
+// Prime the accident-claims badge (open-claim count)
+loadClaims();
 // Load the reply-agent instructions (for the Settings editor)
 loadAgentInstructions();
 </script>
