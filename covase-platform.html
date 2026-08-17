@@ -4700,9 +4700,13 @@ function fmtClaimVal(v,kind){
   if(kind==='m')return fmtMoney(parseFloat(v)||0);
   return String(v);
 }
-function openClaimDetail(id){
+async function openClaimDetail(id){
   const c=(allClaims||[]).find(x=>x.id===id);if(!c)return;
   document.getElementById('claim-modal-title').textContent='Claim '+(c.claim_reference||'');
+  // Lazy-load reference data so labels + manual-match pickers are populated
+  if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
+  if(!Array.isArray(allVehicles)||!allVehicles.length){try{allVehicles=await sbReq('covase_vehicles?order=created_at.desc&limit=1000');}catch(e){}}
+  if(!Array.isArray(allHires)||!allHires.length){try{allHires=await sbReq('covase_hires?order=start_date.desc&limit=500');hiresLoaded=true;}catch(e){}}
   const acc=c.client_account_id?(allAccounts||[]).find(a=>a.id===c.client_account_id):null;
   const drv=c.driver_contact_id?(allContacts||[]).find(x=>x.id===c.driver_contact_id):null;
   const links=[
@@ -4713,6 +4717,22 @@ function openClaimDetail(id){
   const alerts=claimAlerts(c).map(a=>'<span class="clm-alert '+a.cls+'">'+esc(a.label)+'</span>').join(' ');
   let html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'+links+'</div>';
   if(alerts)html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'+alerts+'</div>';
+  // Manual matching — type to filter; pick from the datalist; Save applies.
+  const maps={acc:new Map(),drv:new Map(),veh:new Map()};
+  const accOpts=(allAccounts||[]).map(a=>{const l=(a.company_name||a.id);maps.acc.set(l,a.id);return '<option value="'+esc(l)+'">';}).join('');
+  const drvOpts=(allContacts||[]).map(ct=>{const l=((ct.first_name||'')+' '+(ct.last_name||'')).trim()+(ct.employee_number?' · '+ct.employee_number:'');maps.drv.set(l,ct.id);return '<option value="'+esc(l)+'">';}).join('');
+  const vehOpts=(allVehicles||[]).map(v=>{const l='FLEET · '+(v.reg||'no reg')+(v.name?' · '+v.name:'');maps.veh.set(l,{vehicle_id:v.id});return '<option value="'+esc(l)+'">';}).join('')
+    +(allHires||[]).filter(h=>h.hire_status!=='cancelled'&&h.vehicle_reg).map(h=>{const l='HIRE · '+(h.vehicle_reg||'')+' · '+(h.customer||'?')+(h.start_date?' · '+fmtUK(h.start_date):'');maps.veh.set(l,{hire_id:h.id});return '<option value="'+esc(l)+'">';}).join('');
+  window._clmLinkMaps=maps;
+  const inp=(fid,listId,ph,opts)=>'<input id="'+fid+'" list="'+listId+'" placeholder="'+esc(ph)+'" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:6px"><datalist id="'+listId+'">'+opts+'</datalist>';
+  html+='<div style="border:1px solid var(--n200);border-radius:8px;padding:10px;margin-bottom:6px;background:var(--n50)">'
+    +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin-bottom:6px">Manual matching — type to search, pick, then Save</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">'
+    +'<div><label style="font-size:10px;color:var(--n500)">Account</label>'+inp('clm-link-acc','clm-dl-acc','FMG says: '+(c.company||c.client_group||'—'),accOpts)+'</div>'
+    +'<div><label style="font-size:10px;color:var(--n500)">Driver</label>'+inp('clm-link-drv','clm-dl-drv','FMG says: '+(c.driver_name||'—'),drvOpts)+'</div>'
+    +'<div><label style="font-size:10px;color:var(--n500)">Vehicle (fleet or hire)</label>'+inp('clm-link-veh','clm-dl-veh','FMG says: '+(c.vehicle_reg||'—'),vehOpts)+'</div>'
+    +'<button class="btn btn-secondary" style="font-size:12px;padding:7px 14px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="saveClaimLinks(\''+esc(c.id)+'\')">Save links</button>'
+    +'</div><div style="font-size:10px;color:var(--n400);margin-top:5px">Leave a box blank to keep the current link. Links are Covase-side only — FMG data is untouched.</div></div>';
   html+=CLAIM_DETAIL_SECTIONS.map(sec=>{
     const cells=sec.f.map(([k,label,kind])=>{
       const wide=kind==='wide';
@@ -4725,6 +4745,27 @@ function openClaimDetail(id){
   document.getElementById('claim-modal').classList.add('open');
 }
 function closeClaimModal(){document.getElementById('claim-modal').classList.remove('open');}
+async function saveClaimLinks(id){
+  const c=(allClaims||[]).find(x=>x.id===id);if(!c)return;
+  const maps=window._clmLinkMaps||{};
+  const patch={};
+  const accL=(document.getElementById('clm-link-acc')?.value||'').trim();
+  const drvL=(document.getElementById('clm-link-drv')?.value||'').trim();
+  const vehL=(document.getElementById('clm-link-veh')?.value||'').trim();
+  if(accL){const aid=maps.acc&&maps.acc.get(accL);if(!aid){toast('Pick the account from the list (type to filter)','error');return;}patch.client_account_id=aid;patch.account_matched_via='manual';}
+  if(drvL){const did=maps.drv&&maps.drv.get(drvL);if(!did){toast('Pick the driver from the list (type to filter)','error');return;}patch.driver_contact_id=did;}
+  if(vehL){const v=maps.veh&&maps.veh.get(vehL);if(!v){toast('Pick the vehicle from the list (type to filter)','error');return;}
+    if(v.vehicle_id){patch.vehicle_id=v.vehicle_id;}else{patch.hire_id=v.hire_id;}patch.vehicle_matched_via='manual';}
+  if(!Object.keys(patch).length){toast('Nothing selected to link','error');return;}
+  patch.updated_at=new Date().toISOString();
+  try{
+    await sbReq('covase_claims?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:patch,prefer:'return=minimal'});
+    Object.assign(c,patch);
+    toast('Links saved','success');
+    updateClaimStats();renderClaimsView();
+    openClaimDetail(id); // refresh the modal with the new match chips
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
 // ── Dashboard ──
 function clmBar(label,val,max,valTxt){const pct=max?Math.max(2,Math.round(val/max*100)):0;return '<div class="clm-bar-row"><div class="clm-bar-label" title="'+esc(label)+'">'+esc(label)+'</div><div class="clm-bar-track"><div class="clm-bar-fill" style="width:'+pct+'%"></div></div><div class="clm-bar-val">'+esc(valTxt!=null?valTxt:String(val))+'</div></div>';}
 function renderClaimsDashboard(){
@@ -4790,11 +4831,21 @@ async function importClaimsFile(file){
     try{contacts=await sbReq('covase_contacts?select=id,first_name,last_name,dynamics_id&limit=3000');}catch(e){}
     try{vehicles=await sbReq('covase_vehicles?select=id,reg,dynamics_id&limit=2000');}catch(e){}
     try{hires=await sbReq('covase_hires?select=id,vehicle_reg,start_date,hire_status&limit=1000');}catch(e){}
-    const accByName=new Map(accounts.map(a=>[normStr(a.company_name),a.id]));
-    const ctByName=new Map();contacts.forEach(ct=>{const k=normStr((ct.first_name||'')+' '+(ct.last_name||''));if(!ctByName.has(k))ctByName.set(k,ct.id);else ctByName.set(k,null);/* ambiguous → no match */});
+    // Account index: exact (ignoring a leading "The ") then unique-contains.
+    const stripThe=s=>s.replace(/^the /,'');
+    const accIndex=accounts.map(a=>({id:a.id,n:stripThe(normStr(a.company_name))})).filter(a=>a.n);
+    const findAccountId=nm=>{const k=stripThe(normStr(nm));if(!k)return null;
+      const ex=accIndex.filter(a=>a.n===k);if(ex.length===1)return ex[0].id;if(ex.length)return null;
+      const co=accIndex.filter(a=>a.n.includes(k)||k.includes(a.n));return co.length===1?co[0].id:null;};
+    // Driver index: first + last token (ignores middle names); ambiguous → no match.
+    const nameKey=s=>{const t=normStr(s).split(' ').filter(Boolean);return t.length?t[0]+' '+t[t.length-1]:'';};
+    const ctByKey=new Map();contacts.forEach(ct=>{const k=nameKey((ct.first_name||'')+' '+(ct.last_name||''));if(!k)return;if(!ctByKey.has(k))ctByKey.set(k,ct.id);else ctByKey.set(k,null);});
+    const findContactId=nm=>{const k=nameKey(nm);return (k&&ctByKey.get(k))||null;};
     const vehByReg=new Map(vehicles.filter(v=>v.reg).map(v=>[normReg(v.reg),v.id]));
     const hiresByReg={};hires.filter(h=>h.vehicle_reg&&h.hire_status!=='cancelled').forEach(h=>{const k=normReg(h.vehicle_reg);(hiresByReg[k]=hiresByReg[k]||[]).push(h);});
-    const existing=new Set(((await sbReq('covase_claims?select=claim_reference&limit=5000').catch(()=>[]))||[]).map(r=>r.claim_reference));
+    const existingRows=((await sbReq('covase_claims?select=claim_reference,client_account_id,driver_contact_id,vehicle_id,hire_id,account_matched_via,vehicle_matched_via&limit=5000').catch(()=>[]))||[]);
+    const existing=new Set(existingRows.map(r=>r.claim_reference));
+    const existingLinks=new Map(existingRows.map(r=>[r.claim_reference,r]));
     const now=new Date().toISOString();
     const payload=[];let skipped=0;
     for(const row of src){
@@ -4803,13 +4854,13 @@ async function importClaimsFile(file){
       const rec={id:'clm-'+ref.trim(),claim_reference:ref.trim(),raw:row,last_synced_at:now,updated_at:now};
       FMG_CLAIM_MAP.forEach(([hdr,col,ty])=>{if(col!=='claim_reference')rec[col]=claimVal(row[hdr],ty);});
       // Account: Company first (more specific), else Group
-      const co=normStr(rec.company),gr=normStr(rec.client_group);
-      if(co&&accByName.get(co)){rec.client_account_id=accByName.get(co);rec.account_matched_via='company';}
-      else if(gr&&accByName.get(gr)){rec.client_account_id=accByName.get(gr);rec.account_matched_via='group';}
+      const coId=rec.company?findAccountId(rec.company):null;
+      const grId=rec.client_group?findAccountId(rec.client_group):null;
+      if(coId){rec.client_account_id=coId;rec.account_matched_via='company';}
+      else if(grId){rec.client_account_id=grId;rec.account_matched_via='group';}
       else{rec.client_account_id=null;rec.account_matched_via=null;}
-      // Driver: exact full-name match, unambiguous only
-      const dn=normStr(rec.driver_name);
-      rec.driver_contact_id=(dn&&ctByName.get(dn))||null;
+      // Driver: first+last name match (middle names ignored), unambiguous only
+      rec.driver_contact_id=rec.driver_name?findContactId(rec.driver_name):null;
       // Vehicle: fleet first, then rental bookings (most recent hire wins)
       const rg=normReg(rec.vehicle_reg);
       const vid=rg?vehByReg.get(rg):null;
