@@ -4860,7 +4860,7 @@ async function clmPick(kind,idx){
         const np={id:'ct-'+Date.now(),first_name:d.firstName||fn.split(' ')[0]||fn,last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,account_id:(window._clmStaged&&window._clmStaged.acc)||(claim&&claim.client_account_id)||null,email:d.email||null,mobile:d.mobile||null,job_description:d.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:d.contactId,updated_at:now};
         await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});(allContacts=allContacts||[]).push(np);staged=np.id;toast('Contact created from Dynamics','success');
       }else{
-        const np={id:'veh-'+Date.now(),reg:d.reg||null,name:d.makeModel||d.name||null,status:'active',source:'Dynamics (claims match)',dynamics_id:d.vehicleId};
+        const np={id:'veh-'+Date.now(),reg:d.reg||null,registration:d.reg||null,name:d.makeModel||d.name||null,status:'active',source:'Dynamics (claims match)',dynamics_id:d.vehicleId};
         await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});(allVehicles=allVehicles||[]).push(np);staged={vehicle_id:np.id};toast('Vehicle created from Dynamics','success');
       }
     }catch(e){toast('Create failed: '+e.message,'error');return;}
@@ -5065,7 +5065,7 @@ async function importClaimsFile(file){
           const local=vehicles.find(v=>v.dynamics_id===hit.vehicleId);
           if(local)id=local.id;
           else{
-            const np={id:newId('veh'),reg:hit.reg||rec.vehicle_reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId};
+            const np={id:newId('veh'),reg:hit.reg||rec.vehicle_reg,registration:hit.reg||rec.vehicle_reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId};
             try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){linkErrors.push('Vehicle create failed ('+(hit.reg||rec.vehicle_reg)+'): '+e.message);}
           }
         }
