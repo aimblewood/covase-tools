@@ -5019,50 +5019,20 @@ async function importClaimsFile(file){
       }
       if(accCache.get(key)){rec.client_account_id=accCache.get(key);rec.account_matched_via='dynamics';}
     }
-    // Drivers
-    const ctCache=new Map();let ctLooks=0;
-    for(const rec of payload){
-      if(rec.driver_contact_id)continue;
-      const nm=rec.driver_name;if(!nm||!cfg.n8nContact)continue;
-      const key=normStr(nm);
-      if(!ctCache.has(key)){
-        if(ctLooks>=CAP){capDrv.add(key);continue;}ctLooks++;
-        // Query Dynamics by SURNAME (a full-name contains() fails on nickname
-        // variants like DAVID vs Dave), then compare first names intelligently.
-        const f=clmFirstTok(nm),l=clmLastTok(nm);
-        const data=await fetchJson(cfg.n8nContact+'?q='+encodeURIComponent(l||nm));
-        let hit=null;
-        if(data&&data.length){
-          const cands=data.filter(d=>{const fn=normStr(d.fullName||((d.firstName||'')+' '+(d.lastName||'')));return clmLastTok(fn)===l&&clmFirstNamesMatch(clmFirstTok(fn),f);});
-          hit=cands.length===1?cands[0]:null;
-        }
-        let id=null;
-        if(hit&&hit.contactId){
-          const local=contacts.find(ct=>ct.dynamics_id===hit.contactId);
-          if(local)id=local.id;
-          else{
-            const np={id:newId('ct'),first_name:hit.firstName||nm.split(' ')[0],last_name:hit.lastName||nm.split(' ').slice(1).join(' ')||null,account_id:rec.client_account_id||null,email:hit.email||null,mobile:hit.mobile||null,job_description:hit.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:hit.contactId,updated_at:now};
-            try{await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;contacts.push(np);}catch(e){linkErrors.push('Contact create failed ('+nm+'): '+e.message);}
-          }
-        }
-        ctCache.set(key,id);
-      }
-      if(ctCache.get(key))rec.driver_contact_id=ctCache.get(key);
-    }
-    // Vehicles — ONE bulk Dynamics lookup for ALL unmatched regs (the webhook
-    // accepts a comma-separated list and handles spaced-reg variants itself).
-    // No cap needed: a whole import costs 1–2 n8n executions instead of ~35.
+    // Vehicles — ONE bulk Dynamics lookup for ALL unmatched regs. Runs BEFORE
+    // drivers so a matched vehicle's driver GUID can tie-break duplicate contacts.
+    const vehDrvByRef=new Map(); // claim_reference → Dynamics driver GUID from matched vehicle
     if(cfg.n8nVehicle){
       const want=[...new Set(payload.filter(r=>!r.vehicle_id&&!r.hire_id&&normReg(r.vehicle_reg)).map(r=>normReg(r.vehicle_reg)))];
-      const found=new Map(); // normReg → hits[]
-      for(let i=0;i<want.length;i+=40){ // chunk to keep the URL sane
+      const found=new Map();
+      for(let i=0;i<want.length;i+=40){
         const data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(want.slice(i,i+40).join(',')));
         (data||[]).forEach(v=>{const k=normReg(v.reg);if(!k)return;if(!found.has(k))found.set(k,[]);found.get(k).push(v);});
       }
       const vehCache=new Map();
       for(const rg of want){
         const hits=found.get(rg)||[];
-        const hit=hits.length===1?hits[0]:null; // ambiguous → no match
+        const hit=hits.length===1?hits[0]:null;
         let id=null;
         if(hit&&hit.vehicleId){
           const local=vehicles.find(v=>v.dynamics_id===hit.vehicleId);
@@ -5072,13 +5042,48 @@ async function importClaimsFile(file){
             try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){linkErrors.push('Vehicle create failed ('+hit.reg+'): '+e.message);}
           }
         }
-        vehCache.set(rg,id);
+        vehCache.set(rg,{id:id,driverId:hit?hit.driverId:null});
       }
       payload.forEach(rec=>{
-        if(rec.vehicle_id||rec.hire_id)return;
-        const id=vehCache.get(normReg(rec.vehicle_reg));
-        if(id){rec.vehicle_id=id;rec.vehicle_matched_via='dynamics';}
+        const v=vehCache.get(normReg(rec.vehicle_reg));
+        if(!v)return;
+        if(v.driverId)vehDrvByRef.set(rec.claim_reference,v.driverId);
+        if(!rec.vehicle_id&&!rec.hire_id&&v.id){rec.vehicle_id=v.id;rec.vehicle_matched_via='dynamics';}
       });
+    }
+    // Drivers — surname query (full-name contains() fails on nickname variants
+    // like DAVID vs Dave); first names match via nickname map or prefix. When
+    // Dynamics holds DUPLICATE contacts, tie-break by the claim's account, then
+    // by the driver GUID on the claim's matched Dynamics vehicle.
+    const ctCands=new Map();let ctLooks=0;
+    const ctLocalByDyn=new Map(contacts.filter(c=>c.dynamics_id).map(c=>[c.dynamics_id,c.id]));
+    for(const rec of payload){
+      if(rec.driver_contact_id)continue;
+      const nm=rec.driver_name;if(!nm||!cfg.n8nContact)continue;
+      const key=normStr(nm);
+      if(!ctCands.has(key)){
+        if(ctLooks>=CAP){capDrv.add(key);continue;}ctLooks++;
+        const f=clmFirstTok(nm),l=clmLastTok(nm);
+        const data=await fetchJson(cfg.n8nContact+'?q='+encodeURIComponent(l||nm));
+        ctCands.set(key,(data||[]).filter(d=>{const fn=normStr(d.fullName||((d.firstName||'')+' '+(d.lastName||'')));return clmLastTok(fn)===l&&clmFirstNamesMatch(clmFirstTok(fn),clmFirstTok(nm));}));
+      }
+      const cands=ctCands.get(key)||[];
+      let hit=cands.length===1?cands[0]:null;
+      if(!hit&&cands.length>1){
+        const accDyn=rec.client_account_id?(accounts.find(a=>a.id===rec.client_account_id)||{}).dynamics_id:null;
+        const byAcc=accDyn?cands.filter(d=>d.accountId===accDyn):[];
+        if(byAcc.length===1)hit=byAcc[0];
+        if(!hit){const vd=vehDrvByRef.get(rec.claim_reference);if(vd){const byVeh=cands.filter(d=>d.contactId===vd);if(byVeh.length===1)hit=byVeh[0];}}
+      }
+      if(hit&&hit.contactId){
+        let id=ctLocalByDyn.get(hit.contactId)||null;
+        if(!id){
+          const fn2=mvDriverName(hit);
+          const np={id:newId('ct'),first_name:hit.firstName||fn2.split(' ')[0],last_name:hit.lastName||fn2.split(' ').slice(1).join(' ')||null,account_id:rec.client_account_id||null,email:hit.email||null,mobile:hit.mobile||null,job_description:hit.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:hit.contactId,updated_at:now};
+          try{await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;contacts.push(np);ctLocalByDyn.set(hit.contactId,id);}catch(e){linkErrors.push('Contact create failed ('+nm+'): '+e.message);}
+        }
+        if(id)rec.driver_contact_id=id;
+      }
     }
     await sbReq('covase_claims?on_conflict=claim_reference',{method:'POST',body:payload,prefer:'resolution=merge-duplicates,return=minimal'});
     const added=payload.filter(r=>!existing.has(r.claim_reference)).length;
@@ -5086,7 +5091,13 @@ async function importClaimsFile(file){
     const misses=[];
     payload.forEach(rec=>{
       if(!rec.client_account_id&&(rec.company||rec.client_group)){const w=rec.company||rec.client_group;misses.push({ref:rec.claim_reference,type:'Account',wanted:w,why:capAcc.has(normStr(w))?'Not looked up in Dynamics — per-import lookup cap reached; re-import to continue':'No unique match in Covase accounts or Dynamics'});}
-      if(!rec.driver_contact_id&&rec.driver_name)misses.push({ref:rec.claim_reference,type:'Driver',wanted:rec.driver_name,why:capDrv.has(normStr(rec.driver_name))?'Not looked up in Dynamics — per-import lookup cap reached; re-import to continue':'No unique surname + first-name match in Covase contacts or Dynamics (nicknames/prefixes were tried)'});
+      if(!rec.driver_contact_id&&rec.driver_name){
+        const dk=normStr(rec.driver_name);const dc=(ctCands.get(dk)||[]).length;
+        misses.push({ref:rec.claim_reference,type:'Driver',wanted:rec.driver_name,
+          why:capDrv.has(dk)?'Not looked up in Dynamics — per-import lookup cap reached; re-import to continue'
+            :dc>1?dc+' matching contacts in Dynamics (duplicates?) — account/vehicle tie-breaks could not decide; link manually or merge the duplicates in Dynamics'
+            :'No unique surname + first-name match in Covase contacts or Dynamics (nicknames/prefixes tried)'});
+      }
       if(!rec.vehicle_id&&!rec.hire_id&&rec.vehicle_reg)misses.push({ref:rec.claim_reference,type:'Vehicle',wanted:rec.vehicle_reg,why:'Reg not found (or ambiguous) in fleet, rental bookings, or Dynamics — spaced variant included in the search'});
     });
     window._claimMatchReport={when:new Date().toISOString(),total:payload.length,
