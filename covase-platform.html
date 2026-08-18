@@ -4991,7 +4991,8 @@ async function importClaimsFile(file){
     // This also enriches covase_accounts/contacts/vehicles ahead of detachment.
     const cfg=getConfig();
     const linkErrors=[]; // surfaced in the match report — never swallow silently
-    const CAP=15; // max unique Dynamics lookups per entity type per import
+    const CAP=25; // max unique Dynamics lookups per import (accounts/drivers; vehicles are bulk)
+    const capAcc=new Set(),capDrv=new Set(); // names skipped due to cap — reported honestly
     const fetchJson=async(url)=>{try{const r=await fetch(url,{mode:'cors'});if(!r.ok)return null;const j=await r.json();return Array.isArray(j)?j:null;}catch(e){return null;}};
     let idSeq=0;const newId=p=>p+'-'+Date.now()+'-'+(idSeq++);
     // Accounts
@@ -5001,7 +5002,7 @@ async function importClaimsFile(file){
       const nm=rec.company||rec.client_group;if(!nm||!cfg.n8nClient)continue;
       const key=normStr(nm);
       if(!accCache.has(key)){
-        if(accLooks>=CAP)continue;accLooks++;
+        if(accLooks>=CAP){capAcc.add(key);continue;}accLooks++;
         const data=await fetchJson(cfg.n8nClient+'?q='+encodeURIComponent(nm));
         let hit=null;
         if(data&&data.length){const exact=data.filter(a=>normStr(a.name)===key);hit=exact.length===1?exact[0]:(data.length===1?data[0]:null);}
@@ -5025,7 +5026,7 @@ async function importClaimsFile(file){
       const nm=rec.driver_name;if(!nm||!cfg.n8nContact)continue;
       const key=normStr(nm);
       if(!ctCache.has(key)){
-        if(ctLooks>=CAP)continue;ctLooks++;
+        if(ctLooks>=CAP){capDrv.add(key);continue;}ctLooks++;
         // Query Dynamics by SURNAME (a full-name contains() fails on nickname
         // variants like DAVID vs Dave), then compare first names intelligently.
         const f=clmFirstTok(nm),l=clmLastTok(nm);
@@ -5048,39 +5049,45 @@ async function importClaimsFile(file){
       }
       if(ctCache.get(key))rec.driver_contact_id=ctCache.get(key);
     }
-    // Vehicles
-    const vehCache=new Map();let vehLooks=0;
-    for(const rec of payload){
-      if(rec.vehicle_id||rec.hire_id)continue;
-      const rg=normReg(rec.vehicle_reg);if(!rg||!cfg.n8nVehicle)continue;
-      if(!vehCache.has(rg)){
-        if(vehLooks>=CAP)continue;vehLooks++;
-        let data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(rg));
-        let exact=(data||[]).filter(v=>normReg(v.reg)===rg);
-        // Some Dynamics regs are stored WITH a space — retry 'AB12 CDE' style
-        if(!exact.length){const sp=clmRegVariant(rg);if(sp){data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(sp));exact=(data||[]).filter(v=>normReg(v.reg)===rg);}}
-        const hit=exact.length===1?exact[0]:null;
+    // Vehicles — ONE bulk Dynamics lookup for ALL unmatched regs (the webhook
+    // accepts a comma-separated list and handles spaced-reg variants itself).
+    // No cap needed: a whole import costs 1–2 n8n executions instead of ~35.
+    if(cfg.n8nVehicle){
+      const want=[...new Set(payload.filter(r=>!r.vehicle_id&&!r.hire_id&&normReg(r.vehicle_reg)).map(r=>normReg(r.vehicle_reg)))];
+      const found=new Map(); // normReg → hits[]
+      for(let i=0;i<want.length;i+=40){ // chunk to keep the URL sane
+        const data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(want.slice(i,i+40).join(',')));
+        (data||[]).forEach(v=>{const k=normReg(v.reg);if(!k)return;if(!found.has(k))found.set(k,[]);found.get(k).push(v);});
+      }
+      const vehCache=new Map();
+      for(const rg of want){
+        const hits=found.get(rg)||[];
+        const hit=hits.length===1?hits[0]:null; // ambiguous → no match
         let id=null;
         if(hit&&hit.vehicleId){
           const local=vehicles.find(v=>v.dynamics_id===hit.vehicleId);
           if(local)id=local.id;
           else{
-            const np={id:newId('veh'),reg:hit.reg||rec.vehicle_reg,registration:hit.reg||rec.vehicle_reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId};
-            try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){linkErrors.push('Vehicle create failed ('+(hit.reg||rec.vehicle_reg)+'): '+e.message);}
+            const np={id:newId('veh'),reg:hit.reg,registration:hit.reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId};
+            try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){linkErrors.push('Vehicle create failed ('+hit.reg+'): '+e.message);}
           }
         }
         vehCache.set(rg,id);
       }
-      if(vehCache.get(rg)){rec.vehicle_id=vehCache.get(rg);rec.vehicle_matched_via='dynamics';}
+      payload.forEach(rec=>{
+        if(rec.vehicle_id||rec.hire_id)return;
+        const id=vehCache.get(normReg(rec.vehicle_reg));
+        if(id){rec.vehicle_id=id;rec.vehicle_matched_via='dynamics';}
+      });
     }
     await sbReq('covase_claims?on_conflict=claim_reference',{method:'POST',body:payload,prefer:'resolution=merge-duplicates,return=minimal'});
     const added=payload.filter(r=>!existing.has(r.claim_reference)).length;
     // Build the match report: what matched, what didn't, and why.
     const misses=[];
     payload.forEach(rec=>{
-      if(!rec.client_account_id&&(rec.company||rec.client_group))misses.push({ref:rec.claim_reference,type:'Account',wanted:rec.company||rec.client_group,why:'No unique match in Covase accounts or Dynamics'});
-      if(!rec.driver_contact_id&&rec.driver_name)misses.push({ref:rec.claim_reference,type:'Driver',wanted:rec.driver_name,why:'No unique surname + first-name match in Covase contacts or Dynamics (nicknames/prefixes were tried)'});
-      if(!rec.vehicle_id&&!rec.hire_id&&rec.vehicle_reg)misses.push({ref:rec.claim_reference,type:'Vehicle',wanted:rec.vehicle_reg,why:'Reg not found in fleet, rental bookings, or Dynamics (spaced variant tried)'});
+      if(!rec.client_account_id&&(rec.company||rec.client_group)){const w=rec.company||rec.client_group;misses.push({ref:rec.claim_reference,type:'Account',wanted:w,why:capAcc.has(normStr(w))?'Not looked up in Dynamics — per-import lookup cap reached; re-import to continue':'No unique match in Covase accounts or Dynamics'});}
+      if(!rec.driver_contact_id&&rec.driver_name)misses.push({ref:rec.claim_reference,type:'Driver',wanted:rec.driver_name,why:capDrv.has(normStr(rec.driver_name))?'Not looked up in Dynamics — per-import lookup cap reached; re-import to continue':'No unique surname + first-name match in Covase contacts or Dynamics (nicknames/prefixes were tried)'});
+      if(!rec.vehicle_id&&!rec.hire_id&&rec.vehicle_reg)misses.push({ref:rec.claim_reference,type:'Vehicle',wanted:rec.vehicle_reg,why:'Reg not found (or ambiguous) in fleet, rental bookings, or Dynamics — spaced variant included in the search'});
     });
     window._claimMatchReport={when:new Date().toISOString(),total:payload.length,
       acc:payload.filter(r=>r.client_account_id).length,drv:payload.filter(r=>r.driver_contact_id).length,
