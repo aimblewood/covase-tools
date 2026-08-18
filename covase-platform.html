@@ -756,6 +756,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
         <button class="seg-btn" data-cv="dashboard" onclick="setClaimView('dashboard')">Dashboard</button>
       </div>
       <input type="file" id="claim-file-input" accept=".xlsx,.xls" style="display:none" onchange="importClaimsFile(this.files[0]);this.value=''">
+      <button class="topbar-btn" onclick="showClaimMatchReport()">📋 Match report</button>
       <button class="topbar-btn" onclick="loadClaims()">↻ Refresh</button>
       <button class="topbar-btn primary" onclick="document.getElementById('claim-file-input').click()">⬆ Import FMG file</button>
     </div>
@@ -4588,6 +4589,24 @@ const FMG_CLAIM_MAP=[
 ];
 // Alert thresholds (days). Tune here — surfaced in card chips + dashboard.
 const CLAIM_ALERT_CFG={notBookedInDays:7,vorDays:14,ulrOpenDays:45,lateReportDays:3};
+// First-name equivalence for driver matching: common UK nicknames map to a
+// canonical form; a ≥3-char prefix also matches (Dan→Daniel, Seb→Sebastian).
+const CLAIM_NICKNAMES={dave:'david',davey:'david',mike:'michael',mick:'michael',micky:'michael',bob:'robert',bobby:'robert',rob:'robert',robbie:'robert',bill:'william',billy:'william',will:'william',jim:'james',jimmy:'james',jamie:'james',jack:'john',johnny:'john',jon:'jonathan',jonny:'jonathan',tony:'anthony',andy:'andrew',drew:'andrew',matt:'matthew',nick:'nicholas',nicky:'nicholas',pete:'peter',phil:'philip',steve:'stephen',stevie:'stephen',stu:'stuart',stew:'stuart',rich:'richard',rick:'richard',ricky:'richard',dick:'richard',ed:'edward',eddie:'edward',ted:'edward',teddy:'edward',ben:'benjamin',benny:'benjamin',alex:'alexander',fred:'frederick',freddie:'frederick',harry:'henry',hal:'henry',greg:'gregory',jeff:'jeffrey',geoff:'geoffrey',ken:'kenneth',kenny:'kenneth',ray:'raymond',ron:'ronald',ronnie:'ronald',terry:'terence',tel:'terence',vince:'vincent',gaz:'gary',baz:'barry',tom:'thomas',tommy:'thomas',dan:'daniel',danny:'daniel',seb:'sebastian',chris:'christopher',kit:'christopher',abi:'abigail',abby:'abigail',becky:'rebecca',becca:'rebecca',beth:'elizabeth',liz:'elizabeth',lizzie:'elizabeth',libby:'elizabeth',betty:'elizabeth',cathy:'catherine',cath:'catherine',kate:'katherine',katie:'katherine',kathy:'katherine',kath:'katherine',jen:'jennifer',jenny:'jennifer',jess:'jessica',jo:'joanne',mandy:'amanda',maggie:'margaret',meg:'margaret',peggy:'margaret',pat:'patricia',trish:'patricia',tricia:'patricia',sue:'susan',susie:'susan',suzy:'susan',vicky:'victoria',tori:'victoria',debbie:'deborah',deb:'deborah',steph:'stephanie'};
+function clmFirstTok(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim().split(' ')[0]||'';}
+function clmLastTok(s){const t=String(s||'').toLowerCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean);return t.length?t[t.length-1]:'';}
+function clmFirstNamesMatch(a,b){
+  if(!a||!b)return false;
+  if(a===b)return true;
+  const ca=CLAIM_NICKNAMES[a]||a,cb=CLAIM_NICKNAMES[b]||b;
+  if(ca===cb)return true;
+  // Prefix rule = abbreviation: shorter ≥3 chars AND at least 2 chars shorter
+  // than the longer (Dan→Daniel yes; Paul→Paula no — that's a different name).
+  const pref=(x,y)=>x.length>=3&&y.length-x.length>=2&&y.startsWith(x);
+  if(pref(a,b)||pref(b,a)||pref(ca,cb)||pref(cb,ca))return true;
+  return false;
+}
+// UK plate spaced variant: 'DG72LVR' → 'DG72 LVR' (Dynamics stores some with a space)
+function clmRegVariant(rg){const m=String(rg||'').match(/^([A-Z]{2}\d{2})([A-Z]{3})$/);return m?m[1]+' '+m[2]:null;}
 function claimType(c){const t=(c.incident_type||'').toLowerCase();if(t==='glass only')return 'glass';if(t==='reference claim')return 'reference';return 'damage';}
 function claimUlrOpen(c){return !!(c.ulr_status&&c.ulr_status!=='File Closed');}
 function claimStage(c){
@@ -4763,6 +4782,24 @@ async function saveClaimLinks(id){
     openClaimDetail(id); // refresh the modal with the new match chips
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
+function showClaimMatchReport(){
+  const r=window._claimMatchReport;
+  if(!r){toast('Run an FMG import first — the report covers the latest import','error');return;}
+  document.getElementById('claim-modal-title').textContent='FMG import — match report';
+  let html='<div style="font-size:12px;color:var(--n600);margin-bottom:10px">Import at '+new Date(r.when).toLocaleString('en-GB')+' · '+r.total+' claims · matched accounts <strong>'+r.acc+'/'+r.total+'</strong>, drivers <strong>'+r.drv+'/'+r.total+'</strong>, vehicles <strong>'+r.veh+'/'+r.total+'</strong></div>';
+  if(!r.misses.length)html+='<div style="font-size:13px;color:#0a7a72;font-weight:600">Everything matched 🎉</div>';
+  else{
+    html+='<div style="font-size:11px;color:var(--n500);margin-bottom:8px">'+r.misses.length+' unmatched link'+(r.misses.length>1?'s':'')+' — open the claim and use Manual matching to fix. Manual links survive re-imports.</div>';
+    html+=r.misses.map(m=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--n100)">'
+      +'<span class="clm-alert warn" style="min-width:52px;text-align:center">'+esc(m.type)+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px"><strong>'+esc(m.ref)+'</strong> · FMG says: <strong>'+esc(m.wanted)+'</strong></div>'
+      +'<div style="font-size:11px;color:var(--n500)">'+esc(m.why)+'</div></div>'
+      +'<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="openClaimDetail(\'clm-'+esc(m.ref)+'\')">Open claim</button>'
+      +'</div>').join('');
+  }
+  document.getElementById('claim-modal-body').innerHTML=html;
+  document.getElementById('claim-modal').classList.add('open');
+}
 // Live Covase + Dynamics typeahead for the manual-match panel
 let _clmLookupTimers={},_clmLookupResults={};
 async function clmLookup(kind,q){
@@ -4782,8 +4819,15 @@ async function clmLookup(kind,q){
     }else if(kind==='drv'){
       (allContacts||[]).filter(ct=>((ct.first_name||'')+' '+(ct.last_name||'')).toLowerCase().includes(ql)).slice(0,5)
         .forEach(ct=>items.push({label:((ct.first_name||'')+' '+(ct.last_name||'')).trim(),meta:'Covase contact',pick:ct.id}));
-      if(cfg.n8nContact)(await dyn(cfg.n8nContact)).slice(0,5).forEach(d=>{
-        if(!(allContacts||[]).some(x=>x.dynamics_id===d.contactId))items.push({label:mvDriverName(d),meta:'Dynamics — will create Covase contact'+(d.accountName?' · '+d.accountName:''),dyn:{type:'drv',d:d}});});
+      if(cfg.n8nContact){
+        let dl=await dyn(cfg.n8nContact);
+        // Full-name search found nothing? Retry on surname alone — catches
+        // nickname variants (searching 'DAVID MACKAY' misses 'Dave Mackay').
+        const toks=q.trim().split(/\s+/);
+        if(!dl.length&&toks.length>1){const r2=await fetch(cfg.n8nContact+'?q='+encodeURIComponent(toks[toks.length-1]),{mode:'cors'}).then(r=>r.json()).catch(()=>null);if(Array.isArray(r2))dl=r2;}
+        dl.slice(0,6).forEach(d=>{
+          if(!(allContacts||[]).some(x=>x.dynamics_id===d.contactId))items.push({label:mvDriverName(d),meta:'Dynamics — will create Covase contact'+(d.accountName?' · '+d.accountName:''),dyn:{type:'drv',d:d}});});
+      }
     }else{
       const rq=normReg(q);
       (allVehicles||[]).filter(v=>(rq&&normReg(v.reg).includes(rq))||String(v.name||'').toLowerCase().includes(ql)).slice(0,4)
@@ -4896,10 +4940,13 @@ async function importClaimsFile(file){
     const findAccountId=nm=>{const k=stripThe(normStr(nm));if(!k)return null;
       const ex=accIndex.filter(a=>a.n===k);if(ex.length===1)return ex[0].id;if(ex.length)return null;
       const co=accIndex.filter(a=>a.n.includes(k)||k.includes(a.n));return co.length===1?co[0].id:null;};
-    // Driver index: first + last token (ignores middle names); ambiguous → no match.
-    const nameKey=s=>{const t=normStr(s).split(' ').filter(Boolean);return t.length?t[0]+' '+t[t.length-1]:'';};
-    const ctByKey=new Map();contacts.forEach(ct=>{const k=nameKey((ct.first_name||'')+' '+(ct.last_name||''));if(!k)return;if(!ctByKey.has(k))ctByKey.set(k,ct.id);else ctByKey.set(k,null);});
-    const findContactId=nm=>{const k=nameKey(nm);return (k&&ctByKey.get(k))||null;};
+    // Driver matching: surname must match exactly; first names match directly,
+    // via nickname equivalence (Dave=David) or prefix (Dan→Daniel). Unique only.
+    const findContactId=nm=>{
+      const f=clmFirstTok(nm),l=clmLastTok(nm);if(!f||!l)return null;
+      const hits=contacts.filter(ct=>clmLastTok(ct.last_name||'')===l&&clmFirstNamesMatch(clmFirstTok(ct.first_name||''),f));
+      return hits.length===1?hits[0].id:null;
+    };
     const vehByReg=new Map(vehicles.filter(v=>v.reg).map(v=>[normReg(v.reg),v.id]));
     const hiresByReg={};hires.filter(h=>h.vehicle_reg&&h.hire_status!=='cancelled').forEach(h=>{const k=normReg(h.vehicle_reg);(hiresByReg[k]=hiresByReg[k]||[]).push(h);});
     const existingRows=((await sbReq('covase_claims?select=claim_reference,client_account_id,driver_contact_id,vehicle_id,hire_id,account_matched_via,vehicle_matched_via&limit=5000').catch(()=>[]))||[]);
@@ -4977,9 +5024,15 @@ async function importClaimsFile(file){
       const key=normStr(nm);
       if(!ctCache.has(key)){
         if(ctLooks>=CAP)continue;ctLooks++;
-        const data=await fetchJson(cfg.n8nContact+'?q='+encodeURIComponent(nm));
+        // Query Dynamics by SURNAME (a full-name contains() fails on nickname
+        // variants like DAVID vs Dave), then compare first names intelligently.
+        const f=clmFirstTok(nm),l=clmLastTok(nm);
+        const data=await fetchJson(cfg.n8nContact+'?q='+encodeURIComponent(l||nm));
         let hit=null;
-        if(data&&data.length){const exact=data.filter(d=>normStr(d.fullName||((d.firstName||'')+' '+(d.lastName||'')))===key);hit=exact.length===1?exact[0]:null;}
+        if(data&&data.length){
+          const cands=data.filter(d=>{const fn=normStr(d.fullName||((d.firstName||'')+' '+(d.lastName||'')));return clmLastTok(fn)===l&&clmFirstNamesMatch(clmFirstTok(fn),f);});
+          hit=cands.length===1?cands[0]:null;
+        }
         let id=null;
         if(hit&&hit.contactId){
           const local=contacts.find(ct=>ct.dynamics_id===hit.contactId);
@@ -5000,9 +5053,11 @@ async function importClaimsFile(file){
       const rg=normReg(rec.vehicle_reg);if(!rg||!cfg.n8nVehicle)continue;
       if(!vehCache.has(rg)){
         if(vehLooks>=CAP)continue;vehLooks++;
-        const data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(rg));
-        let hit=null;
-        if(data&&data.length){const exact=data.filter(v=>normReg(v.reg)===rg);hit=exact.length===1?exact[0]:null;}
+        let data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(rg));
+        let exact=(data||[]).filter(v=>normReg(v.reg)===rg);
+        // Some Dynamics regs are stored WITH a space — retry 'AB12 CDE' style
+        if(!exact.length){const sp=clmRegVariant(rg);if(sp){data=await fetchJson(cfg.n8nVehicle+'?q='+encodeURIComponent(sp));exact=(data||[]).filter(v=>normReg(v.reg)===rg);}}
+        const hit=exact.length===1?exact[0]:null;
         let id=null;
         if(hit&&hit.vehicleId){
           const local=vehicles.find(v=>v.dynamics_id===hit.vehicleId);
@@ -5018,7 +5073,17 @@ async function importClaimsFile(file){
     }
     await sbReq('covase_claims?on_conflict=claim_reference',{method:'POST',body:payload,prefer:'resolution=merge-duplicates,return=minimal'});
     const added=payload.filter(r=>!existing.has(r.claim_reference)).length;
-    toast('Synced '+payload.length+' claims — '+added+' new, '+(payload.length-added)+' updated'+(skipped?' ('+skipped+' non-claim rows skipped)':''),'success');
+    // Build the match report: what matched, what didn't, and why.
+    const misses=[];
+    payload.forEach(rec=>{
+      if(!rec.client_account_id&&(rec.company||rec.client_group))misses.push({ref:rec.claim_reference,type:'Account',wanted:rec.company||rec.client_group,why:'No unique match in Covase accounts or Dynamics'});
+      if(!rec.driver_contact_id&&rec.driver_name)misses.push({ref:rec.claim_reference,type:'Driver',wanted:rec.driver_name,why:'No unique surname + first-name match in Covase contacts or Dynamics (nicknames/prefixes were tried)'});
+      if(!rec.vehicle_id&&!rec.hire_id&&rec.vehicle_reg)misses.push({ref:rec.claim_reference,type:'Vehicle',wanted:rec.vehicle_reg,why:'Reg not found in fleet, rental bookings, or Dynamics (spaced variant tried)'});
+    });
+    window._claimMatchReport={when:new Date().toISOString(),total:payload.length,
+      acc:payload.filter(r=>r.client_account_id).length,drv:payload.filter(r=>r.driver_contact_id).length,
+      veh:payload.filter(r=>r.vehicle_id||r.hire_id).length,misses:misses};
+    toast('Synced '+payload.length+' claims — '+added+' new. Matched: accounts '+window._claimMatchReport.acc+'/'+payload.length+', drivers '+window._claimMatchReport.drv+'/'+payload.length+', vehicles '+window._claimMatchReport.veh+'/'+payload.length+(misses.length?' — see 📋 Match report':''),'success');
     loadClaims();
   }catch(e){toast('Import failed: '+e.message,'error');}
 }
