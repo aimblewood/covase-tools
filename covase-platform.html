@@ -4787,6 +4787,7 @@ function showClaimMatchReport(){
   if(!r){toast('Run an FMG import first — the report covers the latest import','error');return;}
   document.getElementById('claim-modal-title').textContent='FMG import — match report';
   let html='<div style="font-size:12px;color:var(--n600);margin-bottom:10px">Import at '+new Date(r.when).toLocaleString('en-GB')+' · '+r.total+' claims · matched accounts <strong>'+r.acc+'/'+r.total+'</strong>, drivers <strong>'+r.drv+'/'+r.total+'</strong>, vehicles <strong>'+r.veh+'/'+r.total+'</strong></div>';
+  if(r.errors&&r.errors.length)html+='<div style="border:1px solid var(--tl-red-t);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--tl-red-l)"><div style="font-size:11px;font-weight:700;color:var(--tl-red-t);margin-bottom:4px">⚠ Errors during linking (these blocked matches)</div>'+r.errors.map(e=>'<div style="font-size:11px;color:var(--tl-red-t)">'+esc(e)+'</div>').join('')+'</div>';
   if(!r.misses.length)html+='<div style="font-size:13px;color:#0a7a72;font-weight:600">Everything matched 🎉</div>';
   else{
     html+='<div style="font-size:11px;color:var(--n500);margin-bottom:8px">'+r.misses.length+' unmatched link'+(r.misses.length>1?'s':'')+' — open the claim and use Manual matching to fix. Manual links survive re-imports.</div>';
@@ -4859,7 +4860,7 @@ async function clmPick(kind,idx){
         const np={id:'ct-'+Date.now(),first_name:d.firstName||fn.split(' ')[0]||fn,last_name:d.lastName||fn.split(' ').slice(1).join(' ')||null,account_id:(window._clmStaged&&window._clmStaged.acc)||(claim&&claim.client_account_id)||null,email:d.email||null,mobile:d.mobile||null,job_description:d.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:d.contactId,updated_at:now};
         await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});(allContacts=allContacts||[]).push(np);staged=np.id;toast('Contact created from Dynamics','success');
       }else{
-        const np={id:'veh-'+Date.now(),reg:d.reg||null,name:d.makeModel||d.name||null,status:'active',source:'Dynamics (claims match)',dynamics_id:d.vehicleId,updated_at:now};
+        const np={id:'veh-'+Date.now(),reg:d.reg||null,name:d.makeModel||d.name||null,status:'active',source:'Dynamics (claims match)',dynamics_id:d.vehicleId};
         await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});(allVehicles=allVehicles||[]).push(np);staged={vehicle_id:np.id};toast('Vehicle created from Dynamics','success');
       }
     }catch(e){toast('Create failed: '+e.message,'error');return;}
@@ -4989,6 +4990,7 @@ async function importClaimsFile(file){
     // n8n lookup webhooks; hits create local rows (with dynamics_id) and link.
     // This also enriches covase_accounts/contacts/vehicles ahead of detachment.
     const cfg=getConfig();
+    const linkErrors=[]; // surfaced in the match report — never swallow silently
     const CAP=15; // max unique Dynamics lookups per entity type per import
     const fetchJson=async(url)=>{try{const r=await fetch(url,{mode:'cors'});if(!r.ok)return null;const j=await r.json();return Array.isArray(j)?j:null;}catch(e){return null;}};
     let idSeq=0;const newId=p=>p+'-'+Date.now()+'-'+(idSeq++);
@@ -5009,7 +5011,7 @@ async function importClaimsFile(file){
           if(local)id=local.id;
           else{
             const np={id:newId('acc'),company_name:hit.name||nm,type:'client',status:'active',address:hit.address||null,contact_email:hit.email||null,contact_phone:hit.phone||null,payment_terms:hit.paymentTerms||'28 days',payment_method:'BACS',account_manager:'Simon Homer',dynamics_id:hit.accountId,updated_at:now};
-            try{await sbReq('covase_accounts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;accounts.push(np);}catch(e){}
+            try{await sbReq('covase_accounts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;accounts.push(np);}catch(e){linkErrors.push('Account create failed ('+(hit.name||nm)+'): '+e.message);}
           }
         }
         accCache.set(key,id);
@@ -5039,7 +5041,7 @@ async function importClaimsFile(file){
           if(local)id=local.id;
           else{
             const np={id:newId('ct'),first_name:hit.firstName||nm.split(' ')[0],last_name:hit.lastName||nm.split(' ').slice(1).join(' ')||null,account_id:rec.client_account_id||null,email:hit.email||null,mobile:hit.mobile||null,job_description:hit.jobTitle||null,contact_type:'driver',employee_status:'employed',address_type:'home',dynamics_id:hit.contactId,updated_at:now};
-            try{await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;contacts.push(np);}catch(e){}
+            try{await sbReq('covase_contacts',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;contacts.push(np);}catch(e){linkErrors.push('Contact create failed ('+nm+'): '+e.message);}
           }
         }
         ctCache.set(key,id);
@@ -5063,8 +5065,8 @@ async function importClaimsFile(file){
           const local=vehicles.find(v=>v.dynamics_id===hit.vehicleId);
           if(local)id=local.id;
           else{
-            const np={id:newId('veh'),reg:hit.reg||rec.vehicle_reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId,updated_at:now};
-            try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){}
+            const np={id:newId('veh'),reg:hit.reg||rec.vehicle_reg,name:hit.makeModel||hit.name||null,status:'active',source:'Dynamics (claims import)',dynamics_id:hit.vehicleId};
+            try{await sbReq('covase_vehicles',{method:'POST',body:np,prefer:'return=minimal'});id=np.id;vehicles.push(np);}catch(e){linkErrors.push('Vehicle create failed ('+(hit.reg||rec.vehicle_reg)+'): '+e.message);}
           }
         }
         vehCache.set(rg,id);
@@ -5082,7 +5084,8 @@ async function importClaimsFile(file){
     });
     window._claimMatchReport={when:new Date().toISOString(),total:payload.length,
       acc:payload.filter(r=>r.client_account_id).length,drv:payload.filter(r=>r.driver_contact_id).length,
-      veh:payload.filter(r=>r.vehicle_id||r.hire_id).length,misses:misses};
+      veh:payload.filter(r=>r.vehicle_id||r.hire_id).length,misses:misses,errors:linkErrors};
+    if(linkErrors.length&&typeof console!=='undefined')console.warn('[claims import] link errors:',linkErrors);
     toast('Synced '+payload.length+' claims — '+added+' new. Matched: accounts '+window._claimMatchReport.acc+'/'+payload.length+', drivers '+window._claimMatchReport.drv+'/'+payload.length+', vehicles '+window._claimMatchReport.veh+'/'+payload.length+(misses.length?' — see 📋 Match report':''),'success');
     loadClaims();
   }catch(e){toast('Import failed: '+e.message,'error');}
