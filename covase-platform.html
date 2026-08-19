@@ -1053,8 +1053,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
           <input id="mv-customer-ref" placeholder="PO / job ref">
         </div>
       </div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>Movement date</label><input type="date" id="mv-movement-date"></div>
+        <div class="form-field">
+          <label>Supplier</label>
+          <select id="mv-supplier"><option value="">— select —</option></select>
+        </div>
         <div class="form-field">
           <label>Status</label>
           <select id="mv-status">
@@ -3531,7 +3535,7 @@ function movementRowsFiltered(applyStatus){
   const q=(document.getElementById('movement-search')?.value||'').toLowerCase().trim();
   let rows=(allMovements||[]).slice();
   if(applyStatus&&movementFilter!=='all')rows=rows.filter(m=>m.movement_status===movementFilter);
-  if(q){rows=rows.filter(m=>{const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.notes].map(x=>String(x||'').toLowerCase()).join(' ');return hay.includes(q);});}
+  if(q){rows=rows.filter(m=>{const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.supplier,m.driver_name,m.notes].map(x=>String(x||'').toLowerCase()).join(' ');return hay.includes(q);});}
   return rows;
 }
 function applyMovementViewVis(){
@@ -3659,6 +3663,7 @@ const MV_CARD_FIELDS=[
   {key:'vehicle_reg',label:'Vehicle reg',get:m=>m.vehicle_reg||''},
   {key:'vehicle_makemodel',label:'Make / model',get:m=>m.vehicle_makemodel||''},
   {key:'driver_name',label:'Driver',get:m=>m.driver_name||''},
+  {key:'supplier',label:'Supplier',get:m=>m.supplier||''},
   {key:'date',label:'Date',get:m=>m.movement_date?fmtD(m.movement_date):(m.quote_date?fmtD(m.quote_date)+' (quote)':'')},
   {key:'movement_date',label:'Movement date',get:m=>m.movement_date?fmtD(m.movement_date):''},
   {key:'quote_date',label:'Quote date',get:m=>m.quote_date?fmtD(m.quote_date):''},
@@ -3739,6 +3744,13 @@ function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation()
 function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdDraft[zone];const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
 async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovementsView();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
 
+function populateMovementSupplierDropdown(){
+  const sel=document.getElementById('mv-supplier');if(!sel)return;
+  const cur=sel.value;
+  const sups=(allAccounts||[]).filter(a=>a.type==='supplier').slice().sort((a,b)=>(a.company_name||'').localeCompare(b.company_name||''));
+  sel.innerHTML='<option value="">— select —</option>'+sups.map(a=>`<option value="${esc(a.id)}">${esc(a.company_name)}</option>`).join('');
+  if(cur&&[...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
 function populateMovementAccountDropdown(){
   const sel=document.getElementById('mv-account');if(!sel)return;
   const cur=sel.value;
@@ -3754,6 +3766,7 @@ function clearMovementForm(){
    'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mv-account').value='';
+  const mvSup=document.getElementById('mv-supplier');if(mvSup)mvSup.value='';
   document.getElementById('mv-status').value='quoted';
   document.getElementById('mv-mileage-source').value='manual';
   document.getElementById('mv-vat-pct').value='20';
@@ -3772,6 +3785,7 @@ async function openNewMovement(){
   // Load accounts if not already
   if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
   populateMovementAccountDropdown();
+  populateMovementSupplierDropdown();
   document.getElementById('movement-modal').classList.add('open');
 }
 
@@ -3781,12 +3795,14 @@ function openEditMovement(id){
   document.getElementById('movement-modal-title').textContent='Edit movement';
   clearMovementForm();
   populateMovementAccountDropdown();
+  populateMovementSupplierDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
   f('mv-account',m.client_account_id||'');
   f('mv-customer-ref',m.customer_reference);
   f('mv-movement-date',m.movement_date);
   f('mv-quote-date',m.quote_date);
   f('mv-status',m.movement_status||'quoted');
+  f('mv-supplier',m.supplier_account_id||'');
   f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);f('mv-pickup-county',m.pickup_county);
   f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
   f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
@@ -4073,6 +4089,8 @@ async function saveMovement(){
     client_account_id:accountId,
     customer:account.company_name,
     customer_reference:document.getElementById('mv-customer-ref').value.trim()||null,
+    supplier_account_id:document.getElementById('mv-supplier')?.value||null,
+    supplier:(()=>{const sid=document.getElementById('mv-supplier')?.value;if(!sid)return null;const a=(allAccounts||[]).find(x=>x.id===sid);return a?a.company_name:null;})(),
     pickup_postcode:(document.getElementById('mv-pickup-postcode').value||'').trim().toUpperCase()||null,
     pickup_address_line1:document.getElementById('mv-pickup-addr1').value.trim()||null,
     pickup_town:document.getElementById('mv-pickup-town').value.trim()||null,
