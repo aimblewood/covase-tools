@@ -395,6 +395,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .mvcd-chip.lbl{background:#fff;border-style:dashed;color:var(--n500);font-style:italic}
 .mvcd-line-handle{cursor:grab;color:var(--n300);font-size:14px;user-select:none;padding:0 2px}
 .mvcd-line-handle:hover{color:var(--n600)}
+.fe-hi{outline:2px dashed var(--covase) !important;outline-offset:1px;cursor:crosshair !important}
 
 /* Movements: view switcher + kanban wrapper + calendar */
 .seg{display:inline-flex;border:1px solid var(--n200);border-radius:8px;overflow:hidden}
@@ -589,6 +590,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Edit supplier booking email</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions()">🤖 Edit reply-agent instructions</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openFontEditor()">🔤 Fonts &amp; appearance</button>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="toggleEditMode()">🖋 Edit mode — click anything to style it</button>
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
   </div>
 </aside>
@@ -1286,6 +1288,31 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
     </div>
+  </div>
+</div>
+
+<!-- ─── EDIT MODE (click-to-style) ─── -->
+<div id="fe-bar" style="display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:400;background:var(--indigo);color:#fff;padding:8px 16px;border-radius:10px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);align-items:center;gap:12px">
+  <span>🖋 <strong>Edit mode</strong> — click any text to style it (Esc to exit)</span>
+  <button onclick="toggleEditMode()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">Exit</button>
+</div>
+<div id="fe-pop" style="display:none;position:fixed;z-index:401;background:#fff;border:1px solid var(--n200);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px;width:250px">
+  <div id="fe-target" style="font-size:10px;color:var(--n400);margin-bottom:8px;word-break:break-all"></div>
+  <label style="font-size:10px;color:var(--n500)">Font</label>
+  <select id="fe-family" onchange="feApply()" style="width:100%;font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px;margin-bottom:4px"></select>
+  <input id="fe-family-custom" placeholder="…or any Google Font" oninput="feApply()" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid var(--n200);border-radius:6px;box-sizing:border-box;margin-bottom:8px">
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <div style="flex:1"><label style="font-size:10px;color:var(--n500)">Size px</label><input id="fe-size" type="number" min="6" max="72" placeholder="—" oninput="feApply()" style="width:100%;font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px;box-sizing:border-box"></div>
+    <div style="flex:1"><label style="font-size:10px;color:var(--n500)">Weight</label><select id="fe-weight" onchange="feApply()" style="width:100%;font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"><option value="">—</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>800</option></select></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+    <label style="font-size:11px;color:var(--n600)"><input type="checkbox" id="fe-italic" onchange="feApply()"> Italic</label>
+    <input type="color" id="fe-color" value="#333333" oninput="document.getElementById('fe-color-on').checked=true;feApply()" style="width:28px;height:24px;border:1px solid var(--n200);border-radius:5px;padding:1px">
+    <label style="font-size:11px;color:var(--n600)"><input type="checkbox" id="fe-color-on" onchange="feApply()"> Colour</label>
+  </div>
+  <div style="display:flex;gap:6px;justify-content:space-between">
+    <button onclick="feRemove()" style="border:1px solid var(--tl-red-t);color:var(--tl-red-t);background:#fff;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">Remove style</button>
+    <button onclick="feClosePop()" style="border:1px solid var(--n200);background:var(--covase);color:#fff;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer">Done</button>
   </div>
 </div>
 
@@ -5393,6 +5420,112 @@ async function importClaimsFile(file){
   }catch(e){toast('Import failed: '+e.message,'error');}
 }
 
+// ─── EDIT MODE: click any element to style it (overrides shared via
+// covase_config key 'font_overrides'; injected as !important CSS so they win
+// over inline styles). Selectors are class-based, so styling one kanban title
+// styles them all — the popover shows how many elements a rule hits. ───
+let feMode=false,feOverrides={},feTargetSel=null,feSaveTimer=null;
+const FE_STATE_CLASSES=['active','open','disabled','cancelled','selected','pal','lbl','mvcd-over','mvkan-over','fe-hi'];
+function feStyleTag(){let t=document.getElementById('fe-style');if(!t){t=document.createElement('style');t.id='fe-style';document.head.appendChild(t);}return t;}
+function feBuildCss(){
+  feStyleTag().textContent=Object.entries(feOverrides).map(([sel,o])=>{
+    const d=[];
+    if(o.family)d.push("font-family:'"+o.family+"',sans-serif !important");
+    if(o.size)d.push('font-size:'+o.size+'px !important');
+    if(o.weight)d.push('font-weight:'+o.weight+' !important');
+    if(o.italic)d.push('font-style:italic !important');
+    if(o.color)d.push('color:'+o.color+' !important');
+    return d.length?sel+'{'+d.join(';')+'}':'';
+  }).filter(Boolean).join('\n');
+}
+async function loadFontOverrides(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.font_overrides&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    if(v&&typeof v==='object'){feOverrides=v;feBuildCss();ftEnsureFonts(Object.values(v).map(o=>o.family));}
+  }catch(e){}
+}
+function feSaveSoon(){
+  clearTimeout(feSaveTimer);
+  feSaveTimer=setTimeout(async()=>{
+    try{await sbReq('covase_config',{method:'POST',body:{key:'font_overrides',value:feOverrides,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});}
+    catch(e){toast('Style save failed: '+e.message,'error');}
+  },700);
+}
+// Derive a stable, class-based selector for the clicked element
+function feSelectorFor(el){
+  let node=el;
+  while(node&&node!==document.body){
+    if(node.classList&&node.classList.length){
+      const cls=[...node.classList].filter(c=>!FE_STATE_CLASSES.includes(c)&&!/^bill-/.test(c)&&!/^mvcal-(quoted|booked|in_progress|completed_pending_fuel|invoiced|paid|cancelled|today|empty)$/.test(c)&&!/^stat-(covase|indigo|orange|green|purple|red)$/.test(c));
+      if(cls.length)return node.tagName.toLowerCase()+'.'+cls.join('.');
+    }
+    if(node.id&&!/^(badge-|gf-|fe-)/.test(node.id))return '#'+node.id;
+    node=node.parentElement;
+  }
+  return null;
+}
+function toggleEditMode(){
+  feMode=!feMode;
+  const bar=document.getElementById('fe-bar');if(bar)bar.style.display=feMode?'flex':'none';
+  if(!feMode)feClosePop();
+  const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');
+  document.querySelectorAll('.fe-hi').forEach(x=>x.classList.remove('fe-hi'));
+}
+function feClosePop(){const p=document.getElementById('fe-pop');if(p)p.style.display='none';feTargetSel=null;}
+function feOpenPop(x,y,sel){
+  feTargetSel=sel;
+  const o=feOverrides[sel]||{};
+  const fam=document.getElementById('fe-family');
+  if(fam&&fam.options.length<2)fam.innerHTML='<option value="">— inherit —</option>'+FT_FONTS.map(f=>'<option value="'+esc(f)+'">'+esc(f)+'</option>').join('');
+  const setv=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
+  if(o.family&&FT_FONTS.includes(o.family)){setv('fe-family',o.family);setv('fe-family-custom','');}
+  else{setv('fe-family','');setv('fe-family-custom',o.family||'');}
+  setv('fe-size',o.size||'');setv('fe-weight',o.weight||'');
+  document.getElementById('fe-italic').checked=!!o.italic;
+  document.getElementById('fe-color-on').checked=!!o.color;
+  if(o.color)setv('fe-color',o.color);
+  const n=(()=>{try{return document.querySelectorAll(sel).length;}catch(e){return '?';}})();
+  document.getElementById('fe-target').textContent='Applies to: '+sel+' · '+n+' element'+(n===1?'':'s');
+  const p=document.getElementById('fe-pop');
+  p.style.display='block';
+  p.style.left=Math.min(x,window.innerWidth-270)+'px';
+  p.style.top=Math.min(y+10,window.innerHeight-260)+'px';
+}
+function feApply(){
+  if(!feTargetSel)return;
+  const custom=(document.getElementById('fe-family-custom').value||'').trim();
+  const o={
+    family:custom||document.getElementById('fe-family').value||null,
+    size:parseInt(document.getElementById('fe-size').value,10)||null,
+    weight:document.getElementById('fe-weight').value||null,
+    italic:document.getElementById('fe-italic').checked||null,
+    color:document.getElementById('fe-color-on').checked?document.getElementById('fe-color').value:null
+  };
+  Object.keys(o).forEach(k=>{if(!o[k])delete o[k];});
+  if(Object.keys(o).length)feOverrides[feTargetSel]=o;else delete feOverrides[feTargetSel];
+  if(o.family)ftEnsureFonts([o.family]);
+  feBuildCss();feSaveSoon();
+}
+function feRemove(){if(!feTargetSel)return;delete feOverrides[feTargetSel];feBuildCss();feSaveSoon();feClosePop();toast('Style removed','success');}
+function initEditMode(){
+  document.addEventListener('mouseover',e=>{
+    if(!feMode)return;
+    if(e.target.closest('#fe-pop,#fe-bar'))return;
+    document.querySelectorAll('.fe-hi').forEach(x=>x.classList.remove('fe-hi'));
+    if(e.target!==document.body)e.target.classList.add('fe-hi');
+  },true);
+  document.addEventListener('click',e=>{
+    if(!feMode)return;
+    if(e.target.closest('#fe-pop,#fe-bar'))return;
+    e.preventDefault();e.stopPropagation();
+    const sel=feSelectorFor(e.target);
+    if(!sel){toast('Could not identify that element','error');return;}
+    feOpenPop(e.clientX,e.clientY,sel);
+  },true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&feMode)toggleEditMode();});
+}
+
 // ─── FONTS & APPEARANCE (shared via covase_config key 'app_theme') ───
 const FT_FONTS=['Outfit','DM Sans','Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Nunito','Raleway','Work Sans','Source Sans 3','IBM Plex Sans','Manrope','Space Grotesk','Karla','Rubik','Figtree','Lexend','Plus Jakarta Sans'];
 const DEFAULT_THEME={head:'Outfit',body:'DM Sans',scale:100};
@@ -5608,6 +5741,9 @@ loadAgentInstructions();
 loadSidebarLayout();
 // Load the shared fonts/appearance theme
 loadTheme();
+// Element-level style overrides (Edit mode) + listeners
+loadFontOverrides();
+initEditMode();
 </script>
 </body>
 </html>
