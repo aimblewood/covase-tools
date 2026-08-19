@@ -4980,6 +4980,15 @@ function updateBadges(){
   const setBadge=(id,n)=>{const el=document.getElementById(id);if(el)el.textContent=String(n||0);};
   setBadge('badge-pending',(allInvoices||[]).filter(i=>i.status==='pending').length);
   setBadge('badge-pending-recharge',(allHires||[]).filter(h=>h.billing_status==='invoiced-in'&&!h.outgoing_invoice_id).length);
+  // Badges owned by per-module stats functions, repeated here from the caches so
+  // a sidebar re-render (which recreates badge elements) can always restore them
+  setBadge('badge-movements',(typeof allMovements!=='undefined'?(allMovements||[]):[]).filter(m=>!['paid','cancelled'].includes(m.movement_status)).length);
+  setBadge('badge-accounts',(allAccounts||[]).filter(a=>(a.type||'client')==='client'&&a.status==='active').length);
+  setBadge('badge-contacts',(typeof allContacts!=='undefined'?(allContacts||[]):[]).filter(c=>c.employee_status==='employed').length);
+  setBadge('badge-vehicles',(typeof allVehicles!=='undefined'?(allVehicles||[]):[]).filter(v=>v.status==='active').length);
+  setBadge('badge-claims',(typeof allClaims!=='undefined'?(allClaims||[]):[]).filter(c=>{try{return claimOpen(c);}catch(e){return false;}}).length);
+  setBadge('badge-fines',(typeof allFines!=='undefined'?(allFines||[]):[]).filter(f=>{try{return FINE_OPEN(f.status);}catch(e){return false;}}).length);
+  setBadge('badge-supplier-replies',(typeof allSupplierReplies!=='undefined'?(allSupplierReplies||[]):[]).length);
   updatePipelineBadge();
 }
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
