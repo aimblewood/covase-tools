@@ -505,7 +505,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     </div>
     <div class="sb-divider"></div>
     <div class="sb-section">
-      <div class="sb-section-label">Movements</div>
+      <div class="sb-section-label">Logistics</div>
       <div class="sb-item" onclick="showView('movements',this)">
         <span class="icon">🚛</span> Movements
         <span class="sb-badge" id="badge-movements">—</span>
@@ -1308,7 +1308,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <button class="modal-close" onclick="closeMvCardDesigner()">✕</button>
     </div>
     <div class="modal-body">
-      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Fields on the same line show separated by “ · ”.</div>
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Fields on a line flow with spacing only — use 🏷 labels (From, To, →…) to structure the reading.</div>
       <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
         <div>
           <div class="mvcd-zone-label">Available fields</div>
@@ -3730,8 +3730,8 @@ function movementCard(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
   const parts=keys=>mvResolveParts(keys,m).map(t=>esc(t));
   const titleParts=parts(L.title);
-  const title=titleParts.length?titleParts.join(' · '):'—';
-  const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' · ')}</div>`:'';};
+  const title=titleParts.length?titleParts.join(' &nbsp;'):'—';
+  const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' &nbsp;')}</div>`:'';};
   const lineArrs=Array.isArray(L.lines)?L.lines:['line1','line2','line3'].map(k=>L[k]||[]);
   const linesHtml=lineArrs.map((keys,i)=>lineHtml(keys,'font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px')).join('');
   const rightParts=(L.right||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);if(!v)return '';
@@ -3761,7 +3761,7 @@ function mvChipText(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
   const keys=(Array.isArray(L.chip)&&L.chip.length)?L.chip:['customer'];
   const parts=mvResolveParts(keys,m);
-  return parts.length?parts.join(' · '):(m.customer||'—');
+  return parts.length?parts.join(' '):(m.customer||'—');
 }
 function mvcdUsedKeys(){return mvcdDraft.title.concat(mvcdDraft.right,mvcdDraft.chip,...mvcdDraft.lines);}
 // Resolve a zone name ('title' | 'right' | 'line:N') to its draft array
