@@ -560,6 +560,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <div class="sb-item disabled" title="Coming soon"><span class="icon">◉</span> GoCardless</div>
     </div>
   </nav>
+  <div class="sb-config-toggle" onclick="openSbOrganiser()">⇅ Organise sidebar</div>
   <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Settings</div>
   <div class="sb-config-panel" id="config-panel">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin-bottom:2px">Supabase</div>
@@ -1282,6 +1283,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SIDEBAR ORGANISER ─── -->
+<div class="modal-overlay" id="sb-organiser-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Organise sidebar</div>
+      <button class="modal-close" onclick="closeSbOrganiser()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag the ⠿ handle to reorder sections. Drag items between sections, rename section headers inline, and click 🚫 on an item to hide it. Drag hidden items back into a section to restore them. Empty sections show a delete link and are not displayed in the sidebar.</div>
+      <div id="sbo-sections"></div>
+      <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="sboAddSection()">＋ Add section</button>
+      <div class="mvcd-zone-label" style="margin-top:14px">Hidden items</div>
+      <div id="sbo-hidden" class="mvcd-palette" style="min-height:44px" ondragover="sboAllow(event)" ondrop="sboDropHidden(event)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="sboResetDefault()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="closeSbOrganiser()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveSbOrganiser()">Save sidebar</button>
     </div>
   </div>
 </div>
@@ -5322,6 +5345,135 @@ async function importClaimsFile(file){
   }catch(e){toast('Import failed: '+e.message,'error');}
 }
 
+// ─── SIDEBAR ORGANISER (layout shared via covase_config key 'sidebar_layout') ───
+const SB_ITEMS={
+  'received':{icon:'↓',label:'Received invoices',view:'received',badge:'badge-pending'},
+  'outgoing':{icon:'↑',label:'Outgoing invoices',view:'outgoing'},
+  'new-invoice':{button:true,label:'+ New invoice',action:'openGenerator()'},
+  'hires-pipeline':{icon:'🚗',label:'Bookings',view:'hires-pipeline',badge:'badge-pipeline'},
+  'hires-recharge':{icon:'↑',label:'Pending recharge',view:'hires-recharge',badge:'badge-pending-recharge',badgeCls:'purple'},
+  'movements':{icon:'🚛',label:'Movements',view:'movements',badge:'badge-movements'},
+  'claims':{icon:'🚨',label:'Claims',view:'claims',badge:'badge-claims'},
+  'supplier-replies':{icon:'✉',label:'Review queue',view:'supplier-replies',badge:'badge-supplier-replies',badgeCls:'purple'},
+  'accounts':{icon:'◉',label:'Accounts',view:'accounts',badge:'badge-accounts'},
+  'contacts':{icon:'👤',label:'Contacts',view:'contacts',badge:'badge-contacts'},
+  'vehicles':{icon:'🚙',label:'Vehicles',view:'vehicles',badge:'badge-vehicles'},
+  'reconciliation':{icon:'⟷',label:'Reconciliation',disabled:true},
+  'sage':{icon:'◎',label:'Sage',disabled:true},
+  'gocardless':{icon:'◉',label:'GoCardless',disabled:true}
+};
+const DEFAULT_SB_LAYOUT={sections:[
+  {label:'Billing',items:['received','outgoing','new-invoice']},
+  {label:'Short Hires',items:['hires-pipeline','hires-recharge']},
+  {label:'Logistics',items:['movements']},
+  {label:'Accident management',items:['claims']},
+  {label:'Supplier replies',items:['supplier-replies']},
+  {label:'CRM',items:['accounts','contacts']},
+  {label:'Fleet',items:['vehicles']},
+  {label:'Reports',items:['reconciliation']},
+  {label:'Integrations',items:['sage','gocardless']}
+],hidden:[]};
+let sbLayout=null,sboDraft=null,sbDrag=null;
+// Normalise any saved shape; unknown keys dropped, new modules auto-appended.
+function sbCloneLayout(src){
+  const s=src||{};
+  const sections=Array.isArray(s.sections)&&s.sections.length
+    ?s.sections.map(x=>({label:String(x.label||''),items:Array.isArray(x.items)?x.items.filter(k=>SB_ITEMS[k]):[]}))
+    :DEFAULT_SB_LAYOUT.sections.map(x=>({label:x.label,items:x.items.slice()}));
+  let hidden=Array.isArray(s.hidden)?s.hidden.filter(k=>SB_ITEMS[k]):[];
+  // dedupe (first occurrence wins), then append any catalog keys not present
+  const used=new Set();
+  sections.forEach(x=>{x.items=x.items.filter(k=>{if(used.has(k))return false;used.add(k);return true;});});
+  hidden=hidden.filter(k=>{if(used.has(k))return false;used.add(k);return true;});
+  const missing=Object.keys(SB_ITEMS).filter(k=>!used.has(k));
+  if(missing.length){
+    let other=sections.find(x=>x.label==='Other');
+    if(!other){other={label:'Other',items:[]};sections.push(other);}
+    other.items.push(...missing);
+  }
+  return {sections:sections,hidden:hidden};
+}
+async function loadSidebarLayout(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.sidebar_layout&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    sbLayout=sbCloneLayout(v);
+  }catch(e){sbLayout=sbCloneLayout(null);}
+  renderSidebar();
+}
+function renderSidebar(){
+  const nav=document.querySelector('.sb-nav');if(!nav||!sbLayout)return;
+  const cur=window._sbCurrentView||'hires-pipeline';
+  const secs=sbLayout.sections.map(sec=>{
+    const items=sec.items.filter(k=>!sbLayout.hidden.includes(k));
+    if(!items.length)return '';
+    const inner=items.map(k=>{
+      const it=SB_ITEMS[k];if(!it)return '';
+      if(it.button)return '<button class="sb-new-btn" onclick="'+it.action+'">'+esc(it.label)+'</button>';
+      if(it.disabled)return '<div class="sb-item disabled" title="Coming soon"><span class="icon">'+it.icon+'</span> '+esc(it.label)+'</div>';
+      return '<div class="sb-item'+(it.view===cur?' active':'')+'" data-view="'+esc(it.view)+'" onclick="window._sbCurrentView=\''+it.view+'\';showView(\''+it.view+'\',this)"><span class="icon">'+it.icon+'</span> '+esc(it.label)
+        +(it.badge?' <span class="sb-badge'+(it.badgeCls?' '+it.badgeCls:'')+'" id="'+it.badge+'">—</span>':'')+'</div>';
+    }).join('');
+    return '<div class="sb-section"><div class="sb-section-label">'+esc(sec.label)+'</div>'+inner+'</div>';
+  }).filter(Boolean);
+  nav.innerHTML=secs.join('<div class="sb-divider"></div>');
+  if(typeof updateBadges==='function'){try{updateBadges();}catch(e){}}
+}
+// ── Organiser modal ──
+function openSbOrganiser(){sboDraft=sbCloneLayout(sbLayout);sboRender();const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');document.getElementById('sb-organiser-modal').classList.add('open');}
+function closeSbOrganiser(){document.getElementById('sb-organiser-modal').classList.remove('open');}
+function sboResetDefault(){sboDraft=sbCloneLayout(null);sboRender();}
+function sboAddSection(){sboDraft.sections.push({label:'New section',items:[]});sboRender();}
+function sboItemChip(k,loc){
+  const it=SB_ITEMS[k];if(!it)return '';
+  return '<span class="mvcd-chip" draggable="true" ondragstart="sboDragStart(event,\'item\',\''+k+'\',\''+loc+'\')" ondragover="sboChipOver(event)" ondrop="sboDropOnItem(event,\''+loc+'\',\''+k+'\')">'+(it.icon?it.icon+' ':'')+esc(it.label)
+    +(loc!=='hidden'?' <span class="x" title="Hide from sidebar" onclick="sboHide(event,\''+k+'\')">🚫</span>':'')+'</span>';
+}
+function sboRender(){
+  const wrap=document.getElementById('sbo-sections');if(!wrap)return;
+  wrap.innerHTML=sboDraft.sections.map((sec,si)=>
+    '<div style="border:1px solid var(--n200);border-radius:8px;padding:8px;margin-bottom:8px;background:#fff" ondragover="sboAllow(event)" ondrop="sboDropSection(event,'+si+')">'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+    +'<span class="mvcd-line-handle" draggable="true" ondragstart="sboDragStart(event,\'sec\',\''+si+'\',\'\')" title="Drag to reorder section">⠿</span>'
+    +'<input value="'+esc(sec.label)+'" onchange="sboDraft.sections['+si+'].label=this.value" style="flex:1;font-size:12px;font-weight:700;padding:4px 8px;border:1px solid var(--n200);border-radius:6px">'
+    +(sec.items.length?'':'<span style="cursor:pointer;color:var(--tl-red-t);font-size:11px" onclick="sboDraft.sections.splice('+si+',1);sboRender()">delete</span>')
+    +'</div>'
+    +'<div class="mvcd-zone" ondragover="sboAllow(event)" ondrop="sboDropItems(event,'+si+')">'+(sec.items.length?sec.items.map(k=>sboItemChip(k,String(si))).join(''):'<span class="mvcd-zone-empty">Drag items here</span>')+'</div>'
+    +'</div>'
+  ).join('');
+  const hid=document.getElementById('sbo-hidden');
+  if(hid)hid.innerHTML=sboDraft.hidden.length?sboDraft.hidden.map(k=>sboItemChip(k,'hidden')).join(''):'<span class="mvcd-zone-empty">Nothing hidden — drop items here to hide them</span>';
+}
+function sboAllow(e){e.preventDefault();}
+function sboChipOver(e){e.preventDefault();e.stopPropagation();}
+function sboDragStart(e,kind,a,b){sbDrag={kind:kind,key:kind==='item'?a:null,sec:kind==='sec'?parseInt(a,10):null,from:b};e.stopPropagation();try{e.dataTransfer.setData('text/plain',a);}catch(_){}}
+function sboStrip(key){sboDraft.sections.forEach(s=>{const i=s.items.indexOf(key);if(i>=0)s.items.splice(i,1);});const j=sboDraft.hidden.indexOf(key);if(j>=0)sboDraft.hidden.splice(j,1);}
+function sboMoveSection(ti){const from=sbDrag.sec;sbDrag=null;if(from==null||from===ti)return;const s=sboDraft.sections.splice(from,1)[0];let to=ti;if(to>from)to--;sboDraft.sections.splice(to,0,s);sboRender();}
+function sboDropSection(e,ti){e.preventDefault();if(!sbDrag||sbDrag.kind!=='sec')return;sboMoveSection(ti);}
+function sboDropItems(e,si){
+  e.preventDefault();e.stopPropagation();if(!sbDrag)return;
+  if(sbDrag.kind==='sec'){sboMoveSection(si);return;}
+  const k=sbDrag.key;sbDrag=null;sboStrip(k);sboDraft.sections[si].items.push(k);sboRender();
+}
+function sboDropOnItem(e,loc,target){
+  e.preventDefault();e.stopPropagation();if(!sbDrag||sbDrag.kind!=='item')return;
+  const k=sbDrag.key;sbDrag=null;if(k===target)return;
+  sboStrip(k);
+  if(loc==='hidden'){const ti=sboDraft.hidden.indexOf(target);sboDraft.hidden.splice(ti<0?sboDraft.hidden.length:ti,0,k);}
+  else{const arr=sboDraft.sections[parseInt(loc,10)].items;const ti=arr.indexOf(target);arr.splice(ti<0?arr.length:ti,0,k);}
+  sboRender();
+}
+function sboDropHidden(e){e.preventDefault();if(!sbDrag||sbDrag.kind!=='item')return;const k=sbDrag.key;sbDrag=null;sboStrip(k);sboDraft.hidden.push(k);sboRender();}
+function sboHide(e,k){e.stopPropagation();sboStrip(k);sboDraft.hidden.push(k);sboRender();}
+async function saveSbOrganiser(){
+  const layout={sections:sboDraft.sections.map(s=>({label:s.label,items:s.items.slice()})),hidden:sboDraft.hidden.slice()};
+  sbLayout=sbCloneLayout(layout);
+  try{
+    await sbReq('covase_config',{method:'POST',body:{key:'sidebar_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});
+    toast('Sidebar layout saved','success');closeSbOrganiser();renderSidebar();
+  }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
+}
+
 // Boot — Active hires (Pipeline) is the default landing view
 loadHires();
 // Also load accounts in the background so the client filter dropdown is populated immediately
@@ -5336,6 +5488,8 @@ loadSupplierReplies();
 loadClaims();
 // Load the reply-agent instructions (for the Settings editor)
 loadAgentInstructions();
+// Load the shared sidebar layout and render the (organisable) sidebar
+loadSidebarLayout();
 </script>
 </body>
 </html>
