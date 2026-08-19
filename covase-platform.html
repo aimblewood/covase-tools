@@ -391,6 +391,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
 .mvcd-chip.pal{background:var(--covase-l);border-color:var(--covase)}
 .mvcd-chip .x{cursor:pointer;color:var(--n400);font-weight:700;font-size:10px}
 .mvcd-chip .x:hover{color:var(--tl-red-t)}
+.mvcd-chip.lbl{background:#fff;border-style:dashed;color:var(--n500);font-style:italic}
+.mvcd-line-handle{cursor:grab;color:var(--n300);font-size:14px;user-select:none;padding:0 2px}
+.mvcd-line-handle:hover{color:var(--n600)}
 
 /* Movements: view switcher + kanban wrapper + calendar */
 .seg{display:inline-flex;border:1px solid var(--n200);border-radius:8px;overflow:hidden}
@@ -1319,6 +1322,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
                 <div class="mvcd-zone mvcd-zone-title" data-zone="title" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'title')"></div>
                 <div id="mvcd-lines"></div>
                 <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLine()">＋ Add line</button>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLabel()">🏷 Add label</button>
               </div>
               <div class="mvcd-zone mvcd-zone-right" data-zone="right" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'right')"></div>
             </div>
@@ -3676,6 +3680,23 @@ const MV_CARD_FIELDS=[
   {key:'notes',label:'Notes',get:m=>m.notes||''}
 ];
 const MV_FIELD_MAP=Object.fromEntries(MV_CARD_FIELDS.map(f=>[f.key,f]));
+// Label tokens: fixed text placed in the layout ('label:<uid>:<text>'). A label
+// attaches to the NEXT field's value ("From BN1 1AA") instead of being a
+// separate ' · ' segment; a label before an empty field is dropped with it.
+function mvIsLabelKey(k){return typeof k==='string'&&k.indexOf('label:')===0;}
+function mvLabelText(k){return k.split(':').slice(2).join(':');}
+function mvResolveParts(keys,m){
+  const out=[];let pending=null;
+  (keys||[]).forEach(k=>{
+    if(mvIsLabelKey(k)){pending=(pending?pending+' ':'')+mvLabelText(k);return;}
+    const f=MV_FIELD_MAP[k];if(!f)return;
+    const v=f.get(m);
+    if(v!==''&&v!=null&&String(v)!==''){out.push((pending?pending+' ':'')+String(v));}
+    pending=null;
+  });
+  if(pending)out.push(pending); // trailing label with no field still shows
+  return out;
+}
 const DEFAULT_MV_CARD_LAYOUT={title:['customer'],lines:[['route','miles'],['date','customer_reference','vehicle_reg']],right:['total','status'],chip:['customer']};
 const MVCD_MAX_LINES=6;
 // Normalises any saved shape (incl. the legacy fixed line1/line2/line3 format)
@@ -3695,10 +3716,11 @@ async function loadMovementCardLayout(){
     const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
     if(v&&typeof v==='object'){
       const L=mvcdCloneLayout(v);
-      L.title=L.title.filter(k=>MV_FIELD_MAP[k]);
-      L.right=L.right.filter(k=>MV_FIELD_MAP[k]);
-      L.lines=L.lines.map(l=>l.filter(k=>MV_FIELD_MAP[k]));
-      L.chip=L.chip.filter(k=>MV_FIELD_MAP[k]);
+      const ok=k=>MV_FIELD_MAP[k]||mvIsLabelKey(k);
+      L.title=L.title.filter(ok);
+      L.right=L.right.filter(k=>MV_FIELD_MAP[k]); // right column is fields-only
+      L.lines=L.lines.map(l=>l.filter(ok));
+      L.chip=L.chip.filter(ok);
       movementCardLayout=L;
     }
   }catch(e){/* covase_config may not exist yet — keep default */}
@@ -3706,7 +3728,7 @@ async function loadMovementCardLayout(){
 }
 function movementCard(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
-  const parts=keys=>(keys||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);return v?esc(String(v)):'';}).filter(Boolean);
+  const parts=keys=>mvResolveParts(keys,m).map(t=>esc(t));
   const titleParts=parts(L.title);
   const title=titleParts.length?titleParts.join(' · '):'—';
   const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' · ')}</div>`:'';};
@@ -3738,7 +3760,7 @@ function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT)
 function mvChipText(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
   const keys=(Array.isArray(L.chip)&&L.chip.length)?L.chip:['customer'];
-  const parts=keys.map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);return v?String(v):'';}).filter(Boolean);
+  const parts=mvResolveParts(keys,m);
   return parts.length?parts.join(' · '):(m.customer||'—');
 }
 function mvcdUsedKeys(){return mvcdDraft.title.concat(mvcdDraft.right,mvcdDraft.chip,...mvcdDraft.lines);}
@@ -3759,8 +3781,22 @@ function mvcdRemoveLine(i){
   if(!mvcdDraft.lines.length)mvcdDraft.lines=[[]];
   mvcdRender();
 }
-function mvcdChip(key,zone){const f=MV_FIELD_MAP[key];if(!f)return '';const inZone=zone&&zone!=='palette';
-  return `<span class="mvcd-chip${inZone?'':' pal'}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}>${esc(f.label)}${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
+function mvcdChip(key,zone){
+  const isL=mvIsLabelKey(key);
+  const f=isL?null:MV_FIELD_MAP[key];
+  if(!isL&&!f)return '';
+  const inZone=zone&&zone!=='palette';
+  const label=isL?('🏷 '+mvLabelText(key)):f.label;
+  return `<span class="mvcd-chip${inZone?'':' pal'}${isL?' lbl':''}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}>${esc(label)}${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
+function mvcdAddLabel(){
+  let t=prompt('Label text (e.g. From, To, Ref, →)');
+  if(!t)return;
+  t=t.trim().replace(/['"\\]/g,'');
+  if(!t){toast('Label text needed','error');return;}
+  mvcdDraft.lines[0].push('label:'+Date.now()+':'+t);
+  mvcdRender();
+  toast('Label added to line 1 — drag it into position','success');
+}
 function mvcdZonePlaceholder(z){if(z==='title')return 'Title';if(z==='right')return 'Right column';if(z==='chip')return 'Calendar chip — drag fields here (keep it short)';if(z&&z.indexOf('line:')===0)return 'Line '+(parseInt(z.slice(5),10)+1)+' — drag fields here';return z;}
 function mvcdRender(){
   const used=new Set(mvcdUsedKeys());
@@ -3772,6 +3808,7 @@ function mvcdRender(){
   if(lw)lw.innerHTML=mvcdDraft.lines.map((keys,i)=>{
     const z='line:'+i;
     return '<div style="display:flex;align-items:center;gap:6px">'
+      +'<span class="mvcd-line-handle" draggable="true" ondragstart="mvcdLineDragStart(event,'+i+')" title="Drag to reorder line '+(i+1)+'">⠿</span>'
       +'<div class="mvcd-zone" style="flex:1" data-zone="'+z+'" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,\''+z+'\')">'+zoneHtml(z,keys)+'</div>'
       +(mvcdDraft.lines.length>1?'<span class="x" style="cursor:pointer;color:var(--n400);font-weight:700;font-size:12px;padding:2px 4px" title="Delete line '+(i+1)+' (fields return to palette)" onclick="mvcdRemoveLine('+i+')">✕</span>':'')
       +'</div>';
@@ -3788,14 +3825,41 @@ function mvcdPreview(){
   const cp=document.getElementById('mvcd-chip-preview');
   if(cp)cp.innerHTML='<span class="mvcal-chip mvcal-booked" style="display:inline-block;max-width:220px">'+esc(chipTxt)+'</span> <span style="font-size:10px;color:var(--n400)">← calendar chip</span>';
 }
-function mvcdDragStart(e,key,zone){mvcdDrag={key,zone};try{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';}catch(_){}}
+function mvcdDragStart(e,key,zone){mvcdDrag={kind:'chip',key,zone};try{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';}catch(_){}}
+function mvcdLineDragStart(e,i){mvcdDrag={kind:'line',index:i};try{e.dataTransfer.setData('text/plain','line:'+i);e.dataTransfer.effectAllowed='move';}catch(_){}e.stopPropagation();}
+// Move a whole line so it sits where the target line currently is
+function mvcdReorderLine(from,toZone){
+  if(!toZone||toZone.indexOf('line:')!==0)return;
+  let to=parseInt(toZone.slice(5),10);
+  if(isNaN(to)||to===from)return;
+  const l=mvcdDraft.lines.splice(from,1)[0];
+  if(to>from)to--;
+  mvcdDraft.lines.splice(to,0,l);
+}
 function mvcdAllowDrop(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('mvcd-over');}
 function mvcdDragLeave(e){if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.remove('mvcd-over');}
 function mvcdChipOver(e){e.preventDefault();e.stopPropagation();}
 function mvcdStripKey(key){[mvcdDraft.title,mvcdDraft.right,...mvcdDraft.lines].forEach(a=>{const i=a.indexOf(key);if(i>=0)a.splice(i,1);});}
 function mvcdClearOver(){document.querySelectorAll('.mvcd-over').forEach(el=>el.classList.remove('mvcd-over'));}
-function mvcdDrop(e,zone){e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;mvcdStripKey(key);if(zone!=='palette'){const a=mvcdZoneArr(zone);if(a)a.push(key);}mvcdRender();}
-function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;if(key===targetKey)return;mvcdStripKey(key);const arr=mvcdZoneArr(zone);if(!arr){mvcdRender();return;}const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);mvcdRender();}
+function mvcdDrop(e,zone){
+  e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;
+  if(mvcdDrag.kind==='line'){const from=mvcdDrag.index;mvcdDrag=null;mvcdReorderLine(from,zone);mvcdRender();return;}
+  const key=mvcdDrag.key;mvcdDrag=null;
+  mvcdStripKey(key);
+  if(zone!=='palette'){const a=mvcdZoneArr(zone);if(a)a.push(key);}
+  // a label dropped back on the palette is simply deleted (labels are synthetic)
+  mvcdRender();
+}
+function mvcdDropOnChip(e,zone,targetKey){
+  e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;
+  if(mvcdDrag.kind==='line'){const from=mvcdDrag.index;mvcdDrag=null;mvcdReorderLine(from,zone);mvcdRender();return;}
+  const key=mvcdDrag.key;mvcdDrag=null;
+  if(key===targetKey)return;
+  mvcdStripKey(key);
+  const arr=mvcdZoneArr(zone);if(!arr){mvcdRender();return;}
+  const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);
+  mvcdRender();
+}
 function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdZoneArr(zone);if(!a)return;const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
 async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovementsView();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
 
