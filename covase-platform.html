@@ -3677,7 +3677,15 @@ const MV_CARD_FIELDS=[
   {key:'quote_total',label:'Quote total (£)',money:true,get:m=>fmtMoney(parseFloat(m.quote_total)||null)},
   {key:'invoice_total',label:'Invoice total (£)',money:true,get:m=>fmtMoney(parseFloat(m.invoice_total)||null)},
   {key:'actual_fuel',label:'Actual fuel (£)',money:true,get:m=>fmtMoney(parseFloat(m.actual_fuel_cost)||null)},
-  {key:'notes',label:'Notes',get:m=>m.notes||''}
+  {key:'notes',label:'Notes',get:m=>m.notes||''},
+  {key:'pickup_address',label:'Pickup address',get:m=>m.pickup_address_line1||''},
+  {key:'dropoff_address',label:'Dropoff address',get:m=>m.dropoff_address_line1||''},
+  {key:'mileage_source',label:'Mileage source',get:m=>m.mileage_source||''},
+  {key:'base_charge',label:'Base charge (£)',money:true,get:m=>fmtMoney(parseFloat(m.base_charge)||null)},
+  {key:'markup_flat',label:'Markup (£, internal)',money:true,get:m=>fmtMoney(parseFloat(m.markup_flat)||null)},
+  {key:'vat_total',label:'VAT (£)',money:true,get:m=>fmtMoney(parseFloat(m.vat_total)||null)},
+  {key:'fuel_markup_amount',label:'Fuel markup (£)',money:true,get:m=>fmtMoney(parseFloat(m.fuel_markup_amount)||null)},
+  {key:'internal_notes',label:'Internal notes',get:m=>m.internal_notes||''}
 ];
 const MV_FIELD_MAP=Object.fromEntries(MV_CARD_FIELDS.map(f=>[f.key,f]));
 // Label tokens: fixed text placed in the layout ('label:<uid>:<text>'). A label
