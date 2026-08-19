@@ -3768,9 +3768,11 @@ function movementCard(m){
   const lineArrs=Array.isArray(L.lines)?L.lines:['line1','line2','line3'].map(k=>L[k]||[]);
   const linesHtml=lineArrs.map((keys,i)=>lineHtml(keys,'font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px')).join('');
   const rightParts=(L.right||[]).map(k=>{const bk=mvKeyBase(k);const f=MV_FIELD_MAP[bk];if(!f)return '';const v=f.get(m);if(!v)return '';
-    if(bk==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(String(v))}</div>`;
-    if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase)">${esc(String(v))}</div>`;
-    return `<div style="font-size:11px;color:var(--n600);margin-top:2px">${esc(String(v))}</div>`;
+    // chip formatting appended last so it OVERRIDES the built-in styling
+    const fs=mvFmtStyle(mvKeyFmt(k));
+    if(bk==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px;${fs}">${esc(String(v))}</div>`;
+    if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase);${fs}">${esc(String(v))}</div>`;
+    return `<div style="font-size:11px;color:var(--n600);margin-top:2px;${fs}">${esc(String(v))}</div>`;
   }).filter(Boolean).join('');
   const right=rightParts?`<div style="text-align:right;white-space:nowrap">${rightParts}</div>`:'';
   return `<div class="card" onclick="openEditMovement('${esc(m.id)}')">
