@@ -1341,6 +1341,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <button class="btn-primary-modal" onclick="saveMvCardDesigner()">Save layout</button>
     </div>
   </div>
+  <!-- chip formatting popover (opens on chip click) -->
+  <div id="mvcd-fmt-pop" style="display:none;position:fixed;z-index:300;background:#fff;border:1px solid var(--n200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:7px;align-items:center;gap:6px">
+    <button type="button" id="mvcd-fmt-b" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 9px;cursor:pointer;font-weight:700" onclick="mvcdFmtApply(f=>{f.b=f.b?0:1;})">B</button>
+    <button type="button" id="mvcd-fmt-i" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 10px;cursor:pointer;font-style:italic" onclick="mvcdFmtApply(f=>{f.i=f.i?0:1;})">I</button>
+    <select id="mvcd-fmt-s" style="font-size:12px;padding:3px 5px;border:1px solid var(--n200);border-radius:5px" onchange="const v=this.value;mvcdFmtApply(f=>{if(v)f.s=v;else delete f.s;})">
+      <option value="">Size</option><option value="sm">Small</option><option value="lg">Large</option>
+    </select>
+    <input type="color" id="mvcd-fmt-c" value="#333333" title="Text colour" style="width:30px;height:26px;border:1px solid var(--n200);border-radius:5px;padding:1px;cursor:pointer" oninput="const v=this.value;mvcdFmtApply(f=>{f.c=v;})">
+    <button type="button" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--n500)" onclick="mvcdFmtApply(f=>{delete f.b;delete f.i;delete f.s;delete f.c;})">Clear</button>
+    <button type="button" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--n400)" onclick="mvcdFmtClose()">✕</button>
+  </div>
 </div>
 
 <!-- ─── ACCOUNT MODAL ─── -->
@@ -3622,7 +3633,7 @@ function renderMovementCalendar(){
   for(let d=1;d<=daysInMonth;d++){
     const key=year+'-'+pad(month+1)+'-'+pad(d);
     const items=byDate[key]||[];
-    const chips=items.map(m=>`<div class="mvcal-chip mvcal-${esc(m.movement_status)}" title="${esc((m.customer||'—')+' · '+mvStatusLabel(m.movement_status))}" onclick="openEditMovement('${esc(m.id)}')">${esc(mvChipText(m))}</div>`).join('');
+    const chips=items.map(m=>`<div class="mvcal-chip mvcal-${esc(m.movement_status)}" title="${esc((m.customer||'—')+' · '+mvStatusLabel(m.movement_status))}" onclick="openEditMovement('${esc(m.id)}')">${mvChipHtml(m)}</div>`).join('');
     cells+=`<div class="mvcal-cell${key===todayKey?' mvcal-today':''}"><div class="mvcal-daynum">${d}</div>${chips}</div>`;
   }
   const dow=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>`<div class="mvcal-dow">${x}</div>`).join('');
@@ -3693,13 +3704,27 @@ const MV_FIELD_MAP=Object.fromEntries(MV_CARD_FIELDS.map(f=>[f.key,f]));
 // separate ' · ' segment; a label before an empty field is dropped with it.
 function mvIsLabelKey(k){return typeof k==='string'&&k.indexOf('label:')===0;}
 function mvLabelText(k){return k.split(':').slice(2).join(':');}
-function mvResolveParts(keys,m){
+// Per-chip formatting is encoded in the layout entry after a '|':
+//   'customer|b,i,s:lg,c:#0a7a72'  → bold italic large teal customer name
+function mvKeyBase(k){return String(k).split('|')[0];}
+function mvKeyFmt(k){
+  const p=String(k).split('|')[1];const f={};if(!p)return f;
+  p.split(',').forEach(t=>{if(t==='b')f.b=1;else if(t==='i')f.i=1;else if(t.indexOf('s:')===0)f.s=t.slice(2);else if(t.indexOf('c:')===0)f.c=t.slice(2);});
+  return f;
+}
+function mvFmtEncode(base,f){const t=[];if(f.b)t.push('b');if(f.i)t.push('i');if(f.s)t.push('s:'+f.s);if(f.c)t.push('c:'+f.c);return t.length?base+'|'+t.join(','):base;}
+function mvFmtStyle(f){let s='';if(f.b)s+='font-weight:700;';if(f.i)s+='font-style:italic;';if(f.s==='sm')s+='font-size:0.85em;';if(f.s==='lg')s+='font-size:1.25em;';if(f.c)s+='color:'+f.c+';';return s;}
+function mvFmtWrap(html,f){const st=mvFmtStyle(f);return st?'<span style="'+st+'">'+html+'</span>':html;}
+// Resolve layout keys → HTML parts (escaped values, formatting applied).
+// A label glues to the NEXT field's value; label before an empty field is dropped.
+function mvResolvePartsHtml(keys,m){
   const out=[];let pending=null;
   (keys||[]).forEach(k=>{
-    if(mvIsLabelKey(k)){pending=(pending?pending+' ':'')+mvLabelText(k);return;}
-    const f=MV_FIELD_MAP[k];if(!f)return;
+    const base=mvKeyBase(k),fmt=mvKeyFmt(k);
+    if(mvIsLabelKey(base)){const lh=mvFmtWrap(esc(mvLabelText(base)),fmt);pending=pending?pending+' '+lh:lh;return;}
+    const f=MV_FIELD_MAP[base];if(!f)return;
     const v=f.get(m);
-    if(v!==''&&v!=null&&String(v)!==''){out.push((pending?pending+' ':'')+String(v));}
+    if(v!==''&&v!=null&&String(v)!==''){out.push((pending?pending+' ':'')+mvFmtWrap(esc(String(v)),fmt));}
     pending=null;
   });
   if(pending)out.push(pending); // trailing label with no field still shows
@@ -3724,9 +3749,9 @@ async function loadMovementCardLayout(){
     const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
     if(v&&typeof v==='object'){
       const L=mvcdCloneLayout(v);
-      const ok=k=>MV_FIELD_MAP[k]||mvIsLabelKey(k);
+      const ok=k=>MV_FIELD_MAP[mvKeyBase(k)]||mvIsLabelKey(mvKeyBase(k));
       L.title=L.title.filter(ok);
-      L.right=L.right.filter(k=>MV_FIELD_MAP[k]); // right column is fields-only
+      L.right=L.right.filter(k=>MV_FIELD_MAP[mvKeyBase(k)]); // right column is fields-only
       L.lines=L.lines.map(l=>l.filter(ok));
       L.chip=L.chip.filter(ok);
       movementCardLayout=L;
@@ -3736,14 +3761,14 @@ async function loadMovementCardLayout(){
 }
 function movementCard(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
-  const parts=keys=>mvResolveParts(keys,m).map(t=>esc(t));
+  const parts=keys=>mvResolvePartsHtml(keys,m); // already escaped + formatted HTML
   const titleParts=parts(L.title);
   const title=titleParts.length?titleParts.join(' '):'—';
   const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' ')}</div>`:'';};
   const lineArrs=Array.isArray(L.lines)?L.lines:['line1','line2','line3'].map(k=>L[k]||[]);
   const linesHtml=lineArrs.map((keys,i)=>lineHtml(keys,'font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px')).join('');
-  const rightParts=(L.right||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);if(!v)return '';
-    if(k==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(String(v))}</div>`;
+  const rightParts=(L.right||[]).map(k=>{const bk=mvKeyBase(k);const f=MV_FIELD_MAP[bk];if(!f)return '';const v=f.get(m);if(!v)return '';
+    if(bk==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(String(v))}</div>`;
     if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase)">${esc(String(v))}</div>`;
     return `<div style="font-size:11px;color:var(--n600);margin-top:2px">${esc(String(v))}</div>`;
   }).filter(Boolean).join('');
@@ -3762,14 +3787,14 @@ function movementCard(m){
 const MVCD_SAMPLE={id:'sample',customer:'Woodland Trust',customer_reference:'PO-4471',pickup_postcode:'BN1 1AA',dropoff_postcode:'M1 2AB',pickup_town:'Brighton',dropoff_town:'Manchester',pickup_county:'East Sussex',dropoff_county:'Greater Manchester',mileage:264.3,drive_time_minutes:290,vehicle_reg:'AB12 CDE',vehicle_makemodel:'Ford Transit',driver_name:'Jane Doe',movement_date:'2026-08-20',quote_date:'2026-08-14',quote_total:512.4,invoice_total:0,actual_fuel_cost:0,movement_status:'booked'};
 let mvcdDraft=null,mvcdDrag=null;
 function openMvCardDesigner(){mvcdDraft=mvcdCloneLayout(movementCardLayout);mvcdRender();document.getElementById('mv-card-designer-modal').classList.add('open');}
-function closeMvCardDesigner(){document.getElementById('mv-card-designer-modal').classList.remove('open');}
+function closeMvCardDesigner(){mvcdFmtClose();document.getElementById('mv-card-designer-modal').classList.remove('open');}
 function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);mvcdRender();}
 // Chip text for the calendar view — driven by the designed layout's chip zone
-function mvChipText(m){
+function mvChipHtml(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
   const keys=(Array.isArray(L.chip)&&L.chip.length)?L.chip:['customer'];
-  const parts=mvResolveParts(keys,m);
-  return parts.length?parts.join(' '):(m.customer||'—');
+  const parts=mvResolvePartsHtml(keys,m);
+  return parts.length?parts.join(' '):esc(m.customer||'—');
 }
 // Palette hides only fields used ON THE CARD — the calendar chip is a separate
 // surface with its own copies, so a field can be on both card and chip.
@@ -3792,12 +3817,44 @@ function mvcdRemoveLine(i){
   mvcdRender();
 }
 function mvcdChip(key,zone){
-  const isL=mvIsLabelKey(key);
-  const f=isL?null:MV_FIELD_MAP[key];
+  const base=mvKeyBase(key),fmt=mvKeyFmt(key);
+  const isL=mvIsLabelKey(base);
+  const f=isL?null:MV_FIELD_MAP[base];
   if(!isL&&!f)return '';
   const inZone=zone&&zone!=='palette';
-  const label=isL?('🏷 '+mvLabelText(key)):f.label;
-  return `<span class="mvcd-chip${inZone?'':' pal'}${isL?' lbl':''}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}>${esc(label)}${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
+  const label=isL?('🏷 '+mvLabelText(base)):f.label;
+  const st=mvFmtStyle(fmt); // chip text previews its own formatting
+  return `<span class="mvcd-chip${inZone?'':' pal'}${isL?' lbl':''}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`onclick="mvcdOpenFmt(event,'${zone}','${key}')" title="Click to format" ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}><span style="${st}">${esc(label)}</span>${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
+// ── Chip formatting popover ──
+let mvcdFmtTarget=null;
+function mvcdOpenFmt(e,zone,key){
+  e.stopPropagation();
+  mvcdFmtTarget={zone,key};
+  const pop=document.getElementById('mvcd-fmt-pop');if(!pop)return;
+  pop.style.display='flex';
+  pop.style.left=Math.min(e.clientX-20,window.innerWidth-260)+'px';
+  pop.style.top=Math.min(e.clientY+14,window.innerHeight-70)+'px';
+  mvcdFmtSync();
+}
+function mvcdFmtClose(){const pop=document.getElementById('mvcd-fmt-pop');if(pop)pop.style.display='none';mvcdFmtTarget=null;}
+function mvcdFmtSync(){
+  if(!mvcdFmtTarget)return;
+  const f=mvKeyFmt(mvcdFmtTarget.key);
+  const tog=(id,on)=>{const b=document.getElementById(id);if(b){b.style.background=on?'var(--covase)':'#fff';b.style.color=on?'#fff':'var(--n700)';}};
+  tog('mvcd-fmt-b',!!f.b);tog('mvcd-fmt-i',!!f.i);
+  const s=document.getElementById('mvcd-fmt-s');if(s)s.value=f.s||'';
+  const c=document.getElementById('mvcd-fmt-c');if(c)c.value=f.c||'#333333';
+}
+function mvcdFmtApply(mut){
+  if(!mvcdFmtTarget)return;
+  const {zone,key}=mvcdFmtTarget;
+  const arr=mvcdZoneArr(zone);if(!arr)return;
+  const i=arr.indexOf(key);if(i<0)return;
+  const f=mvKeyFmt(key);mut(f);
+  const nk=mvFmtEncode(mvKeyBase(key),f);
+  arr[i]=nk;mvcdFmtTarget.key=nk;
+  mvcdRender();mvcdFmtSync();
+}
 function mvcdAddLabel(){
   let t=prompt('Label text (e.g. From, To, Ref, →)');
   if(!t)return;
@@ -3809,7 +3866,7 @@ function mvcdAddLabel(){
 }
 function mvcdZonePlaceholder(z){if(z==='title')return 'Title';if(z==='right')return 'Right column';if(z==='chip')return 'Calendar chip — drag fields here (keep it short)';if(z&&z.indexOf('line:')===0)return 'Line '+(parseInt(z.slice(5),10)+1)+' — drag fields here';return z;}
 function mvcdRender(){
-  const used=new Set(mvcdUsedKeys());
+  const used=new Set(mvcdUsedKeys().map(mvKeyBase));
   const pal=document.getElementById('mvcd-palette');
   if(pal){const rest=MV_CARD_FIELDS.filter(f=>!used.has(f.key));pal.innerHTML=rest.length?rest.map(f=>mvcdChip(f.key,'palette')).join(''):'<span class="mvcd-zone-empty">All fields placed — drag one back here to remove it</span>';}
   const zoneHtml=(zone,keys)=>keys.length?keys.map(k=>mvcdChip(k,zone)).join(''):'<span class="mvcd-zone-empty">'+mvcdZonePlaceholder(zone)+'</span>';
@@ -3829,11 +3886,11 @@ function mvcdPreview(){
   const sample=(Array.isArray(allMovements)&&allMovements[0])?allMovements[0]:MVCD_SAMPLE;
   const prev=movementCardLayout;movementCardLayout=mvcdDraft;
   let html='',chipTxt='';
-  try{html=movementCard(sample);chipTxt=mvChipText(sample);}catch(e){}
+  try{html=movementCard(sample);chipTxt=mvChipHtml(sample);}catch(e){}
   movementCardLayout=prev;
   const pv=document.getElementById('mvcd-preview');if(pv)pv.innerHTML=html;
   const cp=document.getElementById('mvcd-chip-preview');
-  if(cp)cp.innerHTML='<span class="mvcal-chip mvcal-booked" style="display:inline-block;max-width:220px">'+esc(chipTxt)+'</span> <span style="font-size:10px;color:var(--n400)">← calendar chip</span>';
+  if(cp)cp.innerHTML='<span class="mvcal-chip mvcal-booked" style="display:inline-block;max-width:220px">'+chipTxt+'</span> <span style="font-size:10px;color:var(--n400)">← calendar chip</span>';
 }
 function mvcdDragStart(e,key,zone){mvcdDrag={kind:'chip',key,zone};try{e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';}catch(_){}}
 function mvcdLineDragStart(e,i){mvcdDrag={kind:'line',index:i};try{e.dataTransfer.setData('text/plain','line:'+i);e.dataTransfer.effectAllowed='move';}catch(_){}e.stopPropagation();}
