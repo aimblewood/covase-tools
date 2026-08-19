@@ -1308,7 +1308,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
       <button class="modal-close" onclick="closeMvCardDesigner()">✕</button>
     </div>
     <div class="modal-body">
-      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Fields on a line flow with spacing only — use 🏷 labels (From, To, →…) to structure the reading.</div>
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Fields on a line flow with spacing only — use 🏷 labels (From, To, →…) to structure the reading. The calendar chip is independent: a field can be on the card AND the chip.</div>
       <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
         <div>
           <div class="mvcd-zone-label">Available fields</div>
@@ -3771,7 +3771,9 @@ function mvChipText(m){
   const parts=mvResolveParts(keys,m);
   return parts.length?parts.join(' '):(m.customer||'—');
 }
-function mvcdUsedKeys(){return mvcdDraft.title.concat(mvcdDraft.right,mvcdDraft.chip,...mvcdDraft.lines);}
+// Palette hides only fields used ON THE CARD — the calendar chip is a separate
+// surface with its own copies, so a field can be on both card and chip.
+function mvcdUsedKeys(){return mvcdDraft.title.concat(mvcdDraft.right,...mvcdDraft.lines);}
 // Resolve a zone name ('title' | 'right' | 'line:N') to its draft array
 function mvcdZoneArr(zone){
   if(zone==='title')return mvcdDraft.title;
@@ -3847,15 +3849,22 @@ function mvcdReorderLine(from,toZone){
 function mvcdAllowDrop(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('mvcd-over');}
 function mvcdDragLeave(e){if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.remove('mvcd-over');}
 function mvcdChipOver(e){e.preventDefault();e.stopPropagation();}
-function mvcdStripKey(key){[mvcdDraft.title,mvcdDraft.right,...mvcdDraft.lines].forEach(a=>{const i=a.indexOf(key);if(i>=0)a.splice(i,1);});}
+function mvcdStripKey(key,scope){
+  const arrs=scope==='chip'?[mvcdDraft.chip]:[mvcdDraft.title,mvcdDraft.right,...mvcdDraft.lines];
+  arrs.forEach(a=>{const i=a.indexOf(key);if(i>=0)a.splice(i,1);});
+}
 function mvcdClearOver(){document.querySelectorAll('.mvcd-over').forEach(el=>el.classList.remove('mvcd-over'));}
 function mvcdDrop(e,zone){
   e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;
   if(mvcdDrag.kind==='line'){const from=mvcdDrag.index;mvcdDrag=null;mvcdReorderLine(from,zone);mvcdRender();return;}
-  const key=mvcdDrag.key;mvcdDrag=null;
-  mvcdStripKey(key);
-  if(zone!=='palette'){const a=mvcdZoneArr(zone);if(a)a.push(key);}
-  // a label dropped back on the palette is simply deleted (labels are synthetic)
+  const key=mvcdDrag.key,origin=mvcdDrag.zone;mvcdDrag=null;
+  if(zone==='palette'){
+    // dropping on the palette removes it from where it came from
+    const oa=mvcdZoneArr(origin);if(oa){const i=oa.indexOf(key);if(i>=0)oa.splice(i,1);}
+    mvcdRender();return;
+  }
+  mvcdStripKey(key,zone==='chip'?'chip':'card');
+  const a=mvcdZoneArr(zone);if(a)a.push(key);
   mvcdRender();
 }
 function mvcdDropOnChip(e,zone,targetKey){
@@ -3863,7 +3872,7 @@ function mvcdDropOnChip(e,zone,targetKey){
   if(mvcdDrag.kind==='line'){const from=mvcdDrag.index;mvcdDrag=null;mvcdReorderLine(from,zone);mvcdRender();return;}
   const key=mvcdDrag.key;mvcdDrag=null;
   if(key===targetKey)return;
-  mvcdStripKey(key);
+  mvcdStripKey(key,zone==='chip'?'chip':'card');
   const arr=mvcdZoneArr(zone);if(!arr){mvcdRender();return;}
   const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);
   mvcdRender();
