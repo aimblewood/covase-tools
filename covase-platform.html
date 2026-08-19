@@ -1376,6 +1376,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       </div>
       <div id="ff-timeline" style="font-size:11px;color:var(--n500);margin-top:8px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <a id="ff-pdf-btn" class="btn btn-secondary" style="font-size:12px;display:none;text-decoration:none" target="_blank" rel="noopener">📄 View notice</a>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('autopay')">✉ Notify driver (auto-pay)</button>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('speeding')">✉ Request address (speeding)</button>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineNominationPack()">📋 Nomination pack</button>
@@ -5639,7 +5640,7 @@ function renderFinesRegister(){
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-weight:600;font-size:13px;color:var(--n800)">'+esc(f.driver_name||'Driver unknown')+' · '+esc(f.vehicle_reg||'—')+'</div>'
       +'<div style="font-size:11px;color:var(--n600);margin-top:2px">'+esc(typeTxt)+'</div>'
-      +'<div style="font-size:11px;color:var(--n500);margin-top:2px">'+esc(when)+(f.issuer?' · '+esc(f.issuer):'')+(f.issuer_ref?' · Ref '+esc(f.issuer_ref):'')+(f.coin_invoice_no?' · '+esc(f.coin_invoice_no):'')+'</div>'
+      +'<div style="font-size:11px;color:var(--n500);margin-top:2px">'+esc(when)+(f.issuer?' · '+esc(f.issuer):'')+(f.issuer_ref?' · Ref '+esc(f.issuer_ref):'')+(f.coin_invoice_no?' · '+esc(f.coin_invoice_no):'')+(f.pdf_url?' · 📄':'')+'</div>'
       +'</div>'
       +'<div style="text-align:right;white-space:nowrap">'
       +'<div style="font-weight:700;font-size:13px;color:var(--covase)">'+fmtMoney(fineTotal(f)||null)+'</div>'
@@ -5674,6 +5675,8 @@ function openFineModal(id){
   if(f?.exported_at)tl.push('Exported to WT sheet '+fmtUK(String(f.exported_at).slice(0,10)));
   document.getElementById('ff-timeline').textContent=tl.join(' · ');
   document.getElementById('ff-delete-btn').style.display=id?'':'none';
+  const pb=document.getElementById('ff-pdf-btn');
+  if(pb){if(f&&f.pdf_url){pb.style.display='';pb.href=f.pdf_url;}else pb.style.display='none';}
   document.getElementById('fine-modal').classList.add('open');
 }
 function closeFineModal(){document.getElementById('fine-modal').classList.remove('open');}
