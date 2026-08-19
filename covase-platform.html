@@ -397,6 +397,19 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .mvcd-line-handle:hover{color:var(--n600)}
 .fe-hi{outline:2px dashed var(--covase) !important;outline-offset:1px;cursor:crosshair !important}
 
+/* Fine PDF side-by-side viewer */
+#fine-modal .modal{transition:width .25s ease,max-width .25s ease}
+#fine-modal.pdf-open{gap:10px}
+#fine-modal.pdf-open .modal{width:46vw;max-width:46vw}
+#fine-pdf-panel{display:none;width:46vw;max-width:46vw;height:90vh;background:var(--card);border-radius:16px;box-shadow:0 20px 60px rgba(36,34,84,.22);flex-direction:column;overflow:hidden}
+.fpv-head{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--n100);flex-shrink:0}
+.fpv-head button{border:1px solid var(--n200);background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px;color:var(--n700);font-family:inherit}
+.fpv-head button:hover{background:var(--n50)}
+.fpv-info{font-size:11px;color:var(--n500);min-width:80px;text-align:center}
+#fpv-scroll{flex:1;overflow:auto;background:var(--n100);cursor:grab;text-align:center;padding:12px}
+#fpv-scroll.dragging{cursor:grabbing}
+#fpv-canvas{box-shadow:0 4px 16px rgba(0,0,0,.18);background:#fff}
+
 /* Movements: view switcher + kanban wrapper + calendar */
 .seg{display:inline-flex;border:1px solid var(--n200);border-radius:8px;overflow:hidden}
 .seg-btn{border:none;background:#fff;color:var(--n600);font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit}
@@ -1376,7 +1389,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       </div>
       <div id="ff-timeline" style="font-size:11px;color:var(--n500);margin-top:8px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-        <a id="ff-pdf-btn" class="btn btn-secondary" style="font-size:12px;display:none;text-decoration:none" target="_blank" rel="noopener">📄 View notice</a>
+        <a id="ff-pdf-btn" class="btn btn-secondary" style="font-size:12px;display:none;text-decoration:none" href="#" onclick="openFinePdfPanel(event)">📄 View notice</a>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('autopay')">✉ Notify driver (auto-pay)</button>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('speeding')">✉ Request address (speeding)</button>
         <button class="btn btn-secondary" style="font-size:12px" onclick="fineNominationPack()">📋 Nomination pack</button>
@@ -1387,6 +1400,21 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <button class="btn-secondary-modal" onclick="closeFineModal()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveFine()">Save fine</button>
     </div>
+  </div>
+  <div id="fine-pdf-panel">
+    <div class="fpv-head">
+      <button onclick="fpvPage(-1)" title="Previous page">‹</button>
+      <span class="fpv-info" id="fpv-pageinfo">–</span>
+      <button onclick="fpvPage(1)" title="Next page">›</button>
+      <span style="flex:1"></span>
+      <button onclick="fpvZoomBtn(0.8)" title="Zoom out">−</button>
+      <span class="fpv-info" id="fpv-zoom" style="min-width:46px">—</span>
+      <button onclick="fpvZoomBtn(1.25)" title="Zoom in">＋</button>
+      <button onclick="fpvFit()" title="Fit to width">Fit</button>
+      <a id="fpv-tab" target="_blank" rel="noopener" title="Open in new tab" style="text-decoration:none;font-size:13px;color:var(--n500);padding:0 4px">⧉</a>
+      <button onclick="fpvClose()" title="Close viewer">✕</button>
+    </div>
+    <div id="fpv-scroll"><canvas id="fpv-canvas"></canvas></div>
   </div>
 </div>
 
@@ -5679,7 +5707,7 @@ function openFineModal(id){
   if(pb){if(f&&f.pdf_url){pb.style.display='';pb.href=f.pdf_url;}else pb.style.display='none';}
   document.getElementById('fine-modal').classList.add('open');
 }
-function closeFineModal(){document.getElementById('fine-modal').classList.remove('open');}
+function closeFineModal(){fpvClose();document.getElementById('fine-modal').classList.remove('open');}
 function fineFormPayload(){
   const g=id=>document.getElementById(id)?.value||'';
   const num=id=>{const n=parseFloat(g(id));return isNaN(n)?null:n;};
@@ -5766,6 +5794,88 @@ function fineNominationPack(){
   document.getElementById('fpe-mailto').href='#';
   _fineEmailKind='nominate';
   document.getElementById('fine-email-modal').classList.add('open');
+}
+
+// ── In-app PDF viewer: fine modal slides left, notice renders beside it.
+// Wheel = zoom (centred on cursor), drag = pan, ‹ › = pages, Fit = fit width.
+let fpv={pdf:null,page:1,pages:0,scale:null,timer:null};
+function loadPdfJs(){
+  return new Promise((res,rej)=>{
+    if(window.pdfjsLib)return res();
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';res();};
+    s.onerror=()=>rej(new Error('PDF viewer library failed to load'));
+    document.head.appendChild(s);
+  });
+}
+async function openFinePdfPanel(e){
+  if(e)e.preventDefault();
+  const f=editFineId?(allFines||[]).find(x=>x.id===editFineId):null;
+  if(!f||!f.pdf_url){toast('No notice stored for this fine','error');return;}
+  try{await loadPdfJs();}
+  catch(err){window.open(f.pdf_url,'_blank');return;} // graceful fallback
+  document.getElementById('fine-modal').classList.add('pdf-open');
+  document.getElementById('fine-pdf-panel').style.display='flex';
+  document.getElementById('fpv-tab').href=f.pdf_url;
+  document.getElementById('fpv-pageinfo').textContent='Loading…';
+  fpv={pdf:null,page:1,pages:0,scale:null,timer:null};
+  try{
+    fpv.pdf=await pdfjsLib.getDocument(f.pdf_url).promise;
+    fpv.pages=fpv.pdf.numPages;
+    await fpvRender();
+  }catch(err){toast('Could not load the notice: '+err.message,'error');fpvClose();}
+}
+async function fpvRender(){
+  if(!fpv.pdf)return;
+  const page=await fpv.pdf.getPage(fpv.page);
+  const scroll=document.getElementById('fpv-scroll');
+  if(fpv.scale==null){const v1=page.getViewport({scale:1});fpv.scale=Math.max(0.2,(scroll.clientWidth-40)/v1.width);}
+  const dpr=window.devicePixelRatio||1;
+  const vp=page.getViewport({scale:fpv.scale});
+  const canvas=document.getElementById('fpv-canvas');
+  canvas.width=Math.floor(vp.width*dpr);canvas.height=Math.floor(vp.height*dpr);
+  canvas.style.width=Math.floor(vp.width)+'px';canvas.style.height=Math.floor(vp.height)+'px';
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:page.getViewport({scale:fpv.scale*dpr})}).promise;
+  document.getElementById('fpv-pageinfo').textContent='Page '+fpv.page+' / '+fpv.pages;
+  document.getElementById('fpv-zoom').textContent=Math.round(fpv.scale*100)+'%';
+}
+function fpvPage(d){if(!fpv.pdf)return;const n=fpv.page+d;if(n<1||n>fpv.pages)return;fpv.page=n;fpvRender();}
+function fpvZoomTo(s,cx,cy){
+  if(!fpv.pdf)return;
+  const scroll=document.getElementById('fpv-scroll');
+  const old=fpv.scale||1;
+  fpv.scale=Math.min(6,Math.max(0.2,s));
+  document.getElementById('fpv-zoom').textContent=Math.round(fpv.scale*100)+'%';
+  const k=fpv.scale/old;
+  const ax=scroll.scrollLeft+(cx!=null?cx:scroll.clientWidth/2);
+  const ay=scroll.scrollTop+(cy!=null?cy:scroll.clientHeight/2);
+  clearTimeout(fpv.timer);
+  fpv.timer=setTimeout(async()=>{
+    await fpvRender();
+    scroll.scrollLeft=ax*k-(cx!=null?cx:scroll.clientWidth/2);
+    scroll.scrollTop=ay*k-(cy!=null?cy:scroll.clientHeight/2);
+  },80);
+}
+function fpvZoomBtn(m){fpvZoomTo((fpv.scale||1)*m);}
+function fpvFit(){fpv.scale=null;fpvRender();}
+function fpvClose(){
+  document.getElementById('fine-modal').classList.remove('pdf-open');
+  document.getElementById('fine-pdf-panel').style.display='none';
+  fpv.pdf=null;
+}
+function initFinePdfViewer(){
+  const scroll=document.getElementById('fpv-scroll');if(!scroll)return;
+  scroll.addEventListener('wheel',e=>{
+    if(!fpv.pdf)return;
+    e.preventDefault();
+    const r=scroll.getBoundingClientRect();
+    fpvZoomTo((fpv.scale||1)*(e.deltaY<0?1.12:0.9),e.clientX-r.left,e.clientY-r.top);
+  },{passive:false});
+  let drag=null;
+  scroll.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,sl:scroll.scrollLeft,st:scroll.scrollTop};scroll.classList.add('dragging');e.preventDefault();});
+  window.addEventListener('mousemove',e=>{if(!drag)return;scroll.scrollLeft=drag.sl-(e.clientX-drag.x);scroll.scrollTop=drag.st-(e.clientY-drag.y);});
+  window.addEventListener('mouseup',()=>{drag=null;scroll.classList.remove('dragging');});
 }
 
 // ── COIN import: parse Lex's consolidated invoice xlsx, keep Motoring Offences
@@ -6515,6 +6625,8 @@ loadFines();loadFineTemplates();loadFineDash();
 loadInvoices();loadOutgoing();loadMovements();loadContacts();loadVehicles();
 // Go live: subscribe to database changes so the app stays current by itself
 initRealtime();
+// Fine notice viewer (wheel-zoom / drag-pan handlers)
+initFinePdfViewer();
 // Load the reply-agent instructions (for the Settings editor)
 loadAgentInstructions();
 // Load the shared sidebar layout and render the (organisable) sidebar
