@@ -562,6 +562,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="sb-item disabled" title="Coming soon"><span class="icon">◉</span> GoCardless</div>
     </div>
   </nav>
+  <div id="rt-live" style="padding:6px 20px;font-size:10px;color:rgba(255,255,255,.35)">○ Live updates: connecting…</div>
   <div class="sb-config-toggle" onclick="openSbOrganiser()">⇅ Organise sidebar</div>
   <div class="sb-config-toggle" onclick="toggleConfig()">⚙ Settings</div>
   <div class="sb-config-panel" id="config-panel">
@@ -6140,6 +6141,52 @@ async function saveFontTheme(){
   }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
 }
 
+// ─── REALTIME: Supabase pushes table changes over a websocket; each change
+// debounce-reloads the affected module, so every open browser stays current —
+// n8n inserts, imports, and colleagues' edits appear within ~a second. ───
+const RT_TABLES={
+  covase_hires:()=>{hiresLoaded=false;loadHires();},
+  covase_movements:()=>loadMovements(),
+  covase_claims:()=>loadClaims(),
+  covase_fines:()=>loadFines(),
+  covase_supplier_replies:()=>loadSupplierReplies(),
+  covase_invoices:()=>{loadInvoices();loadOutgoing();},
+  covase_accounts:()=>loadAccounts(),
+  covase_contacts:()=>loadContacts(),
+  covase_vehicles:()=>loadVehicles(),
+  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();}
+};
+let _rtTimers={};
+function rtIndicator(on,msg){
+  const el=document.getElementById('rt-live');if(!el)return;
+  el.textContent=(on?'● ':'○ ')+(msg||(on?'Live — updates apply instantly':'Live updates off'));
+  el.style.color=on?'#03d3c6':'rgba(255,255,255,.35)';
+}
+async function initRealtime(){
+  const c=getConfig();
+  if(!c.url||!c.key){rtIndicator(false,'Live updates off — no Supabase config');return;}
+  try{
+    await new Promise((res,rej)=>{
+      if(window.supabase)return res();
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+      s.onload=res;s.onerror=()=>rej(new Error('lib load failed'));
+      document.head.appendChild(s);
+    });
+  }catch(e){rtIndicator(false,'Live updates unavailable (script blocked)');return;}
+  try{
+    const client=window.supabase.createClient(c.url,c.key);
+    const ch=client.channel('orbis-live');
+    Object.keys(RT_TABLES).forEach(t=>{
+      ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>{
+        clearTimeout(_rtTimers[t]);
+        _rtTimers[t]=setTimeout(()=>{try{RT_TABLES[t]();}catch(e){}},900);
+      });
+    });
+    ch.subscribe(status=>{rtIndicator(status==='SUBSCRIBED',status==='SUBSCRIBED'?null:'Live updates: '+String(status).toLowerCase());});
+  }catch(e){rtIndicator(false);}
+}
+
 // ─── SIDEBAR ORGANISER (layout shared via covase_config key 'sidebar_layout') ───
 const SB_ITEMS={
   'received':{icon:'↓',label:'Received invoices',view:'received',badge:'badge-pending'},
@@ -6285,6 +6332,10 @@ loadSupplierReplies();
 loadClaims();
 // Prime the fines badge + templates + dashboard config
 loadFines();loadFineTemplates();loadFineDash();
+// Prime ALL remaining sidebar badges at boot (previously '—' until visited)
+loadInvoices();loadOutgoing();loadMovements();loadContacts();loadVehicles();
+// Go live: subscribe to database changes so the app stays current by itself
+initRealtime();
 // Load the reply-agent instructions (for the Settings editor)
 loadAgentInstructions();
 // Load the shared sidebar layout and render the (organisable) sidebar
