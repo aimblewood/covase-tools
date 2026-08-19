@@ -1317,9 +1317,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--n800);lin
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
               <div style="flex:1;min-width:0">
                 <div class="mvcd-zone mvcd-zone-title" data-zone="title" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'title')"></div>
-                <div class="mvcd-zone" data-zone="line1" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line1')"></div>
-                <div class="mvcd-zone" data-zone="line2" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line2')"></div>
-                <div class="mvcd-zone" data-zone="line3" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'line3')"></div>
+                <div id="mvcd-lines"></div>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLine()">＋ Add line</button>
               </div>
               <div class="mvcd-zone mvcd-zone-right" data-zone="right" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'right')"></div>
             </div>
@@ -3674,9 +3673,18 @@ const MV_CARD_FIELDS=[
   {key:'notes',label:'Notes',get:m=>m.notes||''}
 ];
 const MV_FIELD_MAP=Object.fromEntries(MV_CARD_FIELDS.map(f=>[f.key,f]));
-const DEFAULT_MV_CARD_LAYOUT={title:['customer'],line1:['route','miles'],line2:['date','customer_reference','vehicle_reg'],line3:[],right:['total','status']};
-const MVCD_ZONES=['title','line1','line2','line3','right'];
-function mvcdCloneLayout(src){const o={};MVCD_ZONES.forEach(z=>{o[z]=Array.isArray(src&&src[z])?src[z].slice():[];});return o;}
+const DEFAULT_MV_CARD_LAYOUT={title:['customer'],lines:[['route','miles'],['date','customer_reference','vehicle_reg']],right:['total','status']};
+const MVCD_MAX_LINES=6;
+// Normalises any saved shape (incl. the legacy fixed line1/line2/line3 format)
+// into {title:[], lines:[[]...], right:[]} with at least one line.
+function mvcdCloneLayout(src){
+  const s=src||{};
+  let lines;
+  if(Array.isArray(s.lines))lines=s.lines.map(l=>Array.isArray(l)?l.slice():[]);
+  else{lines=['line1','line2','line3'].map(k=>Array.isArray(s[k])?s[k].slice():[]);while(lines.length>1&&!lines[lines.length-1].length)lines.pop();}
+  if(!lines.length)lines=[[]];
+  return {title:Array.isArray(s.title)?s.title.slice():[],lines:lines,right:Array.isArray(s.right)?s.right.slice():[]};
+}
 let movementCardLayout=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);
 async function loadMovementCardLayout(){
   try{
@@ -3684,7 +3692,9 @@ async function loadMovementCardLayout(){
     const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
     if(v&&typeof v==='object'){
       const L=mvcdCloneLayout(v);
-      MVCD_ZONES.forEach(z=>{L[z]=L[z].filter(k=>MV_FIELD_MAP[k]);});
+      L.title=L.title.filter(k=>MV_FIELD_MAP[k]);
+      L.right=L.right.filter(k=>MV_FIELD_MAP[k]);
+      L.lines=L.lines.map(l=>l.filter(k=>MV_FIELD_MAP[k]));
       movementCardLayout=L;
     }
   }catch(e){/* covase_config may not exist yet — keep default */}
@@ -3696,9 +3706,8 @@ function movementCard(m){
   const titleParts=parts(L.title);
   const title=titleParts.length?titleParts.join(' · '):'—';
   const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' · ')}</div>`:'';};
-  const l1=lineHtml(L.line1,'font-size:11px;color:var(--n600);margin-top:2px');
-  const l2=lineHtml(L.line2,'font-size:11px;color:var(--n500);margin-top:2px');
-  const l3=lineHtml(L.line3,'font-size:11px;color:var(--n500);margin-top:2px');
+  const lineArrs=Array.isArray(L.lines)?L.lines:['line1','line2','line3'].map(k=>L[k]||[]);
+  const linesHtml=lineArrs.map((keys,i)=>lineHtml(keys,'font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px')).join('');
   const rightParts=(L.right||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);if(!v)return '';
     if(k==='status')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(String(v))}</div>`;
     if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase)">${esc(String(v))}</div>`;
@@ -3709,7 +3718,7 @@ function movementCard(m){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--n800)">${title}</div>
-        ${l1}${l2}${l3}
+        ${linesHtml}
       </div>
       ${right}
     </div>
@@ -3721,15 +3730,40 @@ let mvcdDraft=null,mvcdDrag=null;
 function openMvCardDesigner(){mvcdDraft=mvcdCloneLayout(movementCardLayout);mvcdRender();document.getElementById('mv-card-designer-modal').classList.add('open');}
 function closeMvCardDesigner(){document.getElementById('mv-card-designer-modal').classList.remove('open');}
 function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);mvcdRender();}
-function mvcdUsedKeys(){return MVCD_ZONES.reduce((a,z)=>a.concat(mvcdDraft[z]),[]);}
+function mvcdUsedKeys(){return mvcdDraft.title.concat(mvcdDraft.right,...mvcdDraft.lines);}
+// Resolve a zone name ('title' | 'right' | 'line:N') to its draft array
+function mvcdZoneArr(zone){
+  if(zone==='title')return mvcdDraft.title;
+  if(zone==='right')return mvcdDraft.right;
+  if(zone&&zone.indexOf('line:')===0)return mvcdDraft.lines[parseInt(zone.slice(5),10)]||null;
+  return null;
+}
+function mvcdAddLine(){
+  if(mvcdDraft.lines.length>=MVCD_MAX_LINES){toast('Maximum '+MVCD_MAX_LINES+' lines','error');return;}
+  mvcdDraft.lines.push([]);mvcdRender();
+}
+function mvcdRemoveLine(i){
+  mvcdDraft.lines.splice(i,1);          // removed line's fields return to the palette
+  if(!mvcdDraft.lines.length)mvcdDraft.lines=[[]];
+  mvcdRender();
+}
 function mvcdChip(key,zone){const f=MV_FIELD_MAP[key];if(!f)return '';const inZone=zone&&zone!=='palette';
   return `<span class="mvcd-chip${inZone?'':' pal'}" draggable="true" ondragstart="mvcdDragStart(event,'${key}','${zone||'palette'}')" ${inZone?`ondragover="mvcdChipOver(event)" ondrop="mvcdDropOnChip(event,'${zone}','${key}')"`:''}>${esc(f.label)}${inZone?` <span class="x" onclick="mvcdRemove(event,'${zone}','${key}')">✕</span>`:''}</span>`;}
-function mvcdZonePlaceholder(z){return {title:'Title',line1:'Line 1',line2:'Line 2',line3:'Line 3',right:'Right column'}[z]||z;}
+function mvcdZonePlaceholder(z){if(z==='title')return 'Title';if(z==='right')return 'Right column';if(z&&z.indexOf('line:')===0)return 'Line '+(parseInt(z.slice(5),10)+1)+' — drag fields here';return z;}
 function mvcdRender(){
   const used=new Set(mvcdUsedKeys());
   const pal=document.getElementById('mvcd-palette');
   if(pal){const rest=MV_CARD_FIELDS.filter(f=>!used.has(f.key));pal.innerHTML=rest.length?rest.map(f=>mvcdChip(f.key,'palette')).join(''):'<span class="mvcd-zone-empty">All fields placed — drag one back here to remove it</span>';}
-  MVCD_ZONES.forEach(z=>{const el=document.querySelector('.mvcd-zone[data-zone="'+z+'"]');if(!el)return;const keys=mvcdDraft[z]||[];el.innerHTML=keys.length?keys.map(k=>mvcdChip(k,z)).join(''):'<span class="mvcd-zone-empty">'+mvcdZonePlaceholder(z)+'</span>';});
+  const zoneHtml=(zone,keys)=>keys.length?keys.map(k=>mvcdChip(k,zone)).join(''):'<span class="mvcd-zone-empty">'+mvcdZonePlaceholder(zone)+'</span>';
+  ['title','right'].forEach(z=>{const el=document.querySelector('.mvcd-zone[data-zone="'+z+'"]');if(el)el.innerHTML=zoneHtml(z,mvcdDraft[z]||[]);});
+  const lw=document.getElementById('mvcd-lines');
+  if(lw)lw.innerHTML=mvcdDraft.lines.map((keys,i)=>{
+    const z='line:'+i;
+    return '<div style="display:flex;align-items:center;gap:6px">'
+      +'<div class="mvcd-zone" style="flex:1" data-zone="'+z+'" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,\''+z+'\')">'+zoneHtml(z,keys)+'</div>'
+      +(mvcdDraft.lines.length>1?'<span class="x" style="cursor:pointer;color:var(--n400);font-weight:700;font-size:12px;padding:2px 4px" title="Delete line '+(i+1)+' (fields return to palette)" onclick="mvcdRemoveLine('+i+')">✕</span>':'')
+      +'</div>';
+  }).join('');
   mvcdPreview();
 }
 function mvcdPreview(){const sample=(Array.isArray(allMovements)&&allMovements[0])?allMovements[0]:MVCD_SAMPLE;const prev=movementCardLayout;movementCardLayout=mvcdDraft;let html='';try{html=movementCard(sample);}catch(e){html='';}movementCardLayout=prev;const pv=document.getElementById('mvcd-preview');if(pv)pv.innerHTML=html;}
@@ -3737,11 +3771,11 @@ function mvcdDragStart(e,key,zone){mvcdDrag={key,zone};try{e.dataTransfer.setDat
 function mvcdAllowDrop(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('mvcd-over');}
 function mvcdDragLeave(e){if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.remove('mvcd-over');}
 function mvcdChipOver(e){e.preventDefault();e.stopPropagation();}
-function mvcdStripKey(key){MVCD_ZONES.forEach(z=>{const a=mvcdDraft[z];const i=a.indexOf(key);if(i>=0)a.splice(i,1);});}
+function mvcdStripKey(key){[mvcdDraft.title,mvcdDraft.right,...mvcdDraft.lines].forEach(a=>{const i=a.indexOf(key);if(i>=0)a.splice(i,1);});}
 function mvcdClearOver(){document.querySelectorAll('.mvcd-over').forEach(el=>el.classList.remove('mvcd-over'));}
-function mvcdDrop(e,zone){e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;mvcdStripKey(key);if(zone!=='palette')mvcdDraft[zone].push(key);mvcdRender();}
-function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;if(key===targetKey)return;mvcdStripKey(key);const arr=mvcdDraft[zone];const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);mvcdRender();}
-function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdDraft[zone];const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
+function mvcdDrop(e,zone){e.preventDefault();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;mvcdStripKey(key);if(zone!=='palette'){const a=mvcdZoneArr(zone);if(a)a.push(key);}mvcdRender();}
+function mvcdDropOnChip(e,zone,targetKey){e.preventDefault();e.stopPropagation();mvcdClearOver();if(!mvcdDrag)return;const key=mvcdDrag.key;mvcdDrag=null;if(key===targetKey)return;mvcdStripKey(key);const arr=mvcdZoneArr(zone);if(!arr){mvcdRender();return;}const ti=arr.indexOf(targetKey);arr.splice(ti<0?arr.length:ti,0,key);mvcdRender();}
+function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdZoneArr(zone);if(!a)return;const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
 async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovementsView();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
 
 function populateMovementSupplierDropdown(){
