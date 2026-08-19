@@ -749,6 +749,38 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     </div>
   </div>
 
+  <!-- FINES & PENALTIES -->
+  <div class="view" id="view-fines">
+    <div class="topbar">
+      <h1>Fines &amp; penalties</h1>
+      <input class="search-box" type="text" id="fine-search" placeholder="Search driver, reg, issuer, ref, COIN…" oninput="renderFinesView()">
+      <select id="fine-status-filter" onchange="renderFinesView()" style="font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:8px;background:#fff">
+        <option value="">All statuses</option>
+      </select>
+      <div class="seg" id="fine-view-seg">
+        <button class="seg-btn active" data-fv="register" onclick="setFineView('register')">Register</button>
+        <button class="seg-btn" data-fv="dashboard" onclick="setFineView('dashboard')">Dashboard</button>
+        <button class="seg-btn" data-fv="reports" onclick="setFineView('reports')">Reports</button>
+      </div>
+      <input type="file" id="fine-coin-input" accept=".xlsx,.xls" style="display:none" onchange="importCoinFile(this.files[0]);this.value=''">
+      <button class="topbar-btn" onclick="openFineTemplates()">✉ Templates</button>
+      <button class="topbar-btn" onclick="exportWtSheet()">⬇ WT sheet export</button>
+      <button class="topbar-btn" onclick="document.getElementById('fine-coin-input').click()">⬆ Import COIN</button>
+      <button class="topbar-btn primary" onclick="openFineModal()">+ New fine</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card stat-covase"><div class="stat-label">Open fines</div><div class="stat-val" id="sf-open">—</div><div class="stat-sub">not yet charged/closed</div></div>
+      <div class="stat-card stat-orange"><div class="stat-label">Awaiting nomination</div><div class="stat-val" id="sf-nom">—</div><div class="stat-sub">speeding / NoIP</div></div>
+      <div class="stat-card stat-indigo"><div class="stat-label">Total cost (12m)</div><div class="stat-val" id="sf-cost">—</div><div class="stat-sub" id="sf-cost-sub">fines + admin fees</div></div>
+      <div class="stat-card stat-red"><div class="stat-label">Queries</div><div class="stat-val" id="sf-query">—</div><div class="stat-sub">parked for review</div></div>
+    </div>
+    <div class="content">
+      <div class="card-list" id="fines-register"></div>
+      <div id="fines-dashboard" style="display:none"></div>
+      <div id="fines-reports" style="display:none"></div>
+    </div>
+  </div>
+
   <!-- ACCIDENT MANAGEMENT (FMG claims) -->
   <div class="view" id="view-claims">
     <div class="topbar">
@@ -1287,6 +1319,106 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeEmailTemplate()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveEmailTemplate()">Save template</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FINE DETAIL MODAL ─── -->
+<div class="modal-overlay" id="fine-modal">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-header">
+      <div class="modal-title" id="fine-modal-title">New fine / penalty</div>
+      <button class="modal-close" onclick="closeFineModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section-label">Notice</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Status</label><select id="ff-status"></select></div>
+        <div class="form-field"><label>Offence type</label>
+          <select id="ff-offence"><option value="parking">Parking</option><option value="speeding">Speeding</option><option value="toll">Toll violation</option><option value="congestion">Congestion charge</option><option value="bus_lane">Bus lane</option><option value="route">Route restriction</option><option value="other">Other</option></select></div>
+        <div class="form-field"><label>Notice class</label>
+          <select id="ff-class"><option value="">—</option><option value="pcn_private">Parking Charge Notice (private)</option><option value="pcn_authority">Penalty Charge Notice (authority)</option><option value="noip">Notice of Intended Prosecution</option></select></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Issuer</label><input id="ff-issuer" placeholder="e.g. Parking Eye Ltd"></div>
+        <div class="form-field"><label>Issuer ref</label><input id="ff-ref" placeholder="559900/789997"></div>
+        <div class="form-field"><label>Issuer portal URL</label><input id="ff-portal" placeholder="https:// (for nominations/appeals)"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field" style="grid-column:1/3"><label>Location</label><input id="ff-location" placeholder="Royal Bolton Hospital - Chadwick"></div>
+        <div class="form-field"><label>Offence date &amp; time</label><input type="datetime-local" id="ff-when"></div>
+      </div>
+      <div class="form-section-label">Vehicle &amp; driver</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Registration</label><input id="ff-reg" placeholder="BJ75JKZ" style="text-transform:uppercase"></div>
+        <div class="form-field"><label>Vehicle description</label><input id="ff-vehdesc"></div>
+        <div class="form-field"><label>Driver name</label><input id="ff-driver" list="ff-driver-list" placeholder="Type to search contacts"><datalist id="ff-driver-list"></datalist></div>
+        <div class="form-field"><label>Client</label><select id="ff-client"><option value="">—</option></select></div>
+      </div>
+      <div class="form-section-label">Money</div>
+      <div class="form-row quad">
+        <div class="form-field"><label>Fine/charge £</label><input type="number" step="0.01" id="ff-fine"></div>
+        <div class="form-field"><label>Fine VAT £</label><input type="number" step="0.01" id="ff-fine-vat"></div>
+        <div class="form-field"><label>Admin fee £</label><input type="number" step="0.01" id="ff-admin" value="15"></div>
+        <div class="form-field"><label>Admin VAT £</label><input type="number" step="0.01" id="ff-admin-vat"></div>
+      </div>
+      <div class="form-section-label">COIN &amp; charging</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>COIN invoice no</label><input id="ff-coin" placeholder="COIN331138"></div>
+        <div class="form-field"><label>COIN invoice date</label><input type="date" id="ff-coin-date"></div>
+        <div class="form-field"><label>Charge month (WT sheet)</label><input id="ff-charge-month" placeholder="Sep 26"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Appeal status</label><select id="ff-appeal"><option value="">—</option><option value="advised">Appeal advised to us</option><option value="upheld">Upheld</option><option value="rejected">Rejected</option></select></div>
+        <div class="form-field"><label>Notes</label><input id="ff-notes"></div>
+      </div>
+      <div id="ff-timeline" style="font-size:11px;color:var(--n500);margin-top:8px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('autopay')">✉ Notify driver (auto-pay)</button>
+        <button class="btn btn-secondary" style="font-size:12px" onclick="fineEmail('speeding')">✉ Request address (speeding)</button>
+        <button class="btn btn-secondary" style="font-size:12px" onclick="fineNominationPack()">📋 Nomination pack</button>
+        <button class="btn btn-secondary" style="font-size:12px;color:var(--tl-red-t)" id="ff-delete-btn" onclick="deleteFine()">Delete</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeFineModal()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveFine()">Save fine</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FINE EMAIL PREVIEW ─── -->
+<div class="modal-overlay" id="fine-email-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header"><div class="modal-title" id="fpe-title">Driver email</div><button class="modal-close" onclick="document.getElementById('fine-email-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--n500)" id="fpe-meta"></div>
+      <div id="fpe-body" style="border:1px solid var(--n200);border-radius:8px;padding:12px;margin-top:8px;font-size:13px;white-space:pre-wrap;max-height:340px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="fpeCopy()">Copy text</button>
+      <a class="btn-secondary-modal" id="fpe-mailto" href="#" style="text-decoration:none">Open in mail app</a>
+      <button class="btn-primary-modal" onclick="fpeMarkSent()">Mark as sent</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FINE TEMPLATES EDITOR ─── -->
+<div class="modal-overlay" id="fine-templates-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header"><div class="modal-title">Fine email templates</div><button class="modal-close" onclick="document.getElementById('fine-templates-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--n500);margin-bottom:8px">Tokens: {firstName} {driverName} {fineAmount} {adminFee} {regNo} {vehicleDesc} {issuer} {location} {offenceDate} {ref} — CC list applies to both.</div>
+      <div class="form-field"><label>CC (comma-separated)</label><input id="fpt-cc"></div>
+      <div class="form-field"><label>Auto-pay subject</label><input id="fpt-ap-subject"></div>
+      <div class="form-field"><label>Auto-pay body</label><textarea id="fpt-ap-body" style="width:100%;min-height:140px;font-size:12px;padding:8px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box"></textarea></div>
+      <div class="form-field"><label>Speeding subject</label><input id="fpt-sp-subject"></div>
+      <div class="form-field"><label>Speeding body</label><textarea id="fpt-sp-body" style="width:100%;min-height:140px;font-size:12px;padding:8px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="fineTemplatesReset()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="document.getElementById('fine-templates-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveFineTemplates()">Save templates</button>
     </div>
   </div>
 </div>
@@ -2136,7 +2268,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'claims':loadClaims,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'claims':loadClaims,'fines':loadFines,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
@@ -5420,6 +5552,414 @@ async function importClaimsFile(file){
   }catch(e){toast('Import failed: '+e.message,'error');}
 }
 
+// ─── FINES & PENALTIES MODULE ───
+// Register of motoring fines (Lex notifications → driver comms → nomination →
+// COIN reconciliation → WT-sheet export → charging/appeals). Templates +
+// dashboard config in covase_config; COIN import parses Lex's xlsx client-side.
+let allFines=[],finesLoaded=false,fineView='register',fineDashCfg=null;
+const FINE_STATUSES=[['new','New'],['driver_notified','Driver notified'],['address_requested','Address requested'],['nominated','Nominated'],['on_coin','On COIN'],['to_be_charged','To be charged'],['charged','Charged'],['query','Query (parked)'],['appeal_upheld','Appeal upheld'],['refunded','Refunded'],['cancelled','Cancelled']];
+const FINE_STATUS_LABEL=Object.fromEntries(FINE_STATUSES);
+const FINE_OFFENCE_LABEL={parking:'Parking',speeding:'Speeding',toll:'Toll violation',congestion:'Congestion charge',bus_lane:'Bus lane violation',route:'Route restriction',other:'Other'};
+const FINE_OPEN=s=>!['charged','refunded','cancelled'].includes(s);
+const DEFAULT_FINE_TEMPLATES={
+  cc:'jonoliver@woodlandtrust.org.uk,markbevington@woodlandtrust.org.uk',
+  apSubject:'Motoring fine received — {regNo}',
+  apBody:'Hello {firstName}\n\nSorry to be the bearer of bad news but we have received the attached.\n\nI can confirm that the leasing company (Lex Autolease) has automatically paid the fine at the reduced rate of £{fineAmount}, and this has been recharged to The Woodland Trust along with a £{adminFee} admin fee. The Trust will be in contact with you in due course to confirm when this will be deducted via Payroll.\n\nIf you believe the fine has been issued incorrectly, we strongly encourage you to appeal directly to the issuing authority using the instructions provided on the attached notice.\n\nIf your appeal is successful, please notify us here at Covase and provide:\n• Written confirmation that the appeal was upheld\n• Written confirmation that a refund has been issued back to Lex Autolease\n\nOnce received, we will liaise with Lex to ensure that both the fine and the associated admin fee are credited back to The Trust which will then enable any deduction made by the Trust for their outlay to be returned to you through Payroll.\n\nIf you have any questions or need support with this process, don\'t hesitate to get in touch.\n\nThanks',
+  spSubject:'Speeding notice received — {regNo} — please confirm your address',
+  spBody:'Hi {firstName}\n\nSorry to be the bearer of bad news but we have received the attached.\n\nThe leasing company (Lex Autolease) will charge The Woodland Trust a £{adminFee} admin fee for processing. The Trust will be in contact with you in due course to confirm when this will be deducted via Payroll.\n\nWe need to nominate you as the driver via the issuer\'s online portal. Therefore please can you confirm your current address for us so we can double check against our files and submit correctly?\n\nThanks'
+};
+let fineTemplates={...DEFAULT_FINE_TEMPLATES};
+async function loadFineTemplates(){try{const rows=await sbReq('covase_config?key=eq.fines_templates&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(v&&typeof v==='object')fineTemplates={...DEFAULT_FINE_TEMPLATES,...v};}catch(e){}}
+async function loadFines(){
+  try{
+    allFines=await sbReq('covase_fines?order=created_at.desc&limit=1000');
+    finesLoaded=true;
+    if(!Array.isArray(allAccounts)||!allAccounts.length){try{allAccounts=await sbReq('covase_accounts?order=company_name.asc&limit=500');}catch(e){}}
+    if(!Array.isArray(allContacts)||!allContacts.length){try{allContacts=await sbReq('covase_contacts?order=last_name.asc&limit=2000');}catch(e){}}
+    updateFineStats();applyFineViewVis();renderFinesView();
+  }catch(e){const el=document.getElementById('fines-register');if(el)el.innerHTML='<div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message||'')+' (is phase-fines-penalties.sql applied?)</div></div>';}
+}
+function fineTotal(f){return (parseFloat(f.fine_amount)||0)+(parseFloat(f.fine_vat)||0)+(parseFloat(f.admin_fee)||0)+(parseFloat(f.admin_fee_vat)||0);}
+function updateFineStats(){
+  const open=(allFines||[]).filter(f=>FINE_OPEN(f.status));
+  const nom=(allFines||[]).filter(f=>['address_requested'].includes(f.status)||(f.offence_type==='speeding'&&['new','driver_notified'].includes(f.status)));
+  const yr=Date.now()-365*86400000;
+  const cost=(allFines||[]).filter(f=>f.status!=='cancelled'&&(!f.offence_datetime||new Date(f.offence_datetime).getTime()>yr)).reduce((s,f)=>s+fineTotal(f),0);
+  const q=(allFines||[]).filter(f=>f.status==='query').length;
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('sf-open',open.length);set('sf-nom',nom.length);set('sf-cost',fmtMoney(cost||null));set('sf-query',q);
+  const b=document.getElementById('badge-fines');if(b)b.textContent=String(open.length||0);
+}
+function applyFineViewVis(){
+  const m={'register':'fines-register','dashboard':'fines-dashboard','reports':'fines-reports'};
+  Object.entries(m).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.style.display=fineView===k?'':'none';});
+}
+function setFineView(v){fineView=v;document.querySelectorAll('#fine-view-seg .seg-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-fv')===v));applyFineViewVis();renderFinesView();}
+function finesFiltered(){
+  const q=(document.getElementById('fine-search')?.value||'').toLowerCase().trim();
+  const st=document.getElementById('fine-status-filter')?.value||'';
+  let rows=(allFines||[]).slice();
+  if(st)rows=rows.filter(f=>f.status===st);
+  if(q)rows=rows.filter(f=>[f.driver_name,f.vehicle_reg,f.issuer,f.issuer_ref,f.coin_invoice_no,f.location,f.vehicle_desc].map(x=>String(x||'').toLowerCase()).join(' ').includes(q));
+  return rows;
+}
+function renderFinesView(){
+  const sf=document.getElementById('fine-status-filter');
+  if(sf&&sf.options.length<2)sf.innerHTML='<option value="">All statuses</option>'+FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('');
+  if(fineView==='dashboard')renderFinesDashboard();
+  else if(fineView==='reports')renderFinesReports();
+  else renderFinesRegister();
+}
+function fineStatusBadge(s){const cls={new:'badge-requested',driver_notified:'badge-booked',address_requested:'badge-ordered',nominated:'badge-booked',on_coin:'badge-invoiced',to_be_charged:'badge-ordered',charged:'badge-paid',query:'badge-cancelled',appeal_upheld:'badge-active',refunded:'badge-paid',cancelled:'badge-cancelled'}[s]||'badge-unknown';return '<span class="badge '+cls+'">'+esc(FINE_STATUS_LABEL[s]||s)+'</span>';}
+function renderFinesRegister(){
+  const el=document.getElementById('fines-register');if(!el)return;
+  const rows=finesFiltered();
+  if(!rows.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-title">No fines'+((allFines||[]).length?' match':' yet')+'</div><div class="empty-sub">Import a COIN file or add a fine manually.</div></div>';return;}
+  el.innerHTML=rows.map(f=>{
+    const when=f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const typeTxt=(FINE_OFFENCE_LABEL[f.offence_type]||f.offence_type||'—')+(f.location?' — '+f.location:'');
+    return '<div class="card" onclick="openFineModal(\''+esc(f.id)+'\')">'
+      +'<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-weight:600;font-size:13px;color:var(--n800)">'+esc(f.driver_name||'Driver unknown')+' · '+esc(f.vehicle_reg||'—')+'</div>'
+      +'<div style="font-size:11px;color:var(--n600);margin-top:2px">'+esc(typeTxt)+'</div>'
+      +'<div style="font-size:11px;color:var(--n500);margin-top:2px">'+esc(when)+(f.issuer?' · '+esc(f.issuer):'')+(f.issuer_ref?' · Ref '+esc(f.issuer_ref):'')+(f.coin_invoice_no?' · '+esc(f.coin_invoice_no):'')+'</div>'
+      +'</div>'
+      +'<div style="text-align:right;white-space:nowrap">'
+      +'<div style="font-weight:700;font-size:13px;color:var(--covase)">'+fmtMoney(fineTotal(f)||null)+'</div>'
+      +'<div style="margin-top:4px">'+fineStatusBadge(f.status)+'</div>'
+      +'</div></div></div>';
+  }).join('');
+}
+// ── Fine modal ──
+let editFineId=null;
+function openFineModal(id){
+  editFineId=id||null;
+  const f=id?(allFines||[]).find(x=>x.id===id):null;
+  document.getElementById('fine-modal-title').textContent=f?('Fine — '+(f.vehicle_reg||'')+' '+(f.issuer_ref||'')):'New fine / penalty';
+  const ss=document.getElementById('ff-status');
+  if(ss.options.length<2)ss.innerHTML=FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('');
+  const cs=document.getElementById('ff-client');
+  cs.innerHTML='<option value="">—</option>'+(allAccounts||[]).filter(a=>(a.type||'client')==='client').map(a=>'<option value="'+esc(a.id)+'">'+esc(a.company_name)+'</option>').join('');
+  const dl=document.getElementById('ff-driver-list');
+  if(dl)dl.innerHTML=(allContacts||[]).map(c=>'<option value="'+esc(((c.first_name||'')+' '+(c.last_name||'')).trim())+'">').join('');
+  const v=(id2,val)=>{const e=document.getElementById(id2);if(e)e.value=val==null?'':val;};
+  v('ff-status',f?.status||'new');v('ff-offence',f?.offence_type||'parking');v('ff-class',f?.notice_class||'');
+  v('ff-issuer',f?.issuer);v('ff-ref',f?.issuer_ref);v('ff-portal',f?.issuer_portal);v('ff-location',f?.location);
+  v('ff-when',f?.offence_datetime?String(new Date(f.offence_datetime).toISOString()).slice(0,16):'');
+  v('ff-reg',f?.vehicle_reg);v('ff-vehdesc',f?.vehicle_desc);v('ff-driver',f?.driver_name);v('ff-client',f?.client_account_id||'');
+  v('ff-fine',f?.fine_amount);v('ff-fine-vat',f?.fine_vat);v('ff-admin',f?f.admin_fee:15);v('ff-admin-vat',f?.admin_fee_vat);
+  v('ff-coin',f?.coin_invoice_no);v('ff-coin-date',f?.coin_invoice_date?String(f.coin_invoice_date).slice(0,10):'');v('ff-charge-month',f?.charge_month);
+  v('ff-appeal',f?.appeal_status||'');v('ff-notes',f?.notes);
+  const tl=[];
+  if(f?.driver_notified_at)tl.push('Driver notified '+fmtUK(String(f.driver_notified_at).slice(0,10)));
+  if(f?.address_requested_at)tl.push('Address requested '+fmtUK(String(f.address_requested_at).slice(0,10)));
+  if(f?.nominated_at)tl.push('Nominated '+fmtUK(String(f.nominated_at).slice(0,10)));
+  if(f?.exported_at)tl.push('Exported to WT sheet '+fmtUK(String(f.exported_at).slice(0,10)));
+  document.getElementById('ff-timeline').textContent=tl.join(' · ');
+  document.getElementById('ff-delete-btn').style.display=id?'':'none';
+  document.getElementById('fine-modal').classList.add('open');
+}
+function closeFineModal(){document.getElementById('fine-modal').classList.remove('open');}
+function fineFormPayload(){
+  const g=id=>document.getElementById(id)?.value||'';
+  const num=id=>{const n=parseFloat(g(id));return isNaN(n)?null:n;};
+  const nm=g('ff-driver').trim();
+  // link driver contact by name (nickname/prefix aware — reuses claims helpers)
+  let dcid=null;
+  if(nm){const hits=(allContacts||[]).filter(ct=>clmLastTok(ct.last_name||'')===clmLastTok(nm)&&clmFirstNamesMatch(clmFirstTok(ct.first_name||''),clmFirstTok(nm)));if(hits.length===1)dcid=hits[0].id;}
+  const reg=g('ff-reg').replace(/\s+/g,'').toUpperCase()||null;
+  const veh=reg?(allVehicles||[]).find(x=>normReg(x.reg)===reg):null;
+  return {
+    status:g('ff-status')||'new',offence_type:g('ff-offence')||null,notice_class:g('ff-class')||null,
+    issuer:g('ff-issuer').trim()||null,issuer_ref:g('ff-ref').trim()||null,issuer_portal:g('ff-portal').trim()||null,
+    location:g('ff-location').trim()||null,
+    offence_datetime:g('ff-when')?new Date(g('ff-when')).toISOString():null,
+    vehicle_reg:reg,vehicle_desc:g('ff-vehdesc').trim()||null,
+    driver_name:nm||null,driver_contact_id:dcid,vehicle_id:veh?veh.id:null,
+    client_account_id:g('ff-client')||null,
+    fine_amount:num('ff-fine'),fine_vat:num('ff-fine-vat'),admin_fee:num('ff-admin'),admin_fee_vat:num('ff-admin-vat'),
+    coin_invoice_no:g('ff-coin').trim()||null,coin_invoice_date:g('ff-coin-date')||null,charge_month:g('ff-charge-month').trim()||null,
+    appeal_status:g('ff-appeal')||null,notes:g('ff-notes').trim()||null,
+    updated_at:new Date().toISOString()
+  };
+}
+async function saveFine(){
+  const p=fineFormPayload();
+  try{
+    if(editFineId){
+      await sbReq('covase_fines?id=eq.'+encodeURIComponent(editFineId),{method:'PATCH',body:p,prefer:'return=minimal'});
+      const i=(allFines||[]).findIndex(x=>x.id===editFineId);if(i>=0)allFines[i]={...allFines[i],...p};
+      toast('Fine updated','success');
+    }else{
+      const id='fp-'+Date.now();
+      await sbReq('covase_fines',{method:'POST',body:{...p,id:id},prefer:'return=minimal'});
+      allFines.unshift({...p,id:id,created_at:new Date().toISOString()});
+      toast('Fine saved','success');
+    }
+    closeFineModal();updateFineStats();renderFinesView();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+async function deleteFine(){
+  if(!editFineId||!confirm('Delete this fine record? Cannot be undone.'))return;
+  try{await sbReq('covase_fines?id=eq.'+encodeURIComponent(editFineId),{method:'DELETE',prefer:'return=minimal'});allFines=allFines.filter(x=>x.id!==editFineId);closeFineModal();updateFineStats();renderFinesView();toast('Fine deleted','success');}
+  catch(e){toast('Delete failed: '+e.message,'error');}
+}
+// ── Driver emails (review-first: preview → copy/mail app → mark sent) ──
+let _fineEmailKind=null;
+function fineTokens(f){
+  const first=(f.driver_name||'').trim().split(/\s+/)[0]||'there';
+  return {firstName:first,driverName:f.driver_name||'',fineAmount:(parseFloat(f.fine_amount)||0).toFixed(2),adminFee:(parseFloat(f.admin_fee)||15).toFixed(2),regNo:f.vehicle_reg||'',vehicleDesc:f.vehicle_desc||'',issuer:f.issuer||'',location:f.location||'',offenceDate:f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',ref:f.issuer_ref||''};
+}
+function fineRender(tpl,t){return String(tpl||'').replace(/\{(\w+)\}/g,(m,k)=>t[k]!=null?t[k]:'');}
+function fineEmail(kind){
+  const f=editFineId?(allFines||[]).find(x=>x.id===editFineId):null;
+  if(!f){toast('Save the fine first','error');return;}
+  _fineEmailKind=kind;
+  const t=fineTokens(f);
+  const subj=fineRender(kind==='speeding'?fineTemplates.spSubject:fineTemplates.apSubject,t);
+  const body=fineRender(kind==='speeding'?fineTemplates.spBody:fineTemplates.apBody,t);
+  const ct=f.driver_contact_id?(allContacts||[]).find(c=>c.id===f.driver_contact_id):null;
+  const to=ct&&ct.email?ct.email:'';
+  document.getElementById('fpe-title').textContent=(kind==='speeding'?'Speeding / nomination email':'Auto-pay notification email');
+  document.getElementById('fpe-meta').textContent='To: '+(to||'⚠ no email on contact — add one or paste manually')+' · CC: '+(fineTemplates.cc||'—')+' · Subject: '+subj;
+  document.getElementById('fpe-body').textContent=body;
+  const m=document.getElementById('fpe-mailto');
+  m.href='mailto:'+encodeURIComponent(to)+'?cc='+encodeURIComponent(fineTemplates.cc||'')+'&subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+  document.getElementById('fine-email-modal').classList.add('open');
+}
+function fpeCopy(){const b=document.getElementById('fpe-body').textContent;navigator.clipboard&&navigator.clipboard.writeText(b).then(()=>toast('Email text copied','success'),()=>toast('Copy failed','error'));}
+async function fpeMarkSent(){
+  const f=(allFines||[]).find(x=>x.id===editFineId);if(!f)return;
+  const now=new Date().toISOString();
+  const patch=_fineEmailKind==='speeding'?{status:'address_requested',address_requested_at:now,driver_notified_at:f.driver_notified_at||now,updated_at:now}:{status:'driver_notified',driver_notified_at:now,updated_at:now};
+  try{await sbReq('covase_fines?id=eq.'+encodeURIComponent(f.id),{method:'PATCH',body:patch,prefer:'return=minimal'});Object.assign(f,patch);document.getElementById('fine-email-modal').classList.remove('open');openFineModal(f.id);updateFineStats();renderFinesView();toast('Marked as sent','success');}
+  catch(e){toast('Update failed: '+e.message,'error');}
+}
+function fineNominationPack(){
+  const f=editFineId?(allFines||[]).find(x=>x.id===editFineId):null;
+  if(!f){toast('Save the fine first','error');return;}
+  const ct=f.driver_contact_id?(allContacts||[]).find(c=>c.id===f.driver_contact_id):null;
+  const lines=['NOMINATION PACK — '+(f.issuer_ref||''),'','Issuer: '+(f.issuer||'—'),'Portal: '+(f.issuer_portal||'— (see notice)'),'Notice ref: '+(f.issuer_ref||'—'),'Offence: '+(FINE_OFFENCE_LABEL[f.offence_type]||'—')+' at '+(f.location||'—'),'Date/time: '+(f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB'):'—'),'Vehicle: '+(f.vehicle_reg||'—')+' '+(f.vehicle_desc||''),'','DRIVER','Name: '+(f.driver_name||'—'),'Email: '+(ct&&ct.email?ct.email:'—'),'Mobile: '+(ct&&ct.mobile?ct.mobile:'—'),'Address: '+(ct&&ct.address?ct.address:'⚠ NOT CONFIRMED — request via speeding email'),'Address confirmed: '+(f.address_confirmed_at?fmtUK(String(f.address_confirmed_at).slice(0,10)):'NO')].join('\n');
+  document.getElementById('fpe-title').textContent='Nomination pack';
+  document.getElementById('fpe-meta').textContent='Submit on the issuer portal, then click "Mark as sent" to set status → Nominated';
+  document.getElementById('fpe-body').textContent=lines;
+  document.getElementById('fpe-mailto').href='#';
+  _fineEmailKind='nominate';
+  document.getElementById('fine-email-modal').classList.add('open');
+}
+
+// ── COIN import: parse Lex's consolidated invoice xlsx, keep Motoring Offences
+// rows, pair fine + fee lines, extract issuer/location/date/ref from the text,
+// match driver/vehicle, and merge into the register (fills, never overwrites).
+function fineClassify(text){
+  const t=String(text||'').toLowerCase();
+  if(/speed/.test(t))return 'speeding';
+  if(/bus lane|bus-lane/.test(t))return 'bus_lane';
+  if(/congestion/.test(t))return 'congestion';
+  if(/toll|dartford|crossing|tunnel|humber bridge/.test(t))return 'toll';
+  if(/route|restricted|red route/.test(t))return 'route';
+  if(/parking/.test(t))return 'parking';
+  return 'other';
+}
+function fineParseText(txt){
+  const s=String(txt||'').replace(/\s+/g,' ');
+  const grab=re=>{const m=s.match(re);return m?m[1].trim():null;};
+  const dt=grab(/Date\/Time:\s*(\d{1,2}\s+\w{3}\s+\d{4}\s+\d{1,2}:\d{2})/i);
+  let iso=null;
+  if(dt){const d=new Date(dt);if(!isNaN(d))iso=d.toISOString();}
+  return {
+    issuer:grab(/Issued By:\s*([^\/]+?)(?:\/|\(|Location|$)/i),
+    location:grab(/Location:\s*(.+?)(?:\s*Date\/Time|\s*Ref|$)/i),
+    when:iso,
+    driver:(()=>{const d=grab(/Driver:\s*(.+?)(?:\s*Ref|\s*Charge|$)/i);return d&&!/not assigned/i.test(d)?d:null;})(),
+    ref:(()=>{let r=grab(/Ref\s*(?:No)?\s*:?\s*([A-Za-z0-9\/-]{4,})/i);if(r)r=r.replace(/\/(Processing|Private|Fee).*$/i,'');return r;})(),
+    charge:(()=>{const m=s.match(/Charge:\s*£?([\d,.]+)/i);return m?parseFloat(m[1].replace(/,/g,'')):null;})(),
+    fee:(()=>{const m=s.match(/Fee:\s*£?([\d,.]+)/i);return m?parseFloat(m[1].replace(/,/g,'')):null;})()
+  };
+}
+async function importCoinFile(file){
+  if(!file)return;
+  toast('Reading '+file.name+'…','success');
+  try{
+    await loadSheetJS();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+    const src=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null});
+    const mo=src.filter(r=>/motoring offences/i.test(String(r.DOC_TYPE_DESC||'')));
+    if(!mo.length){toast('No Motoring Offences rows found in that file','error');return;}
+    const invDate=prompt('COIN invoice date (YYYY-MM-DD)? Leave blank to skip.');
+    const chargeMonth=prompt('Charge month for the WT sheet (e.g. "Sep 26")? Leave blank to set later.');
+    // group fine + fee lines: key = reg | extracted ref (fallback reg | datetime)
+    const groups=new Map();
+    mo.forEach(r=>{
+      const p=fineParseText(r.INVOICE_TEXT);
+      const key=String(r.REG_NO||'')+'|'+(p.ref||p.when||'');
+      if(!groups.has(key))groups.set(key,{rows:[],p:p,reg:r.REG_NO,inv:r.INVOICE_NO||r.INVOICE_N||Object.values(r)[0]});
+      const g=groups.get(key);g.rows.push(r);
+      if(!g.p.ref&&p.ref)g.p=p;
+    });
+    let added=0,updated=0;
+    for(const g of groups.values()){
+      const fee=g.rows.find(r=>/fee/i.test(String(r.DOC_TYPE_DESC||'')));
+      const fine=g.rows.find(r=>!/fee/i.test(String(r.DOC_TYPE_DESC||'')));
+      const base=fine||fee;const p=g.p;
+      const reg=String(g.reg||'').replace(/\s+/g,'').toUpperCase()||null;
+      const drvName=p.driver||String(base.DRIVER_NAME||'').trim()||null;
+      let dcid=null;
+      if(drvName){const hits=(allContacts||[]).filter(ct=>clmLastTok(ct.last_name||'')===clmLastTok(drvName)&&clmFirstNamesMatch(clmFirstTok(ct.first_name||''),clmFirstTok(drvName)));if(hits.length===1)dcid=hits[0].id;}
+      const veh=reg?(allVehicles||[]).find(x=>normReg(x.reg)===reg):null;
+      const otype=fineClassify(String(base.INVOICE_TEXT||''));
+      const rec={
+        source:'lex',offence_type:otype,
+        notice_class:otype==='speeding'?'noip':(/ltd|limited|parking eye|horizon|premier/i.test(p.issuer||'')?'pcn_private':'pcn_authority'),
+        issuer:p.issuer,issuer_ref:p.ref,location:p.location,offence_datetime:p.when,
+        vehicle_reg:reg,vehicle_desc:String(base.VEHICLE_DESC||'').trim()||null,
+        driver_name:drvName,driver_contact_id:dcid,vehicle_id:veh?veh.id:null,
+        fine_amount:fine?(parseFloat(fine.NET)||p.charge||null):null,
+        fine_vat:fine?(parseFloat(fine.VAT)||0):null,
+        admin_fee:fee?(parseFloat(fee.NET)||null):null,
+        admin_fee_vat:fee?(parseFloat(fee.VAT)||0):null,
+        coin_invoice_no:String(base.INVOICE_NO||base.INVOICE_N||g.inv||'').trim()||null,
+        coin_invoice_date:invDate||null,charge_month:chargeMonth||null,
+        raw:{rows:g.rows},updated_at:new Date().toISOString()
+      };
+      // merge: existing record for same ref+reg (or reg+datetime) gets COIN data
+      // filled in and moves to on_coin; links are FILLED, never overwritten
+      const ex=(allFines||[]).find(x=>(rec.issuer_ref&&x.issuer_ref===rec.issuer_ref&&x.vehicle_reg===reg)||(rec.offence_datetime&&x.vehicle_reg===reg&&x.offence_datetime&&Math.abs(new Date(x.offence_datetime)-new Date(rec.offence_datetime))<60000));
+      if(ex){
+        const patch={coin_invoice_no:rec.coin_invoice_no,coin_invoice_date:rec.coin_invoice_date,updated_at:rec.updated_at};
+        if(!ex.charge_month&&rec.charge_month)patch.charge_month=rec.charge_month;
+        ['fine_amount','fine_vat','admin_fee','admin_fee_vat','issuer','location','driver_name','driver_contact_id','vehicle_id','vehicle_desc'].forEach(k=>{if(ex[k]==null&&rec[k]!=null)patch[k]=rec[k];});
+        if(['new','driver_notified','address_requested','nominated'].includes(ex.status))patch.status='on_coin';
+        try{await sbReq('covase_fines?id=eq.'+encodeURIComponent(ex.id),{method:'PATCH',body:patch,prefer:'return=minimal'});Object.assign(ex,patch);updated++;}catch(e){}
+      }else{
+        const id='fp-'+Date.now()+'-'+added;
+        try{await sbReq('covase_fines',{method:'POST',body:{...rec,id:id,status:'on_coin'},prefer:'return=minimal'});allFines.unshift({...rec,id:id,status:'on_coin',created_at:new Date().toISOString()});added++;}catch(e){toast('Row failed ('+(reg||'?')+'): '+e.message,'error');}
+      }
+    }
+    toast('COIN processed: '+added+' new, '+updated+' matched to existing ('+groups.size+' offences from '+mo.length+' invoice lines)','success');
+    updateFineStats();renderFinesView();
+  }catch(e){toast('Import failed: '+e.message,'error');}
+}
+// ── WT Teams sheet export (exact column format; grouped by COIN) ──
+async function exportWtSheet(){
+  const rows=(allFines||[]).filter(f=>['on_coin','to_be_charged','query'].includes(f.status)&&f.coin_invoice_no);
+  if(!rows.length){toast('Nothing to export — no fines in On COIN / To be charged / Query with a COIN number','error');return;}
+  await loadSheetJS();
+  const byCoin={};rows.forEach(f=>{(byCoin[f.coin_invoice_no]=byCoin[f.coin_invoice_no]||[]).push(f);});
+  const aoa=[['Status','COIN','Driver','Type','Date of offence','Invoice','Admin','Admin VAT','Fine/Charge','Fine/Charge VAT']];
+  Object.keys(byCoin).sort().forEach(coin=>{
+    byCoin[coin].forEach(f=>{
+      const status=f.status==='query'?'Parked - SH to query':('To be charged '+(f.charge_month||''));
+      const type=(FINE_OFFENCE_LABEL[f.offence_type]||'')+(f.location?' - '+f.location:'');
+      aoa.push([status,coin,f.driver_name||'',type,f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'',f.coin_invoice_date?fmtUK(String(f.coin_invoice_date).slice(0,10)):'',parseFloat(f.admin_fee)||'',parseFloat(f.admin_fee_vat)||'',parseFloat(f.fine_amount)||'',parseFloat(f.fine_vat)||'']);
+    });
+    aoa.push([]); // blank row between COINs, matching the WT sheet convention
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:22},{wch:12},{wch:20},{wch:52},{wch:12},{wch:12},{wch:9},{wch:9},{wch:11},{wch:12}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fines');
+  XLSX.writeFile(wb,'WT-fines-export-'+new Date().toISOString().slice(0,10)+'.xlsx');
+  const now=new Date().toISOString();
+  const ids=rows.map(f=>'"'+f.id+'"').join(',');
+  try{await sbReq('covase_fines?id=in.('+encodeURIComponent(ids)+')',{method:'PATCH',body:{exported_at:now},prefer:'return=minimal'});rows.forEach(f=>f.exported_at=now);}catch(e){}
+  toast('Exported '+rows.length+' rows across '+Object.keys(byCoin).length+' COINs','success');
+}
+// ── Configurable dashboard ──
+const DEFAULT_FINE_DASH=[{m:'count',g:'offence_type'},{m:'total',g:'driver'},{m:'total',g:'month'},{m:'count',g:'status'}];
+async function loadFineDash(){try{const rows=await sbReq('covase_config?key=eq.fines_dashboard&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;fineDashCfg=Array.isArray(v)?v:DEFAULT_FINE_DASH.slice();}catch(e){fineDashCfg=DEFAULT_FINE_DASH.slice();}}
+function fineDashSave(){sbReq('covase_config',{method:'POST',body:{key:'fines_dashboard',value:fineDashCfg,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'}).catch(e=>toast('Dashboard save failed: '+e.message,'error'));}
+const FINE_METRICS={count:{label:'Number of fines',fn:rows=>rows.length,fmt:v=>String(v)},total:{label:'Total cost (£)',fn:rows=>rows.reduce((s,f)=>s+fineTotal(f),0),fmt:v=>fmtMoney(v)},fines:{label:'Fine amounts (£)',fn:rows=>rows.reduce((s,f)=>s+(parseFloat(f.fine_amount)||0),0),fmt:v=>fmtMoney(v)},admin:{label:'Admin fees (£)',fn:rows=>rows.reduce((s,f)=>s+(parseFloat(f.admin_fee)||0),0),fmt:v=>fmtMoney(v)}};
+const FINE_GROUPS={driver:{label:'Driver',key:f=>f.driver_name||'Unknown'},offence_type:{label:'Offence type',key:f=>FINE_OFFENCE_LABEL[f.offence_type]||'Other'},status:{label:'Status',key:f=>FINE_STATUS_LABEL[f.status]||f.status},month:{label:'Month of offence',key:f=>f.offence_datetime?String(f.offence_datetime).slice(0,7):'Unknown'},client:{label:'Client',key:f=>{const a=(allAccounts||[]).find(x=>x.id===f.client_account_id);return a?a.company_name:'—';}},issuer:{label:'Issuer',key:f=>f.issuer||'Unknown'},reg:{label:'Vehicle reg',key:f=>f.vehicle_reg||'—'}};
+function renderFinesDashboard(){
+  const el=document.getElementById('fines-dashboard');if(!el)return;
+  if(!fineDashCfg){loadFineDash().then(renderFinesDashboard);return;}
+  const rows=finesFiltered().filter(f=>f.status!=='cancelled');
+  const widgets=fineDashCfg.map((w,i)=>{
+    const M=FINE_METRICS[w.m]||FINE_METRICS.count,G=FINE_GROUPS[w.g]||FINE_GROUPS.offence_type;
+    const by={};rows.forEach(f=>{const k=G.key(f);by[k]=(by[k]||[]);by[k].push(f);});
+    const entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]).sort((a,b)=>b[1]-a[1]).slice(0,w.topN||8);
+    const max=Math.max(...entries.map(e=>e[1]),1);
+    const bars=entries.map(([k,v])=>clmBar(k,v,max,M.fmt(v))).join('')||'<div style="font-size:12px;color:var(--n400)">No data</div>';
+    return '<div class="clm-dash-card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="clm-dash-title">'+esc(M.label)+' by '+esc(G.label)+'</div><span class="x" style="cursor:pointer;color:var(--n300);font-size:12px" title="Remove widget" onclick="fineDashCfg.splice('+i+',1);fineDashSave();renderFinesDashboard()">✕</span></div>'+bars+'</div>';
+  }).join('');
+  const mOpts=Object.entries(FINE_METRICS).map(([k,m])=>'<option value="'+k+'">'+esc(m.label)+'</option>').join('');
+  const gOpts=Object.entries(FINE_GROUPS).map(([k,g])=>'<option value="'+k+'">'+esc(g.label)+'</option>').join('');
+  el.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:11px;color:var(--n500);font-weight:700">ADD WIDGET:</span><select id="fdw-m" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+mOpts+'</select><span style="font-size:11px;color:var(--n500)">by</span><select id="fdw-g" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+gOpts+'</select><button class="topbar-btn" onclick="fineDashCfg.push({m:document.getElementById(\'fdw-m\').value,g:document.getElementById(\'fdw-g\').value});fineDashSave();renderFinesDashboard()">＋ Add</button></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+widgets+'</div>';
+}
+// ── Reports (filter → table → XLSX / printable PDF) ──
+function renderFinesReports(){
+  const el=document.getElementById('fines-reports');if(!el)return;
+  if(!el.dataset.built){
+    el.dataset.built='1';
+    el.innerHTML='<div class="clm-dash-card" style="margin-bottom:12px"><div class="clm-dash-title">Report filters</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">'
+      +'<div><label style="font-size:10px;color:var(--n500)">Offence from</label><br><input type="date" id="fr-from" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">to</label><br><input type="date" id="fr-to" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Type</label><br><select id="fr-type" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"><option value="">All</option>'+Object.entries(FINE_OFFENCE_LABEL).map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Status</label><br><select id="fr-status" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"><option value="">All</option>'+FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Driver contains</label><br><input id="fr-driver" oninput="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
+      +'<button class="topbar-btn" onclick="fineReportXlsx()">⬇ XLSX</button>'
+      +'<button class="topbar-btn" onclick="fineReportPdf()">🖨 PDF</button>'
+      +'</div></div><div id="fr-out"></div>';
+  }
+  fineReportRun();
+}
+function fineReportRows(){
+  const g=id=>document.getElementById(id)?.value||'';
+  let rows=(allFines||[]).filter(f=>f.status!=='cancelled');
+  if(g('fr-from'))rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)>=g('fr-from'));
+  if(g('fr-to'))rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)<=g('fr-to'));
+  if(g('fr-type'))rows=rows.filter(f=>f.offence_type===g('fr-type'));
+  if(g('fr-status'))rows=rows.filter(f=>f.status===g('fr-status'));
+  if(g('fr-driver'))rows=rows.filter(f=>String(f.driver_name||'').toLowerCase().includes(g('fr-driver').toLowerCase()));
+  return rows.sort((a,b)=>String(b.offence_datetime||'').localeCompare(String(a.offence_datetime||'')));
+}
+function fineReportTableHtml(rows,forPrint){
+  const tot=rows.reduce((s,f)=>s+fineTotal(f),0);
+  const tr=rows.map(f=>'<tr><td>'+esc(f.driver_name||'—')+'</td><td>'+esc(f.vehicle_reg||'—')+'</td><td>'+esc(FINE_OFFENCE_LABEL[f.offence_type]||'—')+'</td><td>'+esc(f.location||'—')+'</td><td>'+(f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'—')+'</td><td>'+esc(f.coin_invoice_no||'—')+'</td><td style="text-align:right">'+((parseFloat(f.fine_amount)||0).toFixed(2))+'</td><td style="text-align:right">'+((parseFloat(f.admin_fee)||0).toFixed(2))+'</td><td style="text-align:right">'+fineTotal(f).toFixed(2)+'</td><td>'+esc(FINE_STATUS_LABEL[f.status]||'')+'</td></tr>').join('');
+  return '<table style="width:100%;border-collapse:collapse;font-size:'+(forPrint?'11px':'12px')+'"><thead><tr style="text-align:left;border-bottom:2px solid #ccc">'
+    +['Driver','Reg','Type','Location','Offence date','COIN','Fine £','Admin £','Total £','Status'].map(h=>'<th style="padding:5px 7px">'+h+'</th>').join('')
+    +'</tr></thead><tbody>'+tr+'</tbody><tfoot><tr style="border-top:2px solid #ccc;font-weight:700"><td colspan="8" style="padding:6px">Total ('+rows.length+' fines)</td><td style="text-align:right;padding:6px">'+tot.toFixed(2)+'</td><td></td></tr></tfoot></table>';
+}
+function fineReportRun(){
+  const out=document.getElementById('fr-out');if(!out)return;
+  const rows=fineReportRows();
+  out.innerHTML='<div class="clm-dash-card">'+(rows.length?fineReportTableHtml(rows,false):'<div style="font-size:12px;color:var(--n400)">No fines match the filters.</div>')+'</div>';
+}
+async function fineReportXlsx(){
+  await loadSheetJS();
+  const rows=fineReportRows();
+  const aoa=[['Driver','Reg','Type','Location','Offence date','COIN','Invoice date','Fine','Fine VAT','Admin','Admin VAT','Total','Status','Issuer','Ref']];
+  rows.forEach(f=>aoa.push([f.driver_name||'',f.vehicle_reg||'',FINE_OFFENCE_LABEL[f.offence_type]||'',f.location||'',f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'',f.coin_invoice_no||'',f.coin_invoice_date?fmtUK(String(f.coin_invoice_date).slice(0,10)):'',parseFloat(f.fine_amount)||0,parseFloat(f.fine_vat)||0,parseFloat(f.admin_fee)||0,parseFloat(f.admin_fee_vat)||0,fineTotal(f),FINE_STATUS_LABEL[f.status]||'',f.issuer||'',f.issuer_ref||'']));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fines report');
+  XLSX.writeFile(wb,'fines-report-'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function fineReportPdf(){
+  const rows=fineReportRows();
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>Fines & penalties report</title></head><body style="font-family:Arial,sans-serif;margin:24px">'
+    +'<h2 style="margin:0 0 4px">Fines &amp; Penalties report</h2>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:14px">Generated '+new Date().toLocaleString('en-GB')+' · '+rows.length+' fines · Covase Ltd</div>'
+    +fineReportTableHtml(rows,true)
+    +'</body></html>');
+  w.document.close();w.focus();setTimeout(()=>w.print(),300);
+}
+// ── Templates editor ──
+function openFineTemplates(){
+  const v=(id,val)=>{const e=document.getElementById(id);if(e)e.value=val;};
+  v('fpt-cc',fineTemplates.cc);v('fpt-ap-subject',fineTemplates.apSubject);v('fpt-ap-body',fineTemplates.apBody);v('fpt-sp-subject',fineTemplates.spSubject);v('fpt-sp-body',fineTemplates.spBody);
+  document.getElementById('fine-templates-modal').classList.add('open');
+}
+function fineTemplatesReset(){const v=(id,val)=>{document.getElementById(id).value=val;};v('fpt-cc',DEFAULT_FINE_TEMPLATES.cc);v('fpt-ap-subject',DEFAULT_FINE_TEMPLATES.apSubject);v('fpt-ap-body',DEFAULT_FINE_TEMPLATES.apBody);v('fpt-sp-subject',DEFAULT_FINE_TEMPLATES.spSubject);v('fpt-sp-body',DEFAULT_FINE_TEMPLATES.spBody);}
+async function saveFineTemplates(){
+  const g=id=>document.getElementById(id).value;
+  fineTemplates={cc:g('fpt-cc').trim(),apSubject:g('fpt-ap-subject'),apBody:g('fpt-ap-body'),spSubject:g('fpt-sp-subject'),spBody:g('fpt-sp-body')};
+  try{await sbReq('covase_config',{method:'POST',body:{key:'fines_templates',value:fineTemplates,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Templates saved','success');document.getElementById('fine-templates-modal').classList.remove('open');}
+  catch(e){toast('Save failed: '+e.message,'error');}
+}
+
 // ─── EDIT MODE: click any element to style it (overrides shared via
 // covase_config key 'font_overrides'; injected as !important CSS so they win
 // over inline styles). Selectors are class-based, so styling one kanban title
@@ -5603,6 +6143,7 @@ const SB_ITEMS={
   'hires-recharge':{icon:'↑',label:'Pending recharge',view:'hires-recharge',badge:'badge-pending-recharge',badgeCls:'purple'},
   'movements':{icon:'🚛',label:'Movements',view:'movements',badge:'badge-movements'},
   'claims':{icon:'🚨',label:'Claims',view:'claims',badge:'badge-claims'},
+  'fines':{icon:'🎫',label:'Fines & penalties',view:'fines',badge:'badge-fines'},
   'supplier-replies':{icon:'✉',label:'Review queue',view:'supplier-replies',badge:'badge-supplier-replies',badgeCls:'purple'},
   'accounts':{icon:'◉',label:'Accounts',view:'accounts',badge:'badge-accounts'},
   'contacts':{icon:'👤',label:'Contacts',view:'contacts',badge:'badge-contacts'},
@@ -5616,6 +6157,7 @@ const DEFAULT_SB_LAYOUT={sections:[
   {label:'Short Hires',items:['hires-pipeline','hires-recharge']},
   {label:'Logistics',items:['movements']},
   {label:'Accident management',items:['claims']},
+  {label:'Fines & penalties',items:['fines']},
   {label:'Supplier replies',items:['supplier-replies']},
   {label:'CRM',items:['accounts','contacts']},
   {label:'Fleet',items:['vehicles']},
@@ -5735,6 +6277,8 @@ loadMovementCardLayout();
 loadSupplierReplies();
 // Prime the accident-claims badge (open-claim count)
 loadClaims();
+// Prime the fines badge + templates + dashboard config
+loadFines();loadFineTemplates();loadFineDash();
 // Load the reply-agent instructions (for the Settings editor)
 loadAgentInstructions();
 // Load the shared sidebar layout and render the (organisable) sidebar
