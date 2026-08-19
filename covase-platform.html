@@ -5887,21 +5887,70 @@ async function loadFineDash(){try{const rows=await sbReq('covase_config?key=eq.f
 function fineDashSave(){sbReq('covase_config',{method:'POST',body:{key:'fines_dashboard',value:fineDashCfg,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'}).catch(e=>toast('Dashboard save failed: '+e.message,'error'));}
 const FINE_METRICS={count:{label:'Number of fines',fn:rows=>rows.length,fmt:v=>String(v)},total:{label:'Total cost (£)',fn:rows=>rows.reduce((s,f)=>s+fineTotal(f),0),fmt:v=>fmtMoney(v)},fines:{label:'Fine amounts (£)',fn:rows=>rows.reduce((s,f)=>s+(parseFloat(f.fine_amount)||0),0),fmt:v=>fmtMoney(v)},admin:{label:'Admin fees (£)',fn:rows=>rows.reduce((s,f)=>s+(parseFloat(f.admin_fee)||0),0),fmt:v=>fmtMoney(v)}};
 const FINE_GROUPS={driver:{label:'Driver',key:f=>f.driver_name||'Unknown'},offence_type:{label:'Offence type',key:f=>FINE_OFFENCE_LABEL[f.offence_type]||'Other'},status:{label:'Status',key:f=>FINE_STATUS_LABEL[f.status]||f.status},month:{label:'Month of offence',key:f=>f.offence_datetime?String(f.offence_datetime).slice(0,7):'Unknown'},client:{label:'Client',key:f=>{const a=(allAccounts||[]).find(x=>x.id===f.client_account_id);return a?a.company_name:'—';}},issuer:{label:'Issuer',key:f=>f.issuer||'Unknown'},reg:{label:'Vehicle reg',key:f=>f.vehicle_reg||'—'}};
+const FINE_CHART_TYPES={bars:'Bars',columns:'Columns',donut:'Donut',line:'Line',stat:'Stat tile'};
+const FINE_PALETTE=['#03d3c6','#6d5ef2','#f59e0b','#ef4444','#10b981','#3b82f6','#ec4899','#8b5cf6','#64748b','#f97316'];
+function fineWidgetBody(w,rows){
+  const M=FINE_METRICS[w.m]||FINE_METRICS.count,G=FINE_GROUPS[w.g]||FINE_GROUPS.offence_type;
+  const t=w.t||'bars';
+  if(t==='stat'){
+    const v=M.fn(rows);
+    return '<div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:var(--covase);margin:6px 0 2px">'+esc(M.fmt(v))+'</div><div style="font-size:11px;color:var(--n500)">across '+rows.length+' fines</div>';
+  }
+  const by={};rows.forEach(f=>{const k=G.key(f);(by[k]=by[k]||[]).push(f);});
+  let entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]);
+  entries=(t==='line'||w.g==='month')?entries.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):entries.sort((a,b)=>b[1]-a[1]);
+  entries=entries.slice(0,t==='donut'?6:(t==='columns'?10:(w.topN||8)));
+  if(!entries.length)return '<div style="font-size:12px;color:var(--n400)">No data</div>';
+  const max=Math.max(...entries.map(e=>e[1]),1);
+  if(t==='columns'){
+    return '<div style="display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px">'
+      +entries.map(([k,v],i)=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0"><div style="font-size:9px;color:var(--n500)">'+esc(M.fmt(v))+'</div><div style="width:100%;border-radius:4px 4px 0 0;background:'+FINE_PALETTE[i%FINE_PALETTE.length]+';height:'+Math.max(4,Math.round(v/max*88))+'px"></div><div style="font-size:9px;color:var(--n500);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(k)+'">'+esc(k)+'</div></div>').join('')+'</div>';
+  }
+  if(t==='donut'){
+    const total=entries.reduce((s,e)=>s+e[1],0)||1;
+    const R=42,C=2*Math.PI*R;let off=0;
+    const segs=entries.map(([k,v],i)=>{
+      const len=v/total*C;
+      const s='<circle r="'+R+'" cx="60" cy="60" fill="none" stroke="'+FINE_PALETTE[i%FINE_PALETTE.length]+'" stroke-width="16" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 60 60)"/>';
+      off+=len;return s;
+    }).join('');
+    const legend=entries.map(([k,v],i)=>'<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--n600);margin:2px 0"><span style="width:9px;height:9px;border-radius:2px;background:'+FINE_PALETTE[i%FINE_PALETTE.length]+';flex-shrink:0"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(k)+'">'+esc(k)+'</span><span style="color:var(--n500)">'+esc(M.fmt(v))+' · '+Math.round(v/total*100)+'%</span></div>').join('');
+    return '<div style="display:flex;gap:14px;align-items:center"><svg viewBox="0 0 120 120" style="width:120px;height:120px;flex-shrink:0">'+segs+'</svg><div style="flex:1;min-width:0">'+legend+'</div></div>';
+  }
+  if(t==='line'){
+    const W=300,H=110,pad=8;
+    const pts=entries.map(([k,v],i)=>{
+      const x=entries.length>1?pad+i*(W-2*pad)/(entries.length-1):W/2;
+      const y=H-pad-(v/max)*(H-2*pad-14);
+      return {x,y,k,v};
+    });
+    const poly=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+    const dots=pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="#03d3c6"><title>'+esc(p.k)+': '+esc(M.fmt(p.v))+'</title></circle>').join('');
+    const step=Math.max(1,Math.ceil(entries.length/6));
+    const labels=pts.filter((_,i)=>i%step===0||i===pts.length-1).map(p=>'<text x="'+p.x.toFixed(1)+'" y="'+(H-1)+'" font-size="8" fill="#8b93a7" text-anchor="middle">'+esc(String(p.k).slice(-5))+'</text>').join('');
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:130px"><polyline points="'+poly+'" fill="none" stroke="#03d3c6" stroke-width="2"/>'+dots+labels+'</svg>';
+  }
+  return entries.map(([k,v])=>clmBar(k,v,max,M.fmt(v))).join(''); // bars (default)
+}
 function renderFinesDashboard(){
   const el=document.getElementById('fines-dashboard');if(!el)return;
   if(!fineDashCfg){loadFineDash().then(renderFinesDashboard);return;}
   const rows=finesFiltered().filter(f=>f.status!=='cancelled');
   const widgets=fineDashCfg.map((w,i)=>{
     const M=FINE_METRICS[w.m]||FINE_METRICS.count,G=FINE_GROUPS[w.g]||FINE_GROUPS.offence_type;
-    const by={};rows.forEach(f=>{const k=G.key(f);by[k]=(by[k]||[]);by[k].push(f);});
-    const entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]).sort((a,b)=>b[1]-a[1]).slice(0,w.topN||8);
-    const max=Math.max(...entries.map(e=>e[1]),1);
-    const bars=entries.map(([k,v])=>clmBar(k,v,max,M.fmt(v))).join('')||'<div style="font-size:12px;color:var(--n400)">No data</div>';
-    return '<div class="clm-dash-card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="clm-dash-title">'+esc(M.label)+' by '+esc(G.label)+'</div><span class="x" style="cursor:pointer;color:var(--n300);font-size:12px" title="Remove widget" onclick="fineDashCfg.splice('+i+',1);fineDashSave();renderFinesDashboard()">✕</span></div>'+bars+'</div>';
+    const title=(w.t==='stat')?M.label:(M.label+' by '+G.label);
+    return '<div class="clm-dash-card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="clm-dash-title">'+esc(title)+'</div><span class="x" style="cursor:pointer;color:var(--n300);font-size:12px" title="Remove widget" onclick="fineDashCfg.splice('+i+',1);fineDashSave();renderFinesDashboard()">✕</span></div>'+fineWidgetBody(w,rows)+'</div>';
   }).join('');
   const mOpts=Object.entries(FINE_METRICS).map(([k,m])=>'<option value="'+k+'">'+esc(m.label)+'</option>').join('');
   const gOpts=Object.entries(FINE_GROUPS).map(([k,g])=>'<option value="'+k+'">'+esc(g.label)+'</option>').join('');
-  el.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:11px;color:var(--n500);font-weight:700">ADD WIDGET:</span><select id="fdw-m" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+mOpts+'</select><span style="font-size:11px;color:var(--n500)">by</span><select id="fdw-g" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+gOpts+'</select><button class="topbar-btn" onclick="fineDashCfg.push({m:document.getElementById(\'fdw-m\').value,g:document.getElementById(\'fdw-g\').value});fineDashSave();renderFinesDashboard()">＋ Add</button></div>'
+  const tOpts=Object.entries(FINE_CHART_TYPES).map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('');
+  el.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:11px;color:var(--n500);font-weight:700">ADD WIDGET:</span>'
+    +'<select id="fdw-m" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+mOpts+'</select>'
+    +'<span style="font-size:11px;color:var(--n500)">by</span>'
+    +'<select id="fdw-g" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+gOpts+'</select>'
+    +'<span style="font-size:11px;color:var(--n500)">as</span>'
+    +'<select id="fdw-t" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px">'+tOpts+'</select>'
+    +'<button class="topbar-btn" onclick="fineDashCfg.push({m:document.getElementById(\'fdw-m\').value,g:document.getElementById(\'fdw-g\').value,t:document.getElementById(\'fdw-t\').value});fineDashSave();renderFinesDashboard()">＋ Add</button></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+widgets+'</div>';
 }
 // ── Reports (filter → table → XLSX / printable PDF) ──
