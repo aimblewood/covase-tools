@@ -3730,8 +3730,8 @@ function movementCard(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
   const parts=keys=>mvResolveParts(keys,m).map(t=>esc(t));
   const titleParts=parts(L.title);
-  const title=titleParts.length?titleParts.join(' &nbsp;'):'—';
-  const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' &nbsp;')}</div>`:'';};
+  const title=titleParts.length?titleParts.join(' '):'—';
+  const lineHtml=(keys,style)=>{const p=parts(keys);return p.length?`<div style="${style}">${p.join(' ')}</div>`:'';};
   const lineArrs=Array.isArray(L.lines)?L.lines:['line1','line2','line3'].map(k=>L[k]||[]);
   const linesHtml=lineArrs.map((keys,i)=>lineHtml(keys,'font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px')).join('');
   const rightParts=(L.right||[]).map(k=>{const f=MV_FIELD_MAP[k];if(!f)return '';const v=f.get(m);if(!v)return '';
