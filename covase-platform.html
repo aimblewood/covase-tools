@@ -763,6 +763,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <button class="seg-btn" data-fv="reports" onclick="setFineView('reports')">Reports</button>
       </div>
       <input type="file" id="fine-coin-input" accept=".xlsx,.xls" style="display:none" onchange="importCoinFile(this.files[0]);this.value=''">
+      <button class="topbar-btn" onclick="checkFinesNow()">⚡ Check mailbox now</button>
       <button class="topbar-btn" onclick="openFineTemplates()">✉ Templates</button>
       <button class="topbar-btn" onclick="exportWtSheet()">⬇ WT sheet export</button>
       <button class="topbar-btn" onclick="document.getElementById('fine-coin-input').click()">⬆ Import COIN</button>
@@ -5569,6 +5570,11 @@ const DEFAULT_FINE_TEMPLATES={
   spBody:'Hi {firstName}\n\nSorry to be the bearer of bad news but we have received the attached.\n\nThe leasing company (Lex Autolease) will charge The Woodland Trust a £{adminFee} admin fee for processing. The Trust will be in contact with you in due course to confirm when this will be deducted via Payroll.\n\nWe need to nominate you as the driver via the issuer\'s online portal. Therefore please can you confirm your current address for us so we can double check against our files and submit correctly?\n\nThanks'
 };
 let fineTemplates={...DEFAULT_FINE_TEMPLATES};
+async function checkFinesNow(){
+  toast('Checking the Lex Fines folder…','success');
+  try{await fetch('https://covase.app.n8n.cloud/webhook/covase-fines-check',{method:'GET',mode:'cors'});}catch(e){/* fire-and-forget */}
+  setTimeout(loadFines,9000); // give Claude time to read the PDF, then refresh
+}
 async function loadFineTemplates(){try{const rows=await sbReq('covase_config?key=eq.fines_templates&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(v&&typeof v==='object')fineTemplates={...DEFAULT_FINE_TEMPLATES,...v};}catch(e){}}
 async function loadFines(){
   try{
