@@ -5573,7 +5573,7 @@ let fineTemplates={...DEFAULT_FINE_TEMPLATES};
 async function checkFinesNow(){
   toast('Checking the Lex Fines folder…','success');
   try{await fetch('https://covase.app.n8n.cloud/webhook/covase-fines-check',{method:'GET',mode:'cors'});}catch(e){/* fire-and-forget */}
-  setTimeout(loadFines,9000); // give Claude time to read the PDF, then refresh
+  setTimeout(loadFines,8000);setTimeout(loadFines,20000); // refresh twice — PDF reads can take 10s+
 }
 async function loadFineTemplates(){try{const rows=await sbReq('covase_config?key=eq.fines_templates&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(v&&typeof v==='object')fineTemplates={...DEFAULT_FINE_TEMPLATES,...v};}catch(e){}}
 async function loadFines(){
