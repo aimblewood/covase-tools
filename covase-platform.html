@@ -5953,61 +5953,179 @@ function renderFinesDashboard(){
     +'<button class="topbar-btn" onclick="fineDashCfg.push({m:document.getElementById(\'fdw-m\').value,g:document.getElementById(\'fdw-g\').value,t:document.getElementById(\'fdw-t\').value});fineDashSave();renderFinesDashboard()">＋ Add</button></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+widgets+'</div>';
 }
-// ── Reports (filter → table → XLSX / printable PDF) ──
+// ── Report builder: pick columns, group with subtotals, sort, save named
+// report definitions (shared via covase_config 'fines_reports') → XLSX/PDF ──
+const FINE_REPORT_FIELDS=[
+  {k:'driver',l:'Driver',get:f=>f.driver_name||'—'},
+  {k:'reg',l:'Reg',get:f=>f.vehicle_reg||'—'},
+  {k:'type',l:'Type',get:f=>FINE_OFFENCE_LABEL[f.offence_type]||'—'},
+  {k:'location',l:'Location',get:f=>f.location||'—'},
+  {k:'issuer',l:'Issuer',get:f=>f.issuer||'—'},
+  {k:'ref',l:'Ref',get:f=>f.issuer_ref||'—'},
+  {k:'offence',l:'Offence date',get:f=>f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'—',sv:f=>String(f.offence_datetime||'')},
+  {k:'coin',l:'COIN',get:f=>f.coin_invoice_no||'—'},
+  {k:'invdate',l:'Invoice date',get:f=>f.coin_invoice_date?fmtUK(String(f.coin_invoice_date).slice(0,10)):'—',sv:f=>String(f.coin_invoice_date||'')},
+  {k:'fine',l:'Fine £',num:1,sum:1,get:f=>parseFloat(f.fine_amount)||0},
+  {k:'finevat',l:'Fine VAT £',num:1,sum:1,get:f=>parseFloat(f.fine_vat)||0},
+  {k:'admin',l:'Admin £',num:1,sum:1,get:f=>parseFloat(f.admin_fee)||0},
+  {k:'adminvat',l:'Admin VAT £',num:1,sum:1,get:f=>parseFloat(f.admin_fee_vat)||0},
+  {k:'total',l:'Total £',num:1,sum:1,get:f=>fineTotal(f)},
+  {k:'status',l:'Status',get:f=>FINE_STATUS_LABEL[f.status]||f.status},
+  {k:'chargemonth',l:'Charge month',get:f=>f.charge_month||'—'},
+  {k:'appeal',l:'Appeal',get:f=>f.appeal_status||'—'}
+];
+const FINE_REPORT_FMAP=Object.fromEntries(FINE_REPORT_FIELDS.map(f=>[f.k,f]));
+const FINE_REPORT_DEFAULT_COLS=['driver','reg','type','location','offence','coin','fine','admin','total','status'];
+const FINE_REPORT_GROUPS={'':'No grouping',driver:'Driver',type:'Offence type',coin:'COIN',status:'Status',month:'Month of offence'};
+let fineSavedReports=null;
+function fineGroupKey(f,g){
+  if(g==='driver')return f.driver_name||'Unknown';
+  if(g==='type')return FINE_OFFENCE_LABEL[f.offence_type]||'Other';
+  if(g==='coin')return f.coin_invoice_no||'No COIN';
+  if(g==='status')return FINE_STATUS_LABEL[f.status]||f.status;
+  if(g==='month')return f.offence_datetime?String(f.offence_datetime).slice(0,7):'Unknown';
+  return '';
+}
+function fineReportDef(){
+  const cols=[...document.querySelectorAll('.fr-col:checked')].map(c=>c.value);
+  return {
+    cols:cols.length?cols:FINE_REPORT_DEFAULT_COLS.slice(),
+    group:document.getElementById('fr-group')?.value||'',
+    sortK:document.getElementById('fr-sort')?.value||'offence',
+    sortDir:document.getElementById('fr-dir')?.value||'desc',
+    from:document.getElementById('fr-from')?.value||'',to:document.getElementById('fr-to')?.value||'',
+    type:document.getElementById('fr-type')?.value||'',status:document.getElementById('fr-status')?.value||'',
+    driver:document.getElementById('fr-driver')?.value||''
+  };
+}
+function fineReportApplyDef(d){
+  document.querySelectorAll('.fr-col').forEach(c=>{c.checked=(d.cols||FINE_REPORT_DEFAULT_COLS).includes(c.value);});
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+  set('fr-group',d.group);set('fr-sort',d.sortK||'offence');set('fr-dir',d.sortDir||'desc');
+  set('fr-from',d.from);set('fr-to',d.to);set('fr-type',d.type);set('fr-status',d.status);set('fr-driver',d.driver);
+}
 function renderFinesReports(){
   const el=document.getElementById('fines-reports');if(!el)return;
   if(!el.dataset.built){
     el.dataset.built='1';
-    el.innerHTML='<div class="clm-dash-card" style="margin-bottom:12px"><div class="clm-dash-title">Report filters</div>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">'
-      +'<div><label style="font-size:10px;color:var(--n500)">Offence from</label><br><input type="date" id="fr-from" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
-      +'<div><label style="font-size:10px;color:var(--n500)">to</label><br><input type="date" id="fr-to" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
-      +'<div><label style="font-size:10px;color:var(--n500)">Type</label><br><select id="fr-type" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"><option value="">All</option>'+Object.entries(FINE_OFFENCE_LABEL).map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
-      +'<div><label style="font-size:10px;color:var(--n500)">Status</label><br><select id="fr-status" onchange="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"><option value="">All</option>'+FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
-      +'<div><label style="font-size:10px;color:var(--n500)">Driver contains</label><br><input id="fr-driver" oninput="fineReportRun()" style="font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px"></div>'
+    const inp='font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px';
+    const colBoxes=FINE_REPORT_FIELDS.map(f=>'<label style="font-size:11px;color:var(--n600);display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0"><input type="checkbox" class="fr-col" value="'+f.k+'"'+(FINE_REPORT_DEFAULT_COLS.includes(f.k)?' checked':'')+' onchange="fineReportRun()">'+esc(f.l)+'</label>').join('');
+    el.innerHTML='<div class="clm-dash-card" style="margin-bottom:12px"><div class="clm-dash-title">Report builder</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px">'
+      +'<div><label style="font-size:10px;color:var(--n500)">Offence from</label><br><input type="date" id="fr-from" onchange="fineReportRun()" style="'+inp+'"></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">to</label><br><input type="date" id="fr-to" onchange="fineReportRun()" style="'+inp+'"></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Type</label><br><select id="fr-type" onchange="fineReportRun()" style="'+inp+'"><option value="">All</option>'+Object.entries(FINE_OFFENCE_LABEL).map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Status</label><br><select id="fr-status" onchange="fineReportRun()" style="'+inp+'"><option value="">All</option>'+FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Driver contains</label><br><input id="fr-driver" oninput="fineReportRun()" style="'+inp+'"></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Group by</label><br><select id="fr-group" onchange="fineReportRun()" style="'+inp+'">'+Object.entries(FINE_REPORT_GROUPS).map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Sort by</label><br><select id="fr-sort" onchange="fineReportRun()" style="'+inp+'">'+FINE_REPORT_FIELDS.map(f=>'<option value="'+f.k+'"'+(f.k==='offence'?' selected':'')+'>'+esc(f.l)+'</option>').join('')+'</select></div>'
+      +'<div><label style="font-size:10px;color:var(--n500)">Direction</label><br><select id="fr-dir" onchange="fineReportRun()" style="'+inp+'"><option value="desc">↓ Desc</option><option value="asc">↑ Asc</option></select></div>'
+      +'</div>'
+      +'<div style="margin-bottom:8px"><span style="font-size:10px;color:var(--n500);font-weight:700">COLUMNS:</span><br>'+colBoxes+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--n100);padding-top:8px">'
+      +'<select id="fr-saved" onchange="fineReportLoadSaved()" style="'+inp+'"><option value="">— saved reports —</option></select>'
+      +'<input id="fr-name" placeholder="Report name" style="'+inp+'">'
+      +'<button class="topbar-btn" onclick="fineReportSave()">💾 Save report</button>'
+      +'<button class="topbar-btn" onclick="fineReportDelete()">🗑 Delete</button>'
+      +'<span style="flex:1"></span>'
       +'<button class="topbar-btn" onclick="fineReportXlsx()">⬇ XLSX</button>'
       +'<button class="topbar-btn" onclick="fineReportPdf()">🖨 PDF</button>'
       +'</div></div><div id="fr-out"></div>';
+    fineLoadSavedReports();
   }
   fineReportRun();
 }
-function fineReportRows(){
-  const g=id=>document.getElementById(id)?.value||'';
-  let rows=(allFines||[]).filter(f=>f.status!=='cancelled');
-  if(g('fr-from'))rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)>=g('fr-from'));
-  if(g('fr-to'))rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)<=g('fr-to'));
-  if(g('fr-type'))rows=rows.filter(f=>f.offence_type===g('fr-type'));
-  if(g('fr-status'))rows=rows.filter(f=>f.status===g('fr-status'));
-  if(g('fr-driver'))rows=rows.filter(f=>String(f.driver_name||'').toLowerCase().includes(g('fr-driver').toLowerCase()));
-  return rows.sort((a,b)=>String(b.offence_datetime||'').localeCompare(String(a.offence_datetime||'')));
+async function fineLoadSavedReports(){
+  try{const rows=await sbReq('covase_config?key=eq.fines_reports&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;fineSavedReports=Array.isArray(v)?v:[];}catch(e){fineSavedReports=[];}
+  const sel=document.getElementById('fr-saved');
+  if(sel)sel.innerHTML='<option value="">— saved reports —</option>'+fineSavedReports.map((r,i)=>'<option value="'+i+'">'+esc(r.name)+'</option>').join('');
 }
-function fineReportTableHtml(rows,forPrint){
-  const tot=rows.reduce((s,f)=>s+fineTotal(f),0);
-  const tr=rows.map(f=>'<tr><td>'+esc(f.driver_name||'—')+'</td><td>'+esc(f.vehicle_reg||'—')+'</td><td>'+esc(FINE_OFFENCE_LABEL[f.offence_type]||'—')+'</td><td>'+esc(f.location||'—')+'</td><td>'+(f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'—')+'</td><td>'+esc(f.coin_invoice_no||'—')+'</td><td style="text-align:right">'+((parseFloat(f.fine_amount)||0).toFixed(2))+'</td><td style="text-align:right">'+((parseFloat(f.admin_fee)||0).toFixed(2))+'</td><td style="text-align:right">'+fineTotal(f).toFixed(2)+'</td><td>'+esc(FINE_STATUS_LABEL[f.status]||'')+'</td></tr>').join('');
-  return '<table style="width:100%;border-collapse:collapse;font-size:'+(forPrint?'11px':'12px')+'"><thead><tr style="text-align:left;border-bottom:2px solid #ccc">'
-    +['Driver','Reg','Type','Location','Offence date','COIN','Fine £','Admin £','Total £','Status'].map(h=>'<th style="padding:5px 7px">'+h+'</th>').join('')
-    +'</tr></thead><tbody>'+tr+'</tbody><tfoot><tr style="border-top:2px solid #ccc;font-weight:700"><td colspan="8" style="padding:6px">Total ('+rows.length+' fines)</td><td style="text-align:right;padding:6px">'+tot.toFixed(2)+'</td><td></td></tr></tfoot></table>';
+function fineSavedPersist(){sbReq('covase_config',{method:'POST',body:{key:'fines_reports',value:fineSavedReports,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'}).catch(e=>toast('Save failed: '+e.message,'error'));}
+function fineReportSave(){
+  const name=(document.getElementById('fr-name')?.value||'').trim();
+  if(!name){toast('Give the report a name first','error');return;}
+  const def={name:name,...fineReportDef()};
+  const i=(fineSavedReports||[]).findIndex(r=>r.name===name);
+  if(i>=0)fineSavedReports[i]=def;else (fineSavedReports=fineSavedReports||[]).push(def);
+  fineSavedPersist();fineLoadSavedReports();toast('Report "'+name+'" saved','success');
+}
+function fineReportLoadSaved(){
+  const i=document.getElementById('fr-saved')?.value;
+  if(i===''||i==null)return;
+  const r=(fineSavedReports||[])[parseInt(i,10)];
+  if(!r)return;
+  fineReportApplyDef(r);
+  const n=document.getElementById('fr-name');if(n)n.value=r.name;
+  fineReportRun();
+}
+function fineReportDelete(){
+  const i=document.getElementById('fr-saved')?.value;
+  if(i===''||i==null){toast('Pick a saved report to delete','error');return;}
+  const r=fineSavedReports[parseInt(i,10)];
+  if(!confirm('Delete report "'+r.name+'"?'))return;
+  fineSavedReports.splice(parseInt(i,10),1);
+  fineSavedPersist();fineLoadSavedReports();toast('Report deleted','success');
+}
+function fineReportRows(def){
+  def=def||fineReportDef();
+  let rows=(allFines||[]).filter(f=>f.status!=='cancelled');
+  if(def.from)rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)>=def.from);
+  if(def.to)rows=rows.filter(f=>f.offence_datetime&&String(f.offence_datetime).slice(0,10)<=def.to);
+  if(def.type)rows=rows.filter(f=>f.offence_type===def.type);
+  if(def.status)rows=rows.filter(f=>f.status===def.status);
+  if(def.driver)rows=rows.filter(f=>String(f.driver_name||'').toLowerCase().includes(def.driver.toLowerCase()));
+  const sf=FINE_REPORT_FMAP[def.sortK]||FINE_REPORT_FMAP.offence;
+  const sv=f=>sf.sv?sf.sv(f):sf.get(f);
+  rows.sort((a,b)=>{const x=sv(a),y=sv(b);const c=(typeof x==='number'&&typeof y==='number')?x-y:String(x).localeCompare(String(y));return def.sortDir==='asc'?c:-c;});
+  return rows;
+}
+function fineReportTableHtml(rows,forPrint,def){
+  def=def||fineReportDef();
+  const cols=def.cols.map(k=>FINE_REPORT_FMAP[k]).filter(Boolean);
+  const pad='padding:6px 8px;';
+  const th=cols.map(c=>'<th style="'+pad+'text-align:'+(c.num?'right':'left')+';white-space:nowrap">'+esc(c.l)+'</th>').join('');
+  const cell=(c,f)=>{const v=c.get(f);return '<td style="'+pad+(c.num?'text-align:right;white-space:nowrap':'')+'">'+(c.num?Number(v).toFixed(2):esc(String(v)))+'</td>';};
+  const sums=list=>cols.map(c=>c.sum?'<td style="'+pad+'text-align:right;white-space:nowrap">'+list.reduce((s,f)=>s+(Number(c.get(f))||0),0).toFixed(2)+'</td>':'<td style="'+pad+'"></td>').join('');
+  let body='';
+  if(def.group){
+    const groups=new Map();
+    rows.forEach(f=>{const k=fineGroupKey(f,def.group);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(f);});
+    [...groups.entries()].forEach(([k,list])=>{
+      body+='<tr><td colspan="'+cols.length+'" style="'+pad+'background:#f0f1f6;font-weight:700;border-top:1px solid #ddd">'+esc(k)+' <span style="font-weight:400;color:#888">('+list.length+')</span></td></tr>';
+      body+=list.map(f=>'<tr style="border-bottom:1px solid #eee">'+cols.map(c=>cell(c,f)).join('')+'</tr>').join('');
+      if(cols.some(c=>c.sum))body+='<tr style="font-weight:600;color:#555;border-bottom:1px solid #ddd">'+sums(list).replace('<td style="'+pad+'"></td>','<td style="'+pad+'font-size:10px">Subtotal</td>')+'</tr>';
+    });
+  }else{
+    body=rows.map(f=>'<tr style="border-bottom:1px solid #eee">'+cols.map(c=>cell(c,f)).join('')+'</tr>').join('');
+  }
+  const foot='<tr style="border-top:2px solid #ccc;font-weight:700"><td style="'+pad+'" colspan="'+Math.max(1,cols.length-cols.filter(c=>c.sum).length)+'">Total ('+rows.length+' fines)</td>'+cols.filter(c=>c.sum).map(c=>'<td style="'+pad+'text-align:right;white-space:nowrap">'+rows.reduce((s,f)=>s+(Number(c.get(f))||0),0).toFixed(2)+'</td>').join('')+'</tr>';
+  return '<table style="width:100%;border-collapse:collapse;font-size:'+(forPrint?'11px':'12px')+'"><thead><tr style="border-bottom:2px solid #ccc">'+th+'</tr></thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
 }
 function fineReportRun(){
   const out=document.getElementById('fr-out');if(!out)return;
-  const rows=fineReportRows();
-  out.innerHTML='<div class="clm-dash-card">'+(rows.length?fineReportTableHtml(rows,false):'<div style="font-size:12px;color:var(--n400)">No fines match the filters.</div>')+'</div>';
+  const def=fineReportDef();
+  const rows=fineReportRows(def);
+  out.innerHTML='<div class="clm-dash-card" style="overflow-x:auto">'+(rows.length?fineReportTableHtml(rows,false,def):'<div style="font-size:12px;color:var(--n400)">No fines match the filters.</div>')+'</div>';
 }
 async function fineReportXlsx(){
   await loadSheetJS();
-  const rows=fineReportRows();
-  const aoa=[['Driver','Reg','Type','Location','Offence date','COIN','Invoice date','Fine','Fine VAT','Admin','Admin VAT','Total','Status','Issuer','Ref']];
-  rows.forEach(f=>aoa.push([f.driver_name||'',f.vehicle_reg||'',FINE_OFFENCE_LABEL[f.offence_type]||'',f.location||'',f.offence_datetime?fmtUK(String(new Date(f.offence_datetime).toISOString()).slice(0,10)):'',f.coin_invoice_no||'',f.coin_invoice_date?fmtUK(String(f.coin_invoice_date).slice(0,10)):'',parseFloat(f.fine_amount)||0,parseFloat(f.fine_vat)||0,parseFloat(f.admin_fee)||0,parseFloat(f.admin_fee_vat)||0,fineTotal(f),FINE_STATUS_LABEL[f.status]||'',f.issuer||'',f.issuer_ref||'']));
+  const def=fineReportDef();
+  const rows=fineReportRows(def);
+  const cols=def.cols.map(k=>FINE_REPORT_FMAP[k]).filter(Boolean);
+  const aoa=[(def.group?['Group']:[]).concat(cols.map(c=>c.l))];
+  rows.forEach(f=>aoa.push((def.group?[fineGroupKey(f,def.group)]:[]).concat(cols.map(c=>c.get(f)))));
   const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fines report');
   XLSX.writeFile(wb,'fines-report-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 function fineReportPdf(){
-  const rows=fineReportRows();
+  const def=fineReportDef();
+  const rows=fineReportRows(def);
+  const name=(document.getElementById('fr-name')?.value||'').trim();
   const w=window.open('','_blank');
   w.document.write('<html><head><title>Fines & penalties report</title></head><body style="font-family:Arial,sans-serif;margin:24px">'
-    +'<h2 style="margin:0 0 4px">Fines &amp; Penalties report</h2>'
+    +'<h2 style="margin:0 0 4px">'+esc(name||'Fines & Penalties report')+'</h2>'
     +'<div style="font-size:12px;color:#666;margin-bottom:14px">Generated '+new Date().toLocaleString('en-GB')+' · '+rows.length+' fines · Covase Ltd</div>'
-    +fineReportTableHtml(rows,true)
+    +fineReportTableHtml(rows,true,def)
     +'</body></html>');
   w.document.close();w.focus();setTimeout(()=>w.print(),300);
 }
