@@ -266,8 +266,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .form-field input,.form-field select,.form-field textarea{background:var(--n50);border:1px solid var(--n200);color:var(--n800);padding:8px 11px;border-radius:8px;font-size:13px;font-family:var(--font-body);outline:none;transition:border-color .15s;width:100%}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--covase);background:#fff}
 .form-field textarea{min-height:56px;resize:vertical;line-height:1.5}
-.form-field .label-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.form-field .label-row label{margin:0}
+.form-field .label-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:16px}
+.form-field .label-row label{margin:0;white-space:nowrap}
+.form-field .label-row .dynamics-link{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1;min-width:0}
 .dynamics-link{font-size:10px;font-weight:600;color:var(--covase);cursor:pointer;text-transform:none;letter-spacing:0;user-select:none}
 .dynamics-link:hover{text-decoration:underline}
 .d365-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--indigo);background:var(--covase-l);border:1px solid rgba(3,211,198,.35);padding:3px 8px;border-radius:999px;text-decoration:none;margin-left:6px;white-space:nowrap}
@@ -926,7 +927,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
           <a id="hf-account-d365" href="#" target="_blank" rel="noopener" class="d365-chip small" style="display:none;margin-top:6px;align-self:flex-start">↗ Open in Dynamics</a>
         </div>
         <div class="form-field lookup-wrap">
-          <div class="label-row"><label>Driver *</label><span class="dynamics-link" id="hf-driver-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <div class="label-row"><label>Driver *</label><span class="dynamics-link" id="hf-driver-lookup-hint">🔍 Search Dynamics</span></div>
           <input id="hf-driver" placeholder="Start typing driver name…" oninput="lookupDynamicsDriver(this.value)" autocomplete="off">
           <input type="hidden" id="hf-driver-contact-id">
           <input type="hidden" id="hf-driver-dynamics-id">
@@ -1136,6 +1137,15 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
         <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
       </div>
+      <div class="form-row trio">
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Contact at pickup</label><span class="dynamics-link">🔍 Search Dynamics</span></div>
+          <input id="mv-pickup-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('pickup',this.value)" autocomplete="off">
+          <div id="mv-pickup-contact-results" class="lookup-results"></div>
+        </div>
+        <div class="form-field"><label>Pickup contact phone</label><input id="mv-pickup-phone" placeholder="07…"></div>
+        <div class="form-field"></div>
+      </div>
 
       <div class="form-section-label">Dropoff</div>
       <div class="form-row quad">
@@ -1144,17 +1154,26 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
         <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
+      <div class="form-row trio">
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Contact at dropoff</label><span class="dynamics-link">🔍 Search Dynamics</span></div>
+          <input id="mv-dropoff-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('dropoff',this.value)" autocomplete="off">
+          <div id="mv-dropoff-contact-results" class="lookup-results"></div>
+        </div>
+        <div class="form-field"><label>Dropoff contact phone</label><input id="mv-dropoff-phone" placeholder="07…"></div>
+        <div class="form-field"></div>
+      </div>
 
       <div class="form-section-label">Vehicle &amp; driver <span style="font-size:10px;color:var(--n400);font-weight:400">(optional · Dynamics lookup, or type manually)</span></div>
       <div class="form-row trio">
         <div class="form-field lookup-wrap">
-          <div class="label-row"><label>Registration</label><span class="dynamics-link" id="mv-vehicle-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <div class="label-row"><label>Registration</label><span class="dynamics-link" id="mv-vehicle-lookup-hint">🔍 Search Dynamics</span></div>
           <input id="mv-vehicle-reg" placeholder="AB12CDE" style="text-transform:uppercase" oninput="lookupMovementVehicle(this.value)" autocomplete="off">
           <div id="mv-vehicle-results" class="lookup-results"></div>
         </div>
         <div class="form-field"><label>Make / Model</label><input id="mv-vehicle-makemodel" placeholder="e.g. Ford Focus"></div>
         <div class="form-field lookup-wrap">
-          <div class="label-row"><label>Driver</label><span class="dynamics-link" id="mv-driver-lookup-hint">🔍 Type to search Dynamics</span></div>
+          <div class="label-row"><label>Driver</label><span class="dynamics-link" id="mv-driver-lookup-hint">🔍 Search Dynamics</span></div>
           <input id="mv-driver-name" placeholder="Start typing driver name…" oninput="lookupMovementDriver(this.value)" autocomplete="off">
           <input type="hidden" id="mv-driver-dynamics-id">
           <div id="mv-driver-results" class="lookup-results"></div>
@@ -1179,9 +1198,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       </div>
       <div class="form-row quad">
         <div class="form-field"><label>Markup (£)</label><input type="number" step="0.01" id="mv-markup" placeholder="0.00" oninput="updateMovementCalc()"></div>
-        <div class="form-field"><label>Spec price ex VAT (override)</label><input type="number" step="0.01" id="mv-override" placeholder="blank = calculated" oninput="updateMovementCalc()"></div>
+        <div class="form-field"><label>Base price override (ex VAT)</label><input type="number" step="0.01" id="mv-override" placeholder="blank = calculated" oninput="updateMovementCalc()"></div>
         <div class="form-field"><label>VAT %</label><input type="number" step="0.1" id="mv-vat-pct" value="20" oninput="updateMovementCalc()"></div>
-        <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Base £80 first 100 mi, then £0.80/mi. Spec price replaces base + markup.</div></div>
+        <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Base £80 first 100 mi, then £0.80/mi. Override replaces the calculated base; markup still adds.</div></div>
       </div>
 
       <div id="mv-pricing-summary" style="background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:12px">
@@ -1221,6 +1240,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="form-field"><label>Internal notes <span style="font-size:10px;color:var(--n400);font-weight:400">(never shown to customer)</span></label><textarea id="mv-internal-notes" placeholder="Internal-only notes…"></textarea></div>
     </div>
     <div class="modal-footer">
+      <span id="mv-supplier-sent" style="font-size:11px;color:var(--n500);margin-right:auto;align-self:center"></span>
+      <button class="btn-secondary-modal" id="mv-send-btn" onclick="openMovementSend()">✉ Send to supplier</button>
       <button class="btn-secondary-modal" onclick="closeMovementModal()">Cancel</button>
       <button class="btn-secondary-modal" id="mv-delete-btn" onclick="deleteMovementFromModal()" style="display:none;color:var(--tl-red-t)">Delete</button>
       <button class="btn-primary-modal" onclick="saveMovement()">Save movement</button>
@@ -1559,6 +1580,41 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div class="modal-body" id="claim-modal-body"></div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeClaimModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MOVEMENT SEND-TO-SUPPLIER ─── -->
+<div class="modal-overlay" id="mv-send-modal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header"><div class="modal-title">Send movement request</div><button class="modal-close" onclick="document.getElementById('mv-send-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div id="mvs-summary" style="font-size:12px;color:var(--n700);margin-bottom:8px"></div>
+      <div id="mvs-warn" style="display:none;background:var(--tl-orange-l);color:var(--tl-orange-t);font-size:12px;padding:8px 10px;border-radius:8px;margin-bottom:8px"></div>
+      <div id="mvs-preview" style="border:1px solid var(--n200);border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;max-height:320px;overflow-y:auto"></div>
+      <div class="form-field" style="margin-top:8px"><label>Add a note (optional)</label><input id="mvs-notes"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="openMovementTemplate()">Edit template</button>
+      <button class="btn-secondary-modal" onclick="document.getElementById('mv-send-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary-modal" id="mvs-send-btn" onclick="doMovementSend()">Send request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MOVEMENT EMAIL TEMPLATE ─── -->
+<div class="modal-overlay" id="mv-template-modal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header"><div class="modal-title">Movement request email template</div><button class="modal-close" onclick="document.getElementById('mv-template-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--n500);margin-bottom:8px">Tokens: {supplierName} {customer} {vehicleReg} {makeModel} {driver} {movementDate} {pickupAddress} {pickupContact} {pickupPhone} {dropoffAddress} {dropoffContact} {dropoffPhone} {mileage} {notes}</div>
+      <div class="form-field"><label>Subject</label><input id="mvt-subject"></div>
+      <div class="form-field"><label>Body</label><textarea id="mvt-body" style="width:100%;min-height:240px;font-size:12px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="movementTemplateReset()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="document.getElementById('mv-template-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveMovementTemplate()">Save template</button>
     </div>
   </div>
 </div>
@@ -4222,7 +4278,8 @@ function clearMovementForm(){
   window._pendingMvDriverContact=null;
   ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
    'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
-   'mv-mileage','mv-drive-time','mv-markup','mv-override','mv-actual-fuel','mv-notes','mv-internal-notes'
+   'mv-mileage','mv-drive-time','mv-markup','mv-override','mv-actual-fuel','mv-notes','mv-internal-notes',
+   'mv-pickup-contact','mv-pickup-phone','mv-dropoff-contact','mv-dropoff-phone'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mv-account').value='';
   const mvSup=document.getElementById('mv-supplier');if(mvSup)mvSup.value='';
@@ -4233,6 +4290,7 @@ function clearMovementForm(){
   movementSupps=[];renderMovementSupps();
   document.getElementById('mv-reconciliation').style.display='none';
   document.getElementById('mv-delete-btn').style.display='none';
+  renderMovementSentState(null);
   updateMovementCalc();
 }
 
@@ -4266,6 +4324,9 @@ function openEditMovement(id){
   f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
   f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
   f('mv-driver-name',m.driver_name);f('mv-driver-dynamics-id',m.driver_dynamics_id);
+  f('mv-pickup-contact',m.pickup_contact_name);f('mv-pickup-phone',m.pickup_contact_phone);
+  f('mv-dropoff-contact',m.dropoff_contact_name);f('mv-dropoff-phone',m.dropoff_contact_phone);
+  renderMovementSentState(m);
   window._mvLastDriverName=m.driver_name||'';
   f('mv-mileage',m.mileage);f('mv-drive-time',m.drive_time_minutes);f('mv-mileage-source',m.mileage_source||'manual');
   f('mv-markup',m.markup_flat);f('mv-override',m.price_override);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
@@ -4352,10 +4413,11 @@ function calcMovementTotals(){
   const suppsVatable=movementSupps.filter(s=>(s.vat_status||'full')==='full').reduce((acc,s)=>acc+suppsCharge(s),0);
   const suppsExempt=movementSupps.filter(s=>s.vat_status==='outside_of_scope').reduce((acc,s)=>acc+suppsCharge(s),0);
   const suppsTotal=suppsVatable+suppsExempt;
-  // Spec price override: replaces base + markup (ex VAT); supps + VAT still apply
+  // Base price override: replaces the mileage-calculated base only —
+  // markup, supplementaries and VAT all still apply on top
   const ov=parseFloat(document.getElementById('mv-override')?.value);
   const override=(!isNaN(ov)&&ov>0)?ov:null;
-  const jobExVat=override!=null?override:(base+markup);
+  const jobExVat=(override!=null?override:base)+markup;
   const vatableSubtotal=jobExVat+suppsVatable;
   const vatAmount=vatableSubtotal*(vatPct/100);
   const subtotalExVat=vatableSubtotal+suppsExempt;
@@ -4387,7 +4449,7 @@ function updateMovementCalc(){
   if(on){
     if(t.override!=null){
       on.style.display='';
-      on.textContent='⚠ Spec price override £'+t.override.toFixed(2)+' ex VAT in use — calculated would be £'+(t.base+t.markup).toFixed(2)+' (base £'+t.base.toFixed(2)+' + markup £'+t.markup.toFixed(2)+')';
+      on.textContent='⚠ Base price override £'+t.override.toFixed(2)+' in use — calculated base would be £'+t.base.toFixed(2)+' (markup £'+t.markup.toFixed(2)+' still applied on top)';
     }else on.style.display='none';
   }
   // Reconciliation block (only relevant when shown, but harmless to update)
@@ -4413,15 +4475,15 @@ async function lookupMovementMileage(){
   const btn=document.getElementById('mv-lookup-btn');
   if(btn){btn.disabled=true;btn.textContent='Looking up…';}
   try{
-    // Postcodes.io for lat/lon
+    // Postcodes.io for postcode lat/lon (also fills town/county)
     const [pRes,dRes]=await Promise.all([
       fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pickupPc)}`),
       fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(dropoffPc)}`)
     ]);
     if(!pRes.ok)throw new Error(`Pickup postcode not recognised (${pickupPc})`);
     if(!dRes.ok)throw new Error(`Dropoff postcode not recognised (${dropoffPc})`);
-    const pickup=(await pRes.json()).result;
-    const dropoff=(await dRes.json()).result;
+    let pickup=(await pRes.json()).result;
+    let dropoff=(await dRes.json()).result;
     if(!pickup||!dropoff)throw new Error('Could not resolve one of the postcodes');
     // Fill town + county from the geocode. admin_district is the usual town
     // proxy; admin_county is null for unitary authorities (e.g. Brighton & Hove,
@@ -4431,6 +4493,23 @@ async function lookupMovementMileage(){
     const setIfEl=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
     setIfEl('mv-pickup-town',pcTown(pickup));setIfEl('mv-pickup-county',pcCounty(pickup));
     setIfEl('mv-dropoff-town',pcTown(dropoff));setIfEl('mv-dropoff-county',pcCounty(dropoff));
+    // When a full address is present, refine the point via ORS geocoding —
+    // routes then start/end at the actual premises, not the postcode centroid.
+    const refine=async(prefix,fallback)=>{
+      const g=id=>(document.getElementById(id)?.value||'').trim();
+      const a1=g('mv-'+prefix+'-addr1');
+      if(!a1)return fallback;
+      const text=[a1,g('mv-'+prefix+'-town'),g('mv-'+prefix+'-county'),g('mv-'+prefix+'-postcode')].filter(Boolean).join(', ');
+      try{
+        const r=await fetch('https://api.openrouteservice.org/geocode/search?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=1');
+        if(!r.ok)return fallback;
+        const j=await r.json();
+        const c=j.features&&j.features[0]&&j.features[0].geometry&&j.features[0].geometry.coordinates;
+        return c?{longitude:c[0],latitude:c[1]}:fallback;
+      }catch(e){return fallback;}
+    };
+    pickup=await refine('pickup',pickup);
+    dropoff=await refine('dropoff',dropoff);
     // OpenRouteService directions (driving-car). Returns distance in metres,
     // duration in seconds. Response shape can be either {routes:[...]} (json)
     // or {features:[...]} (geojson) — handle both defensively.
@@ -4465,6 +4544,100 @@ async function lookupMovementMileage(){
   }finally{
     if(btn){btn.disabled=false;btn.textContent='Look up mileage';}
   }
+}
+
+// ── End-point contact lookup (pickup/dropoff): Dynamics typeahead, manual always allowed ──
+let _endContactTimers={};
+async function lookupEndContact(prefix,q){
+  clearTimeout(_endContactTimers[prefix]);
+  const res=document.getElementById('mv-'+prefix+'-contact-results');if(!res)return;
+  if(!q||q.length<2){res.classList.remove('open');return;}
+  const url=getConfig().n8nContact;
+  if(!url){res.classList.remove('open');return;}
+  res.innerHTML='<div class="lookup-status">Searching Dynamics…</div>';res.classList.add('open');
+  _endContactTimers[prefix]=setTimeout(async()=>{
+    try{
+      const r=await fetch(url+'?q='+encodeURIComponent(q),{mode:'cors'});
+      const data=await r.json();
+      if(!Array.isArray(data)||!data.length){res.innerHTML='<div class="lookup-status">No matches — keep typing to enter manually</div>';return;}
+      window['_endContactResults_'+prefix]=data.slice(0,8);
+      res.innerHTML=window['_endContactResults_'+prefix].map((d,i)=>'<div class="lookup-item" onclick="pickEndContact(\''+prefix+'\','+i+')"><strong>'+esc(mvDriverName(d))+'</strong><div class="meta">'+esc([d.accountName,d.mobile].filter(Boolean).join(' · '))+'</div></div>').join('');
+    }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed — enter manually</div>';}
+  },350);
+}
+function pickEndContact(prefix,i){
+  const d=(window['_endContactResults_'+prefix]||[])[i];if(!d)return;
+  document.getElementById('mv-'+prefix+'-contact').value=mvDriverName(d);
+  if(d.mobile)document.getElementById('mv-'+prefix+'-phone').value=d.mobile;
+  document.getElementById('mv-'+prefix+'-contact-results').classList.remove('open');
+}
+// ── Movement request email (template in covase_config 'movement_booking_template') ──
+const DEFAULT_MOVEMENT_TEMPLATE={
+  subject:'Vehicle movement request - {customer} - {movementDate}',
+  body:'Hi {supplierName},\n\nPlease can you arrange the following vehicle movement:\n\nVehicle: {vehicleReg} {makeModel}\nMovement date: {movementDate}\n\nCOLLECTION\n{pickupAddress}\nContact: {pickupContact} — {pickupPhone}\n\nDELIVERY\n{dropoffAddress}\nContact: {dropoffContact} — {dropoffPhone}\n\nEstimated mileage: {mileage} mi\n\n{notes}\n\nPlease confirm you can cover this job and your price.\n\nMany thanks,\nCovase'
+};
+let movementTemplate={...DEFAULT_MOVEMENT_TEMPLATE};
+async function loadMovementTemplate(){try{const rows=await sbReq('covase_config?key=eq.movement_booking_template&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(v&&(v.subject||v.body))movementTemplate={...DEFAULT_MOVEMENT_TEMPLATE,...v};}catch(e){}}
+function openMovementTemplate(){document.getElementById('mvt-subject').value=movementTemplate.subject;document.getElementById('mvt-body').value=movementTemplate.body;document.getElementById('mv-template-modal').classList.add('open');}
+function movementTemplateReset(){document.getElementById('mvt-subject').value=DEFAULT_MOVEMENT_TEMPLATE.subject;document.getElementById('mvt-body').value=DEFAULT_MOVEMENT_TEMPLATE.body;}
+async function saveMovementTemplate(){
+  movementTemplate={subject:document.getElementById('mvt-subject').value,body:document.getElementById('mvt-body').value};
+  try{await sbReq('covase_config',{method:'POST',body:{key:'movement_booking_template',value:movementTemplate,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Template saved','success');document.getElementById('mv-template-modal').classList.remove('open');if(document.getElementById('mv-send-modal').classList.contains('open'))openMovementSend();}
+  catch(e){toast('Save failed: '+e.message,'error');}
+}
+function movementTokens(extraNote){
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const acc=(allAccounts||[]).find(a=>a.id===g('mv-account'));
+  const sup=(allAccounts||[]).find(a=>a.id===g('mv-supplier'));
+  const addr=p=>[g('mv-'+p+'-addr1'),g('mv-'+p+'-town'),g('mv-'+p+'-county'),g('mv-'+p+'-postcode')].filter(Boolean).join(', ');
+  return {
+    supplierName:sup?sup.company_name:'',customer:acc?acc.company_name:'',
+    vehicleReg:g('mv-vehicle-reg').toUpperCase(),makeModel:g('mv-vehicle-makemodel'),driver:g('mv-driver-name'),
+    movementDate:g('mv-movement-date')?fmtUK(g('mv-movement-date')):'TBC',
+    pickupAddress:addr('pickup'),pickupContact:g('mv-pickup-contact')||'—',pickupPhone:g('mv-pickup-phone')||'—',
+    dropoffAddress:addr('dropoff'),dropoffContact:g('mv-dropoff-contact')||'—',dropoffPhone:g('mv-dropoff-phone')||'—',
+    mileage:g('mv-mileage')||'?',notes:extraNote||''
+  };
+}
+function openMovementSend(){
+  if(!editMovementId){toast('Save the movement first, then send','error');return;}
+  const sid=document.getElementById('mv-supplier')?.value;
+  const sup=(allAccounts||[]).find(a=>a.id===sid);
+  const email=sup&&sup.booking_email?sup.booking_email:'';
+  const warn=document.getElementById('mvs-warn'),sb=document.getElementById('mvs-send-btn');
+  if(!sid){warn.style.display='';warn.textContent='Pick a supplier in the movement first.';sb.disabled=true;sb.style.opacity='0.5';}
+  else if(!email){warn.style.display='';warn.textContent='No booking email on "'+(sup?sup.company_name:'')+'" — add one in CRM → Accounts.';sb.disabled=true;sb.style.opacity='0.5';}
+  else{warn.style.display='none';sb.disabled=false;sb.style.opacity='';}
+  const t=movementTokens(document.getElementById('mvs-notes')?.value||'');
+  document.getElementById('mvs-summary').innerHTML='<strong>To: '+esc(t.supplierName||'—')+(email?' &lt;'+esc(email)+'&gt;':'')+'</strong>';
+  document.getElementById('mvs-preview').textContent=fineRender(movementTemplate.body,t);
+  document.getElementById('mv-send-modal').classList.add('open');
+}
+async function doMovementSend(){
+  const m=(allMovements||[]).find(x=>x.id===editMovementId);if(!m)return;
+  const sup=(allAccounts||[]).find(a=>a.id===document.getElementById('mv-supplier')?.value);
+  const email=sup&&sup.booking_email;if(!email){toast('No supplier booking email','error');return;}
+  const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
+  const t=movementTokens((document.getElementById('mvs-notes')?.value||'').trim());
+  const subject=fineRender(movementTemplate.subject,t)+' [CVM:'+editMovementId+']';
+  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(fineRender(movementTemplate.body,t)).replace(/\n/g,'<br>')+'</div>';
+  const btn=document.getElementById('mvs-send-btn');btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,subject:subject,bodyHtml:bodyHtml,customer:t.customer})});
+    if(!r.ok)throw new Error('Webhook returned '+r.status);
+    const now=new Date().toISOString();
+    try{await sbReq('covase_movements?id=eq.'+encodeURIComponent(editMovementId),{method:'PATCH',body:{supplier_email_sent_at:now,updated_at:now},prefer:'return=minimal'});}catch(e){}
+    if(m)m.supplier_email_sent_at=now;
+    renderMovementSentState(m);
+    toast('Movement request sent to '+sup.company_name,'success');
+    document.getElementById('mv-send-modal').classList.remove('open');
+  }catch(e){toast('Send failed: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Send request';}
+}
+function renderMovementSentState(m){
+  const el=document.getElementById('mv-supplier-sent');if(!el)return;
+  if(m&&m.supplier_email_sent_at){const d=new Date(m.supplier_email_sent_at);el.textContent='✓ Request sent '+d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});el.style.color='var(--covase)';}
+  else{el.textContent='';}
 }
 
 // ─── Movement vehicle + driver Dynamics lookups (manual entry always allowed) ───
@@ -4574,6 +4747,10 @@ async function saveMovement(){
     vehicle_makemodel:document.getElementById('mv-vehicle-makemodel').value.trim()||null,
     driver_name:document.getElementById('mv-driver-name').value.trim()||null,
     driver_dynamics_id:document.getElementById('mv-driver-dynamics-id').value.trim()||null,
+    pickup_contact_name:document.getElementById('mv-pickup-contact')?.value.trim()||null,
+    pickup_contact_phone:document.getElementById('mv-pickup-phone')?.value.trim()||null,
+    dropoff_contact_name:document.getElementById('mv-dropoff-contact')?.value.trim()||null,
+    dropoff_contact_phone:document.getElementById('mv-dropoff-phone')?.value.trim()||null,
     mileage:parseFloat(document.getElementById('mv-mileage').value)||null,
     mileage_source:document.getElementById('mv-mileage-source').value||null,
     drive_time_minutes:parseInt(document.getElementById('mv-drive-time').value,10)||null,
@@ -6631,6 +6808,8 @@ loadAccounts();
 loadBookingTemplate();
 // Load the shared movement-card layout (drag-and-drop designer; falls back to default)
 loadMovementCardLayout();
+// Load the movement request email template
+loadMovementTemplate();
 // Prime the supplier-replies review-queue badge
 loadSupplierReplies();
 // Prime the accident-claims badge (open-claim count)
