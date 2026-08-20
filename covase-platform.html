@@ -1150,6 +1150,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
           <div id="mv-pickup-postcode-results" class="lookup-results"></div>
         </div>
         <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-pickup-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('pickup',this.value)" autocomplete="off"><div id="mv-pickup-addr1-results" class="lookup-results"></div></div>
+        <div class="form-field"><label>Address line 2</label><input id="mv-pickup-addr2" placeholder="(optional)"></div>
         <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
         <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
       </div>
@@ -1171,6 +1172,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
           <div id="mv-dropoff-postcode-results" class="lookup-results"></div>
         </div>
         <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-dropoff-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('dropoff',this.value)" autocomplete="off"><div id="mv-dropoff-addr1-results" class="lookup-results"></div></div>
+        <div class="form-field"><label>Address line 2</label><input id="mv-dropoff-addr2" placeholder="(optional)"></div>
         <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
         <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
@@ -4022,8 +4024,8 @@ const MV_CARD_FIELDS=[
   {key:'invoice_total',label:'Invoice total (£)',money:true,get:m=>fmtMoney(parseFloat(m.invoice_total)||null)},
   {key:'actual_fuel',label:'Actual fuel (£)',money:true,get:m=>fmtMoney(parseFloat(m.actual_fuel_cost)||null)},
   {key:'notes',label:'Notes',get:m=>m.notes||''},
-  {key:'pickup_address',label:'Pickup address',get:m=>m.pickup_address_line1||''},
-  {key:'dropoff_address',label:'Dropoff address',get:m=>m.dropoff_address_line1||''},
+  {key:'pickup_address',label:'Pickup address',get:m=>[m.pickup_address_line1,m.pickup_address_line2].filter(Boolean).join(', ')},
+  {key:'dropoff_address',label:'Dropoff address',get:m=>[m.dropoff_address_line1,m.dropoff_address_line2].filter(Boolean).join(', ')},
   {key:'mileage_source',label:'Mileage source',get:m=>m.mileage_source||''},
   {key:'base_charge',label:'Base charge (£)',money:true,get:m=>fmtMoney(parseFloat(m.base_charge)||null)},
   {key:'markup_flat',label:'Markup (£, internal)',money:true,get:m=>fmtMoney(parseFloat(m.markup_flat)||null)},
@@ -4290,8 +4292,8 @@ function populateMovementAccountDropdown(){
 
 function clearMovementForm(){
   window._pendingMvDriverContact=null;
-  ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
-   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
+  ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-addr2','mv-pickup-town','mv-pickup-county',
+   'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-addr2','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
    'mv-mileage','mv-drive-time','mv-markup','mv-override','mv-actual-fuel','mv-notes','mv-internal-notes',
    'mv-pickup-contact','mv-pickup-phone','mv-dropoff-contact','mv-dropoff-phone'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
@@ -4335,8 +4337,8 @@ function openEditMovement(id){
   f('mv-quote-date',m.quote_date);
   f('mv-status',m.movement_status||'quoted');
   f('mv-supplier',m.supplier_account_id||'');
-  f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-town',m.pickup_town);f('mv-pickup-county',m.pickup_county);
-  f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
+  f('mv-pickup-postcode',m.pickup_postcode);f('mv-pickup-addr1',m.pickup_address_line1);f('mv-pickup-addr2',m.pickup_address_line2);f('mv-pickup-town',m.pickup_town);f('mv-pickup-county',m.pickup_county);
+  f('mv-dropoff-postcode',m.dropoff_postcode);f('mv-dropoff-addr1',m.dropoff_address_line1);f('mv-dropoff-addr2',m.dropoff_address_line2);f('mv-dropoff-town',m.dropoff_town);f('mv-dropoff-county',m.dropoff_county);
   f('mv-vehicle-reg',m.vehicle_reg);f('mv-vehicle-makemodel',m.vehicle_makemodel);
   f('mv-driver-name',m.driver_name);f('mv-driver-dynamics-id',m.driver_dynamics_id);
   f('mv-pickup-contact',m.pickup_contact_name);f('mv-pickup-phone',m.pickup_contact_phone);
@@ -4490,7 +4492,8 @@ async function lookupMovementMileage(){
   const btn=document.getElementById('mv-lookup-btn');
   if(btn){btn.disabled=true;btn.textContent='Looking up…';}
   try{
-    // Postcodes.io for postcode lat/lon (also fills town/county)
+    // Postcodes.io for postcode lat/lon — read-only: the mileage lookup never
+    // writes to address fields, it only resolves coordinates for routing
     const [pRes,dRes]=await Promise.all([
       fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pickupPc)}`),
       fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(dropoffPc)}`)
@@ -4500,14 +4503,6 @@ async function lookupMovementMileage(){
     let pickup=(await pRes.json()).result;
     let dropoff=(await dRes.json()).result;
     if(!pickup||!dropoff)throw new Error('Could not resolve one of the postcodes');
-    // Fill town + county from the geocode. admin_district is the usual town
-    // proxy; admin_county is null for unitary authorities (e.g. Brighton & Hove,
-    // City of Edinburgh) so fall back to admin_district then region.
-    const pcTown=p=>p.admin_district||p.parish||'';
-    const pcCounty=p=>p.admin_county||p.admin_district||p.region||'';
-    const setIfEl=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
-    setIfEl('mv-pickup-town',pcTown(pickup));setIfEl('mv-pickup-county',pcCounty(pickup));
-    setIfEl('mv-dropoff-town',pcTown(dropoff));setIfEl('mv-dropoff-county',pcCounty(dropoff));
     // When a full address is present, refine the point via ORS geocoding —
     // routes then start/end at the actual premises, not the postcode centroid.
     const refine=async(prefix,fallback)=>{
@@ -4518,7 +4513,7 @@ async function lookupMovementMileage(){
       const st=(window._mvCoords||{})[prefix];
       if(st&&st.sig===a1+'|'+g('mv-'+prefix+'-postcode').toUpperCase())return {longitude:st.longitude,latitude:st.latitude};
       if(!a1)return fallback;
-      const text=[a1,g('mv-'+prefix+'-town'),g('mv-'+prefix+'-county'),g('mv-'+prefix+'-postcode')].filter(Boolean).join(', ');
+      const text=[a1,g('mv-'+prefix+'-addr2'),g('mv-'+prefix+'-town'),g('mv-'+prefix+'-county'),g('mv-'+prefix+'-postcode')].filter(Boolean).join(', ');
       try{
         const r=await fetch('https://api.openrouteservice.org/geocode/search?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=1');
         if(!r.ok)return fallback;
@@ -4593,8 +4588,10 @@ async function lookupPafAddresses(prefix){
 function pickPafAddress(prefix,i){
   const a=(window['_pafAddr_'+prefix]||[])[i];if(!a)return;
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-  const addr1=[a.line_1,a.line_2].filter(Boolean).join(', ');
+  const addr1=a.line_1||'';
+  const addr2=[a.line_2,a.line_3].filter(Boolean).join(', ');
   set('mv-'+prefix+'-addr1',addr1);
+  set('mv-'+prefix+'-addr2',addr2);
   set('mv-'+prefix+'-town',a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
   if(a.county)set('mv-'+prefix+'-county',a.county);
   if(a.postcode)set('mv-'+prefix+'-postcode',a.postcode.toUpperCase());
@@ -4639,6 +4636,7 @@ function pickMvAddress(prefix,i){
   const p=f.properties||{};
   const set=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
   set('mv-'+prefix+'-addr1',p.name||p.label||'');
+  {const e2=document.getElementById('mv-'+prefix+'-addr2');if(e2)e2.value='';}
   set('mv-'+prefix+'-town',p.locality||p.localadmin||'');
   set('mv-'+prefix+'-county',p.county||p.region||'');
   if(p.postalcode)set('mv-'+prefix+'-postcode',p.postalcode.toUpperCase());
@@ -4669,8 +4667,9 @@ function pickEndContact(prefix,i){
   if(d.mobile)document.getElementById('mv-'+prefix+'-phone').value=d.mobile;
   // Dynamics-first: the contact's address fills the endpoint too (when present)
   const set=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
-  const a1=[d.address1,d.address2].filter(Boolean).join(', ');
+  const a1=d.address1||'';
   if(a1)set('mv-'+prefix+'-addr1',a1);
+  if(d.address2)set('mv-'+prefix+'-addr2',d.address2);
   if(d.town)set('mv-'+prefix+'-town',d.town);
   if(d.postcode)set('mv-'+prefix+'-postcode',String(d.postcode).toUpperCase());
   if(a1||d.postcode)toast('Contact + address filled from Dynamics'+(!d.town?'':''),'success');
@@ -4695,7 +4694,7 @@ function movementTokens(extraNote){
   const g=id=>(document.getElementById(id)?.value||'').trim();
   const acc=(allAccounts||[]).find(a=>a.id===g('mv-account'));
   const sup=(allAccounts||[]).find(a=>a.id===g('mv-supplier'));
-  const addr=p=>[g('mv-'+p+'-addr1'),g('mv-'+p+'-town'),g('mv-'+p+'-county'),g('mv-'+p+'-postcode')].filter(Boolean).join(', ');
+  const addr=p=>[g('mv-'+p+'-addr1'),g('mv-'+p+'-addr2'),g('mv-'+p+'-town'),g('mv-'+p+'-county'),g('mv-'+p+'-postcode')].filter(Boolean).join(', ');
   return {
     supplierName:sup?sup.company_name:'',customer:acc?acc.company_name:'',
     vehicleReg:g('mv-vehicle-reg').toUpperCase(),makeModel:g('mv-vehicle-makemodel'),driver:g('mv-driver-name'),
@@ -4843,10 +4842,12 @@ async function saveMovement(){
     supplier:(()=>{const sid=document.getElementById('mv-supplier')?.value;if(!sid)return null;const a=(allAccounts||[]).find(x=>x.id===sid);return a?a.company_name:null;})(),
     pickup_postcode:(document.getElementById('mv-pickup-postcode').value||'').trim().toUpperCase()||null,
     pickup_address_line1:document.getElementById('mv-pickup-addr1').value.trim()||null,
+    pickup_address_line2:document.getElementById('mv-pickup-addr2').value.trim()||null,
     pickup_town:document.getElementById('mv-pickup-town').value.trim()||null,
     pickup_county:document.getElementById('mv-pickup-county').value.trim()||null,
     dropoff_postcode:(document.getElementById('mv-dropoff-postcode').value||'').trim().toUpperCase()||null,
     dropoff_address_line1:document.getElementById('mv-dropoff-addr1').value.trim()||null,
+    dropoff_address_line2:document.getElementById('mv-dropoff-addr2').value.trim()||null,
     dropoff_town:document.getElementById('mv-dropoff-town').value.trim()||null,
     dropoff_county:document.getElementById('mv-dropoff-county').value.trim()||null,
     vehicle_reg:(document.getElementById('mv-vehicle-reg').value||'').replace(/\s+/g,'').toUpperCase()||null,
