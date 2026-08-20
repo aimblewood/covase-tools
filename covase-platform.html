@@ -1177,10 +1177,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
           </select>
         </div>
       </div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>Markup (£)</label><input type="number" step="0.01" id="mv-markup" placeholder="0.00" oninput="updateMovementCalc()"></div>
+        <div class="form-field"><label>Spec price ex VAT (override)</label><input type="number" step="0.01" id="mv-override" placeholder="blank = calculated" oninput="updateMovementCalc()"></div>
         <div class="form-field"><label>VAT %</label><input type="number" step="0.1" id="mv-vat-pct" value="20" oninput="updateMovementCalc()"></div>
-        <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Base £80 for first 100 mi, then £0.80/mi thereafter.</div></div>
+        <div class="form-field"><label>&nbsp;</label><div style="font-size:10px;color:var(--n400);padding-top:8px;line-height:1.3">Base £80 first 100 mi, then £0.80/mi. Spec price replaces base + markup.</div></div>
       </div>
 
       <div id="mv-pricing-summary" style="background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:12px">
@@ -1190,6 +1191,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid var(--n200);margin-top:4px;padding-top:6px"><span>Subtotal ex VAT</span><strong id="mv-subtotal-display">£0.00</strong></div>
         <div style="display:flex;justify-content:space-between;padding:2px 0"><span>VAT</span><strong id="mv-vat-display">£0.00</strong></div>
         <div style="display:flex;justify-content:space-between;padding:4px 0 2px;border-top:2px solid var(--n300);margin-top:4px;padding-top:8px;font-size:14px"><span><strong>Quote total inc VAT</strong></span><strong id="mv-total-display" style="color:var(--covase)">£0.00</strong></div>
+        <div id="mv-override-note" style="display:none;margin-top:6px;padding:6px 8px;border-radius:6px;background:var(--tl-orange-l);color:var(--tl-orange-t);font-size:11px;font-weight:600"></div>
       </div>
 
       <div class="form-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -3955,6 +3957,7 @@ const MV_CARD_FIELDS=[
   {key:'mileage_source',label:'Mileage source',get:m=>m.mileage_source||''},
   {key:'base_charge',label:'Base charge (£)',money:true,get:m=>fmtMoney(parseFloat(m.base_charge)||null)},
   {key:'markup_flat',label:'Markup (£, internal)',money:true,get:m=>fmtMoney(parseFloat(m.markup_flat)||null)},
+  {key:'price_override',label:'Spec price (£, override)',money:true,get:m=>m.price_override!=null?fmtMoney(parseFloat(m.price_override)):''},
   {key:'vat_total',label:'VAT (£)',money:true,get:m=>fmtMoney(parseFloat(m.vat_total)||null)},
   {key:'fuel_markup_amount',label:'Fuel markup (£)',money:true,get:m=>fmtMoney(parseFloat(m.fuel_markup_amount)||null)},
   {key:'internal_notes',label:'Internal notes',get:m=>m.internal_notes||''}
@@ -4219,7 +4222,7 @@ function clearMovementForm(){
   window._pendingMvDriverContact=null;
   ['mv-customer-ref','mv-movement-date','mv-quote-date','mv-pickup-postcode','mv-pickup-addr1','mv-pickup-town','mv-pickup-county',
    'mv-dropoff-postcode','mv-dropoff-addr1','mv-dropoff-town','mv-dropoff-county','mv-vehicle-reg','mv-vehicle-makemodel','mv-driver-name','mv-driver-dynamics-id',
-   'mv-mileage','mv-drive-time','mv-markup','mv-actual-fuel','mv-notes','mv-internal-notes'
+   'mv-mileage','mv-drive-time','mv-markup','mv-override','mv-actual-fuel','mv-notes','mv-internal-notes'
   ].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('mv-account').value='';
   const mvSup=document.getElementById('mv-supplier');if(mvSup)mvSup.value='';
@@ -4265,7 +4268,7 @@ function openEditMovement(id){
   f('mv-driver-name',m.driver_name);f('mv-driver-dynamics-id',m.driver_dynamics_id);
   window._mvLastDriverName=m.driver_name||'';
   f('mv-mileage',m.mileage);f('mv-drive-time',m.drive_time_minutes);f('mv-mileage-source',m.mileage_source||'manual');
-  f('mv-markup',m.markup_flat);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
+  f('mv-markup',m.markup_flat);f('mv-override',m.price_override);f('mv-vat-pct',m.vat_total!=null&&m.quote_total!=null&&parseFloat(m.quote_total)>parseFloat(m.vat_total)?(parseFloat(m.vat_total)/(parseFloat(m.quote_total)-parseFloat(m.vat_total))*100).toFixed(1):'20');
   f('mv-actual-fuel',m.actual_fuel_cost);f('mv-fuel-markup-pct',m.fuel_markup_pct||'20');
   f('mv-notes',m.notes);f('mv-internal-notes',m.internal_notes);
   movementSupps=Array.isArray(m.supplementaries)?m.supplementaries.map(x=>({...x})):[];
@@ -4349,11 +4352,15 @@ function calcMovementTotals(){
   const suppsVatable=movementSupps.filter(s=>(s.vat_status||'full')==='full').reduce((acc,s)=>acc+suppsCharge(s),0);
   const suppsExempt=movementSupps.filter(s=>s.vat_status==='outside_of_scope').reduce((acc,s)=>acc+suppsCharge(s),0);
   const suppsTotal=suppsVatable+suppsExempt;
-  const vatableSubtotal=base+markup+suppsVatable;
+  // Spec price override: replaces base + markup (ex VAT); supps + VAT still apply
+  const ov=parseFloat(document.getElementById('mv-override')?.value);
+  const override=(!isNaN(ov)&&ov>0)?ov:null;
+  const jobExVat=override!=null?override:(base+markup);
+  const vatableSubtotal=jobExVat+suppsVatable;
   const vatAmount=vatableSubtotal*(vatPct/100);
   const subtotalExVat=vatableSubtotal+suppsExempt;
   const quoteTotal=subtotalExVat+vatAmount;
-  return{base,markup,suppsTotal,subtotalExVat,vatAmount,quoteTotal,vatPct};
+  return{base,markup,override,suppsTotal,subtotalExVat,vatAmount,quoteTotal,vatPct};
 }
 
 function calcMovementReconciliation(quoteTotal,vatPct){
@@ -4375,6 +4382,14 @@ function updateMovementCalc(){
   set('mv-subtotal-display','£'+t.subtotalExVat.toFixed(2));
   set('mv-vat-display','£'+t.vatAmount.toFixed(2));
   set('mv-total-display','£'+t.quoteTotal.toFixed(2));
+  // Override note: show the spec price + what the formula would have charged
+  const on=document.getElementById('mv-override-note');
+  if(on){
+    if(t.override!=null){
+      on.style.display='';
+      on.textContent='⚠ Spec price override £'+t.override.toFixed(2)+' ex VAT in use — calculated would be £'+(t.base+t.markup).toFixed(2)+' (base £'+t.base.toFixed(2)+' + markup £'+t.markup.toFixed(2)+')';
+    }else on.style.display='none';
+  }
   // Reconciliation block (only relevant when shown, but harmless to update)
   const r=calcMovementReconciliation(t.quoteTotal,t.vatPct);
   set('mv-quote-recap','£'+t.quoteTotal.toFixed(2));
@@ -4564,6 +4579,7 @@ async function saveMovement(){
     drive_time_minutes:parseInt(document.getElementById('mv-drive-time').value,10)||null,
     base_charge:t.base,
     markup_flat:t.markup,
+    price_override:t.override,
     supplementaries:cleanSupps,
     vat_total:t.vatAmount,
     quote_total:t.quoteTotal,
