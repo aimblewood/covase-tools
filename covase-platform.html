@@ -3177,6 +3177,7 @@ function buildHireCard(h){
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">Customer</div><div class="detail-val">${esc(h.customer||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Driver</div><div class="detail-val">${esc(h.driver||'—')}${h.driver_mobile?` <span style="color:var(--n500);font-weight:400;font-size:11px">· ${esc(h.driver_mobile)}</span>`:''}</div></div>
+        <div class="detail-field"><div class="detail-label">Job ref</div><div class="detail-val" style="font-weight:700;color:var(--covase)">${esc(h.job_ref||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Booking ref</div><div class="detail-val">${esc(h.reference||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Preferred start time</div><div class="detail-val">${h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'—'}</div></div>
         <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(h.vehicle_reg||'—')}</div></div>
@@ -3263,7 +3264,7 @@ async function openNewHire(){editHireId=null;document.getElementById('hire-modal
 }
 function openEditHire(id){
   const h=allHires.find(x=>x.id===id);if(!h)return;editHireId=id;
-  document.getElementById('hire-modal-title').textContent='Edit hire';
+  document.getElementById('hire-modal-title').textContent='Edit hire'+(h.job_ref?' · '+h.job_ref:'');
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
@@ -3441,7 +3442,7 @@ async function doSendSupplier(){
   const rendered=renderBookingTemplate(tokens);
   // Carry a machine-readable booking code in the subject so the reply agent can
   // match the supplier's response back to this exact hire.
-  const subjectCoded=rendered.subject+' [CVB:'+editHireId+']';
+  const subjectCoded=rendered.subject+' ['+(h.job_ref||('CVB:'+editHireId))+']';
   const payload={to:email,subject:subjectCoded,bodyHtml:rendered.html,customer:h.customer||''};
   const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
@@ -3569,6 +3570,7 @@ async function loadSupplierReplies(){
   const el=document.getElementById('supplier-replies-list');
   try{
     if(!hiresLoaded){try{allHires=await sbReq('covase_hires?order=start_date.desc&limit=500');hiresLoaded=true;}catch(e){}}
+    if(!movementsLoaded){try{await loadMovements();}catch(e){}}
     const rows=await sbReq('covase_supplier_replies?status=in.(needs_review,unmatched)&order=received_at.desc&limit=200');
     allSupplierReplies=Array.isArray(rows)?rows:[];
     const b=document.getElementById('badge-supplier-replies');if(b)b.textContent=String(allSupplierReplies.length);
@@ -3577,8 +3579,10 @@ async function loadSupplierReplies(){
 }
 async function checkRepliesNow(){
   const url=getConfig().n8nReplyCheck;if(!url){toast('Set the reply check-now webhook in Settings','error');return;}
-  toast('Checking rentals@ for new replies…','success');
+  const mvUrl=localStorage.getItem('covase_n8n_movementcheck_webhook')||'https://covase.app.n8n.cloud/webhook/covase-movement-reply-check';
+  toast('Checking rentals@ + logistics@ for new replies…','success');
   try{await fetch(url,{method:'GET',mode:'cors'});}catch(e){/* fire-and-forget; the run still triggers */}
+  try{await fetch(mvUrl,{method:'GET',mode:'cors'});}catch(e){}
   setTimeout(loadSupplierReplies,6000);
 }
 function hireLabel(hireId){const h=(allHires||[]).find(x=>x.id===hireId);return h?((h.customer||'?')+' · '+(h.vehicle_reg||'no reg')+' · '+(h.supplier||'?')):(hireId||'—');}
@@ -3606,13 +3610,22 @@ function renderSupplierReplies(){
     if(r.p11d_value!=null)d.push('P11D £'+esc(r.p11d_value));
     if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
     if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
-    const unmatched=(r.status==='unmatched'||!r.hire_id);
-    const hireOpts=(allHires||[]).filter(h=>h.hire_status!=='cancelled').map(h=>'<option value="'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.driver||'?')+' · '+(h.vehicle_reg||'no reg')+(h.reference?' · '+h.reference:'')+(h.start_date?' · '+fmtUK(h.start_date):'')+' ['+(h.hire_status||'')+']')+'</option>').join('');
+    if(r.price!=null)d.push('Price £'+esc(r.price));
+    const isMv=!!r.movement_id;
+    const unmatched=(r.status==='unmatched'||(!r.hire_id&&!r.movement_id));
+    const hireOpts=(allHires||[]).filter(h=>h.hire_status!=='cancelled').map(h=>'<option value="h:'+esc(h.id)+'">'+esc((h.customer||'?')+' · '+(h.driver||'?')+' · '+(h.vehicle_reg||'no reg')+(h.reference?' · '+h.reference:'')+(h.start_date?' · '+fmtUK(h.start_date):'')+' ['+(h.hire_status||'')+']')+'</option>').join('');
+    const mvOpts=(allMovements||[]).filter(m=>!['paid','cancelled'].includes(m.movement_status)).map(m=>'<option value="m:'+esc(m.id)+'">'+esc([(m.job_ref||''),(m.customer||'?'),(m.vehicle_reg||'no reg'),(m.movement_date?fmtUK(m.movement_date):''),'['+(m.movement_status||'')+']'].filter(Boolean).join(' · '))+'</option>').join('');
+    const linkOpts='<optgroup label="Hires">'+hireOpts+'</optgroup><optgroup label="Movements">'+mvOpts+'</optgroup>';
     let a='';
     if(unmatched){
-      a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire —</option>'+hireOpts+'</select>';
+      a+='<select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— link to hire or movement —</option>'+linkOpts+'</select>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
+    }else if(isMv){
+      if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyMovementReply(\''+r.id+'\')">Apply to movement</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openMovementById(\''+esc(r.movement_id)+'\')">Open movement</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="toggleRelink(\''+r.id+'\')">Re-link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }else{
       if(['confirmed','needs_info','alternative'].includes(oc))a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
@@ -3624,7 +3637,7 @@ function renderSupplierReplies(){
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }
     const q=r.questions?('<div style="margin-top:6px;color:var(--tl-red-t);font-size:12px"><strong>Question:</strong> '+esc(r.questions)+'</div>'):'';
-    const headerLeft=unmatched?('<div style="font-weight:600;color:var(--tl-red-t)">⚠ Unmatched · '+esc(r.from_email||'supplier')+'</div>'):('<div style="font-weight:600">'+esc(hireLabel(r.hire_id))+'</div>');
+    const headerLeft=unmatched?('<div style="font-weight:600;color:var(--tl-red-t)">⚠ Unmatched · '+esc(r.from_email||'supplier')+'</div>'):('<div style="font-weight:600">'+esc(isMv?mvJobLabel(r.movement_id):hireLabel(r.hire_id))+'</div>');
     return '<div style="border:1px solid '+(unmatched?'var(--tl-red-t)':'var(--n200)')+';border-radius:10px;padding:14px;margin-bottom:10px;background:#fff">'
       +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">'+headerLeft+'<span style="font-size:11px;font-weight:700;color:'+(chips[oc]||'var(--n500)')+';text-transform:uppercase">'+esc(oc)+(r.confidence!=null?' · '+Math.round(r.confidence*100)+'%':'')+'</span></div>'
       +(whenTxt?'<div style="font-size:11px;color:var(--n400);margin-top:3px">🕐 '+esc(whenTxt)+'</div>':'')
@@ -3633,7 +3646,7 @@ function renderSupplierReplies(){
       +(d.length?'<div style="font-size:12px;color:var(--n700);margin-top:6px">'+d.join(' · ')+'</div>':'')
       +q
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">'+a+'</div>'
-      +(!unmatched?'<div id="relink-'+r.id+'" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11px;color:var(--n500)">Wrong booking? Link to:</span><select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— choose hire —</option>'+hireOpts+'</select><button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Re-link</button></div>':'')
+      +(!unmatched?'<div id="relink-'+r.id+'" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11px;color:var(--n500)">Wrong job? Link to:</span><select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— choose hire or movement —</option>'+linkOpts+'</select><button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Re-link</button></div>':'')
       +'</div>';
   }).join('');
 }
@@ -3670,12 +3683,34 @@ async function dismissReply(id){
 }
 function toggleRelink(id){const el=document.getElementById('relink-'+id);if(el)el.style.display=el.style.display==='none'?'flex':'none';}
 async function linkUnmatched(id){
-  const sel=document.getElementById('link-sel-'+id);const hireId=sel?sel.value:'';
-  if(!hireId){toast('Pick a hire to link this email to','error');return;}
+  const sel=document.getElementById('link-sel-'+id);const v=sel?sel.value:'';
+  if(!v){toast('Pick a hire or movement to link this email to','error');return;}
+  const isMv=v.startsWith('m:');
+  const target=v.slice(2);
+  const patch=isMv?{movement_id:target,hire_id:null,status:'needs_review'}:{hire_id:target,movement_id:null,status:'needs_review'};
   try{
-    await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{hire_id:hireId,status:'needs_review'},prefer:'return=minimal'});
-    toast('Linked to booking — now in the review queue','success');loadSupplierReplies();
+    await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:patch,prefer:'return=minimal'});
+    toast('Linked to '+(isMv?'movement':'booking')+' — now in the review queue','success');loadSupplierReplies();
   }catch(e){toast('Link failed: '+e.message,'error');}
+}
+async function applyMovementReply(id){
+  const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
+  if(!r.movement_id){toast('No movement linked to this reply','error');return;}
+  const now=new Date().toISOString();
+  const m=(allMovements||[]).find(x=>x.id===r.movement_id);
+  const patch={updated_at:now};
+  if(!m||m.movement_status==='quoted')patch.movement_status='booked';
+  try{
+    await sbReq('covase_movements?id=eq.'+encodeURIComponent(r.movement_id),{method:'PATCH',body:patch,prefer:'return=minimal'});
+    await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'applied'},prefer:'return=minimal'});
+    toast('Movement confirmed'+(patch.movement_status?' — set to Booked':'')+(r.price!=null?' · supplier quoted £'+r.price+' — check pricing':''),'success');
+    movementsLoaded=false;loadMovements();loadSupplierReplies();
+  }catch(e){toast('Apply failed: '+e.message,'error');}
+}
+function openMovementById(id){if((allMovements||[]).some(x=>x.id===id)){showView('movements');openEditMovement(id);}else toast('Movement not found — refresh Movements and retry','error');}
+function mvJobLabel(id){
+  const m=(allMovements||[]).find(x=>x.id===id);if(!m)return id||'—';
+  return '🚚 '+[(m.job_ref||''),(m.customer||''),(m.vehicle_reg||'no reg'),(m.movement_date?fmtUK(m.movement_date):'')].filter(Boolean).join(' · ');
 }
 function cleanReplyText(t){if(!t)return '';const s=String(t);const cut=s.search(/\bFrom:\s/);return (cut>20?s.slice(0,cut):s).trim();}
 function toggleThreadMsg(i){const b=document.getElementById('thread-body-'+i);const c=document.getElementById('thread-chev-'+i);if(!b)return;const open=b.style.display==='none';b.style.display=open?'block':'none';if(c)c.textContent=open?'▾':'▸';}
@@ -4026,6 +4061,7 @@ const MV_CARD_FIELDS=[
   {key:'invoice_total',label:'Invoice total (£)',money:true,get:m=>fmtMoney(parseFloat(m.invoice_total)||null)},
   {key:'actual_fuel',label:'Actual fuel (£)',money:true,get:m=>fmtMoney(parseFloat(m.actual_fuel_cost)||null)},
   {key:'notes',label:'Notes',get:m=>m.notes||''},
+  {key:'job_ref',label:'Job ref',get:m=>m.job_ref||''},
   {key:'pickup_address',label:'Pickup address',get:m=>[m.pickup_address_line1,m.pickup_address_line2].filter(Boolean).join(', ')},
   {key:'dropoff_address',label:'Dropoff address',get:m=>[m.dropoff_address_line1,m.dropoff_address_line2].filter(Boolean).join(', ')},
   {key:'mileage_source',label:'Mileage source',get:m=>m.mileage_source||''},
@@ -4328,7 +4364,7 @@ async function openNewMovement(){
 function openEditMovement(id){
   const m=allMovements.find(x=>x.id===id);if(!m)return;
   editMovementId=id;
-  document.getElementById('movement-modal-title').textContent='Edit movement';
+  document.getElementById('movement-modal-title').textContent='Edit movement'+(m.job_ref?' · '+m.job_ref:'');
   clearMovementForm();
   populateMovementAccountDropdown();
   populateMovementSupplierDropdown();
@@ -4726,13 +4762,14 @@ async function doMovementSend(){
   const email=sup&&sup.booking_email;if(!email){toast('No supplier booking email','error');return;}
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
   const t=movementTokens((document.getElementById('mvs-notes')?.value||'').trim());
-  const subject=fineRender(movementTemplate.subject,t)+' [CVM:'+editMovementId+']';
+  const subject=fineRender(movementTemplate.subject,t)+' ['+(m.job_ref||('CVM:'+editMovementId))+']';
   const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(fineRender(movementTemplate.body,t)).replace(/\n/g,'<br>')+'</div>';
   const btn=document.getElementById('mvs-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,from:'logistics@covase.co.uk',subject:subject,bodyHtml:bodyHtml,customer:t.customer})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     const now=new Date().toISOString();
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-mvout-'+Date.now(),movement_id:editMovementId,direction:'outbound',outcome:'movement_request',subject:subject,raw_body:fineRender(movementTemplate.body,t),from_email:'logistics@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
     try{await sbReq('covase_movements?id=eq.'+encodeURIComponent(editMovementId),{method:'PATCH',body:{supplier_email_sent_at:now,updated_at:now},prefer:'return=minimal'});}catch(e){}
     if(m)m.supplier_email_sent_at=now;
     renderMovementSentState(m);
