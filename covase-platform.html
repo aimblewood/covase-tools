@@ -608,7 +608,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Hire booking request (rentals@)</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openMovementTemplate()">🚚 Movement request (logistics@)</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openFineTemplates()">🚨 Fines driver emails</button>
-    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions()">🤖 Edit reply-agent instructions</button>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions('hire')">🤖 Hire reply agent (rentals@)</button>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions('movement')">🤖 Movement reply agent (logistics@)</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openFontEditor()">🔤 Fonts &amp; appearance</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="toggleEditMode()">🖋 Edit mode — click anything to style it</button>
     <button class="save-btn" onclick="saveConfig()">Save & reload</button>
@@ -1287,7 +1288,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 <div class="modal-overlay" id="agent-modal">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
-      <div class="modal-title">Supplier reply agent — instructions</div>
+      <div class="modal-title" id="agent-modal-title">Supplier reply agent — instructions</div>
       <button class="modal-close" onclick="closeAgentInstructions()">✕</button>
     </div>
     <div class="modal-body">
@@ -3544,23 +3545,42 @@ async function saveEmailTemplate(){
   }catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
 }
 
-// ─── Supplier reply agent instructions (shared via covase_config) ───
+// ─── Reply agent instructions (hire + movement agents, shared via covase_config) ───
 const DEFAULT_AGENT_INSTRUCTIONS='Objectives: get each vehicle booking confirmed by the supplier and capture the assigned vehicle details.\n\nProcess:\n- If the supplier is only acknowledging or says they are working on it, send a brief thank-you and take no other action.\n- If they ask a question, flag it for the team to answer.\n- When they confirm, capture the reservation reference and the vehicle details (registration, make/model, P11D, fuel type, CO2, engine cc, date of first registration).\n- If they decline, flag it so we can re-source with another supplier.\n\nTone of replies: friendly, concise and professional. British English. Sign off as "Covase Rentals".';
+const DEFAULT_MOVEMENT_AGENT_INSTRUCTIONS='Objectives: get each vehicle movement job covered by the supplier at a sensible price, and capture their commitment.\n\nProcess:\n- When they confirm they can cover the job, capture their quoted price (ex VAT) and any collection/delivery dates they commit to.\n- If they decline or cannot cover it, flag it so we can re-source with another supplier.\n- If they ask a question (access, keys, timing, fuel), flag it for the team to answer.\n- A bare acknowledgement (checking availability, will come back to us) needs no action.\n\nBritish English throughout.';
+const AGENT_KINDS={
+  hire:{key:'supplier_agent_instructions',title:'Supplier reply agent — instructions',def:DEFAULT_AGENT_INSTRUCTIONS},
+  movement:{key:'movement_agent_instructions',title:'Movement reply agent (logistics@) — instructions',def:DEFAULT_MOVEMENT_AGENT_INSTRUCTIONS}
+};
 let agentInstructions=DEFAULT_AGENT_INSTRUCTIONS;
+let movementAgentInstructions=DEFAULT_MOVEMENT_AGENT_INSTRUCTIONS;
+let agentModalKind='hire';
 async function loadAgentInstructions(){
-  try{const rows=await sbReq('covase_config?key=eq.supplier_agent_instructions&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(typeof v==='string'&&v.trim())agentInstructions=v;}catch(e){}
+  try{
+    const rows=await sbReq('covase_config?key=in.(supplier_agent_instructions,movement_agent_instructions)&select=key,value');
+    (Array.isArray(rows)?rows:[]).forEach(r=>{
+      if(typeof r.value==='string'&&r.value.trim()){
+        if(r.key==='supplier_agent_instructions')agentInstructions=r.value;
+        if(r.key==='movement_agent_instructions')movementAgentInstructions=r.value;
+      }
+    });
+  }catch(e){}
 }
-function openAgentInstructions(){
-  document.getElementById('agent-instructions-text').value=agentInstructions||DEFAULT_AGENT_INSTRUCTIONS;
+function openAgentInstructions(kind){
+  agentModalKind=(kind==='movement')?'movement':'hire';
+  const cfg=AGENT_KINDS[agentModalKind];
+  document.getElementById('agent-modal-title').textContent=cfg.title;
+  document.getElementById('agent-instructions-text').value=(agentModalKind==='movement'?movementAgentInstructions:agentInstructions)||cfg.def;
   const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');
   document.getElementById('agent-modal').classList.add('open');
 }
 function closeAgentInstructions(){document.getElementById('agent-modal').classList.remove('open');}
-function resetAgentInstructions(){document.getElementById('agent-instructions-text').value=DEFAULT_AGENT_INSTRUCTIONS;}
+function resetAgentInstructions(){document.getElementById('agent-instructions-text').value=AGENT_KINDS[agentModalKind].def;}
 async function saveAgentInstructions(){
-  const text=document.getElementById('agent-instructions-text').value.trim()||DEFAULT_AGENT_INSTRUCTIONS;
-  agentInstructions=text;
-  try{await sbReq('covase_config',{method:'POST',body:{key:'supplier_agent_instructions',value:text,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Agent instructions saved — they apply on the next reply the agent reads','success');closeAgentInstructions();}
+  const cfg=AGENT_KINDS[agentModalKind];
+  const text=document.getElementById('agent-instructions-text').value.trim()||cfg.def;
+  if(agentModalKind==='movement')movementAgentInstructions=text;else agentInstructions=text;
+  try{await sbReq('covase_config',{method:'POST',body:{key:cfg.key,value:text,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Agent instructions saved — they apply on the next reply the agent reads','success');closeAgentInstructions();}
   catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
 }
 
