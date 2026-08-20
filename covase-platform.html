@@ -1133,7 +1133,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="form-section-label">Pickup</div>
       <div class="form-row quad">
         <div class="form-field"><label>Postcode</label><input id="mv-pickup-postcode" placeholder="BN2 1TH" style="text-transform:uppercase"></div>
-        <div class="form-field"><label>Address line 1</label><input id="mv-pickup-addr1"></div>
+        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-pickup-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('pickup',this.value)" autocomplete="off"><div id="mv-pickup-addr1-results" class="lookup-results"></div></div>
         <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
         <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
       </div>
@@ -1150,7 +1150,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="form-section-label">Dropoff</div>
       <div class="form-row quad">
         <div class="form-field"><label>Postcode</label><input id="mv-dropoff-postcode" placeholder="EH1 2NL" style="text-transform:uppercase"></div>
-        <div class="form-field"><label>Address line 1</label><input id="mv-dropoff-addr1"></div>
+        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-dropoff-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('dropoff',this.value)" autocomplete="off"><div id="mv-dropoff-addr1-results" class="lookup-results"></div></div>
         <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
         <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
@@ -4438,7 +4438,7 @@ function calcMovementReconciliation(quoteTotal,vatPct){
 function updateMovementCalc(){
   const t=calcMovementTotals();
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-  set('mv-base-display','£'+t.base.toFixed(2));
+  set('mv-base-display','£'+(t.override!=null?t.override:t.base).toFixed(2)+(t.override!=null?' (override)':''));
   set('mv-markup-display','£'+t.markup.toFixed(2));
   set('mv-supps-display','£'+t.suppsTotal.toFixed(2));
   set('mv-subtotal-display','£'+t.subtotalExVat.toFixed(2));
@@ -4546,6 +4546,44 @@ async function lookupMovementMileage(){
   }
 }
 
+// ── Address autocomplete (ORS/Pelias): suggestions as you type in Address
+// line 1, seeded with the postcode when present. OSM data — good but not PAF;
+// manual entry always stands. Picking fills address/town/county/postcode. ──
+let _mvAddrTimers={};
+async function lookupMvAddress(prefix,q){
+  clearTimeout(_mvAddrTimers[prefix]);
+  const res=document.getElementById('mv-'+prefix+'-addr1-results');if(!res)return;
+  if(!q||q.length<3){res.classList.remove('open');return;}
+  const apiKey=localStorage.getItem('covase_ors_api_key');
+  if(!apiKey){res.classList.remove('open');return;} // no key → plain manual field
+  _mvAddrTimers[prefix]=setTimeout(async()=>{
+    try{
+      const pc=(document.getElementById('mv-'+prefix+'-postcode')?.value||'').trim();
+      const text=q+(pc?' '+pc:'');
+      const r=await fetch('https://api.openrouteservice.org/geocode/autocomplete?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=6');
+      if(!r.ok){res.classList.remove('open');return;}
+      const j=await r.json();
+      const feats=(j.features||[]).filter(f=>f.properties);
+      if(!feats.length){res.innerHTML='<div class="lookup-status">No suggestions — keep typing manually</div>';res.classList.add('open');return;}
+      window['_mvAddr_'+prefix]=feats;
+      res.innerHTML=feats.map((f,i)=>{
+        const p=f.properties;
+        return '<div class="lookup-item" onclick="pickMvAddress(\''+prefix+'\','+i+')"><strong>'+esc(p.name||p.label||'')+'</strong><div class="meta">'+esc([p.locality||p.localadmin,p.county||p.region,p.postalcode].filter(Boolean).join(' · '))+'</div></div>';
+      }).join('');
+      res.classList.add('open');
+    }catch(e){res.classList.remove('open');}
+  },350);
+}
+function pickMvAddress(prefix,i){
+  const f=(window['_mvAddr_'+prefix]||[])[i];if(!f)return;
+  const p=f.properties||{};
+  const set=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
+  set('mv-'+prefix+'-addr1',p.name||p.label||'');
+  set('mv-'+prefix+'-town',p.locality||p.localadmin||'');
+  set('mv-'+prefix+'-county',p.county||p.region||'');
+  if(p.postalcode)set('mv-'+prefix+'-postcode',p.postalcode.toUpperCase());
+  document.getElementById('mv-'+prefix+'-addr1-results').classList.remove('open');
+}
 // ── End-point contact lookup (pickup/dropoff): Dynamics typeahead, manual always allowed ──
 let _endContactTimers={};
 async function lookupEndContact(prefix,q){
