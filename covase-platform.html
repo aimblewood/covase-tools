@@ -3611,7 +3611,7 @@ function renderSupplierReplies(){
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }else{
-      if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
+      if(['confirmed','needs_info','alternative'].includes(oc))a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
       if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
@@ -4305,6 +4305,7 @@ function clearMovementForm(){
   document.getElementById('mv-reconciliation').style.display='none';
   document.getElementById('mv-delete-btn').style.display='none';
   renderMovementSentState(null);
+  window._mvCoords={};
   updateMovementCalc();
 }
 
@@ -4512,6 +4513,10 @@ async function lookupMovementMileage(){
     const refine=async(prefix,fallback)=>{
       const g=id=>(document.getElementById(id)?.value||'').trim();
       const a1=g('mv-'+prefix+'-addr1');
+      // PAF-picked coordinates are the gold standard — use them directly when
+      // the address hasn't been edited since the pick
+      const st=(window._mvCoords||{})[prefix];
+      if(st&&st.sig===a1+'|'+g('mv-'+prefix+'-postcode').toUpperCase())return {longitude:st.longitude,latitude:st.latitude};
       if(!a1)return fallback;
       const text=[a1,g('mv-'+prefix+'-town'),g('mv-'+prefix+'-county'),g('mv-'+prefix+'-postcode')].filter(Boolean).join(', ');
       try{
@@ -4588,10 +4593,16 @@ async function lookupPafAddresses(prefix){
 function pickPafAddress(prefix,i){
   const a=(window['_pafAddr_'+prefix]||[])[i];if(!a)return;
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-  set('mv-'+prefix+'-addr1',[a.line_1,a.line_2].filter(Boolean).join(', '));
+  const addr1=[a.line_1,a.line_2].filter(Boolean).join(', ');
+  set('mv-'+prefix+'-addr1',addr1);
   set('mv-'+prefix+'-town',a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
   if(a.county)set('mv-'+prefix+'-county',a.county);
   if(a.postcode)set('mv-'+prefix+'-postcode',a.postcode.toUpperCase());
+  // PAF gives the property's exact coordinates — stash them for the mileage
+  // route (signature guards against the address being edited afterwards)
+  window._mvCoords=window._mvCoords||{};
+  if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
+  else delete window._mvCoords[prefix];
   document.getElementById('mv-'+prefix+'-postcode-results').classList.remove('open');
   toast('Address filled from Royal Mail PAF','success');
 }
