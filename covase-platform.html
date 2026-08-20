@@ -601,6 +601,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Ideal Postcodes (PAF address lookup)</div>
+    <label>API key (postcode → full address list)</label>
+    <input type="password" id="idealpc-key" placeholder="ak_...">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 6px">Email templates</div>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Edit supplier booking email</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions()">🤖 Edit reply-agent instructions</button>
@@ -1130,38 +1133,46 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Quote date</label><input type="date" id="mv-quote-date"></div>
       </div>
 
-      <div class="form-section-label">Pickup</div>
-      <div class="form-row quad">
-        <div class="form-field"><label>Postcode</label><input id="mv-pickup-postcode" placeholder="BN2 1TH" style="text-transform:uppercase"></div>
-        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-pickup-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('pickup',this.value)" autocomplete="off"><div id="mv-pickup-addr1-results" class="lookup-results"></div></div>
-        <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
-        <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
-      </div>
+      <div class="form-section-label">Pickup <span style="font-size:10px;color:var(--n400);font-weight:400">(search the person in Dynamics first — fills contact + address; 📮 PAF if not in Dynamics)</span></div>
       <div class="form-row trio">
         <div class="form-field lookup-wrap">
-          <div class="label-row"><label>Contact at pickup</label><span class="dynamics-link">🔍 Search Dynamics</span></div>
+          <div class="label-row"><label>Contact at pickup</label><span class="dynamics-link">🔍 Dynamics (fills address)</span></div>
           <input id="mv-pickup-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('pickup',this.value)" autocomplete="off">
           <div id="mv-pickup-contact-results" class="lookup-results"></div>
         </div>
         <div class="form-field"><label>Pickup contact phone</label><input id="mv-pickup-phone" placeholder="07…"></div>
         <div class="form-field"></div>
       </div>
-
-      <div class="form-section-label">Dropoff</div>
       <div class="form-row quad">
-        <div class="form-field"><label>Postcode</label><input id="mv-dropoff-postcode" placeholder="EH1 2NL" style="text-transform:uppercase"></div>
-        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-dropoff-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('dropoff',this.value)" autocomplete="off"><div id="mv-dropoff-addr1-results" class="lookup-results"></div></div>
-        <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
-        <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('pickup')">📮 Find addresses</span></div>
+          <input id="mv-pickup-postcode" placeholder="BN2 1TH" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('pickup');}">
+          <div id="mv-pickup-postcode-results" class="lookup-results"></div>
+        </div>
+        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-pickup-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('pickup',this.value)" autocomplete="off"><div id="mv-pickup-addr1-results" class="lookup-results"></div></div>
+        <div class="form-field"><label>Town</label><input id="mv-pickup-town"></div>
+        <div class="form-field"><label>County</label><input id="mv-pickup-county"></div>
       </div>
+
+      <div class="form-section-label">Dropoff <span style="font-size:10px;color:var(--n400);font-weight:400">(search the person in Dynamics first — fills contact + address; 📮 PAF if not in Dynamics)</span></div>
       <div class="form-row trio">
         <div class="form-field lookup-wrap">
-          <div class="label-row"><label>Contact at dropoff</label><span class="dynamics-link">🔍 Search Dynamics</span></div>
+          <div class="label-row"><label>Contact at dropoff</label><span class="dynamics-link">🔍 Dynamics (fills address)</span></div>
           <input id="mv-dropoff-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('dropoff',this.value)" autocomplete="off">
           <div id="mv-dropoff-contact-results" class="lookup-results"></div>
         </div>
         <div class="form-field"><label>Dropoff contact phone</label><input id="mv-dropoff-phone" placeholder="07…"></div>
         <div class="form-field"></div>
+      </div>
+      <div class="form-row quad">
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('dropoff')">📮 Find addresses</span></div>
+          <input id="mv-dropoff-postcode" placeholder="EH1 2NL" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('dropoff');}">
+          <div id="mv-dropoff-postcode-results" class="lookup-results"></div>
+        </div>
+        <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-dropoff-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('dropoff',this.value)" autocomplete="off"><div id="mv-dropoff-addr1-results" class="lookup-results"></div></div>
+        <div class="form-field"><label>Town</label><input id="mv-dropoff-town"></div>
+        <div class="form-field"><label>County</label><input id="mv-dropoff-county"></div>
       </div>
 
       <div class="form-section-label">Vehicle &amp; driver <span style="font-size:10px;color:var(--n400);font-weight:400">(optional · Dynamics lookup, or type manually)</span></div>
@@ -2062,6 +2073,8 @@ function saveConfig(){
   if(nrc)localStorage.setItem('covase_n8n_replycheck_webhook',nrc);else localStorage.removeItem('covase_n8n_replycheck_webhook');
   const orsKey=document.getElementById('ors-key')?.value?.trim();
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
+  const ipcKey=(document.getElementById('idealpc-key')?.value||'').trim();
+  if(ipcKey)localStorage.setItem('covase_idealpc_key',ipcKey);else localStorage.removeItem('covase_idealpc_key');
   document.getElementById('config-panel').classList.remove('open');
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
@@ -2078,6 +2091,7 @@ function toggleConfig(){
   document.getElementById('n8n-manual-url').value=c.n8nManualReply===DEFAULT_N8N_MANUAL_REPLY?'':c.n8nManualReply;
   document.getElementById('n8n-replycheck-url').value=c.n8nReplyCheck===DEFAULT_N8N_REPLY_CHECK?'':c.n8nReplyCheck;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
+  const ipcField=document.getElementById('idealpc-key');if(ipcField)ipcField.value=localStorage.getItem('covase_idealpc_key')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
 
@@ -4546,6 +4560,41 @@ async function lookupMovementMileage(){
   }
 }
 
+// ── PAF postcode lookup (Ideal Postcodes): postcode → full address list.
+// Royal Mail data, ~3p/lookup — the residential-grade option. ORS autocomplete
+// below remains the free fallback when no key is set.
+async function lookupPafAddresses(prefix){
+  const key=localStorage.getItem('covase_idealpc_key');
+  const res=document.getElementById('mv-'+prefix+'-postcode-results');if(!res)return;
+  if(!key){toast('Add your Ideal Postcodes API key in Settings (⚙) for PAF address lookup','error');return;}
+  const pc=(document.getElementById('mv-'+prefix+'-postcode')?.value||'').trim();
+  if(!pc){toast('Enter a postcode first','error');return;}
+  res.innerHTML='<div class="lookup-status">Looking up addresses…</div>';res.classList.add('open');
+  try{
+    const r=await fetch('https://api.ideal-postcodes.co.uk/v1/postcodes/'+encodeURIComponent(pc)+'?api_key='+encodeURIComponent(key));
+    const j=await r.json();
+    if(r.status===404){
+      const sug=(j.suggestions||[]).slice(0,3);
+      res.innerHTML='<div class="lookup-status">Postcode not found'+(sug.length?' — did you mean '+sug.map(esc).join(', ')+'?':'')+'</div>';
+      return;
+    }
+    if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
+    const list=j.result||[];
+    if(!list.length){res.innerHTML='<div class="lookup-status">No addresses for that postcode</div>';return;}
+    window['_pafAddr_'+prefix]=list;
+    res.innerHTML=list.map((a,i)=>'<div class="lookup-item" onclick="pickPafAddress(\''+prefix+'\','+i+')"><strong>'+esc([a.line_1,a.line_2].filter(Boolean).join(', '))+'</strong><div class="meta">'+esc([a.post_town,a.county,a.postcode].filter(Boolean).join(' · '))+'</div></div>').join('');
+  }catch(e){res.innerHTML='<div class="lookup-status">⚠ Lookup failed: '+esc(e.message)+'</div>';}
+}
+function pickPafAddress(prefix,i){
+  const a=(window['_pafAddr_'+prefix]||[])[i];if(!a)return;
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+  set('mv-'+prefix+'-addr1',[a.line_1,a.line_2].filter(Boolean).join(', '));
+  set('mv-'+prefix+'-town',a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
+  if(a.county)set('mv-'+prefix+'-county',a.county);
+  if(a.postcode)set('mv-'+prefix+'-postcode',a.postcode.toUpperCase());
+  document.getElementById('mv-'+prefix+'-postcode-results').classList.remove('open');
+  toast('Address filled from Royal Mail PAF','success');
+}
 // ── Address autocomplete (ORS/Pelias): suggestions as you type in Address
 // line 1, seeded with the postcode when present. OSM data — good but not PAF;
 // manual entry always stands. Picking fills address/town/county/postcode. ──
@@ -4607,6 +4656,14 @@ function pickEndContact(prefix,i){
   const d=(window['_endContactResults_'+prefix]||[])[i];if(!d)return;
   document.getElementById('mv-'+prefix+'-contact').value=mvDriverName(d);
   if(d.mobile)document.getElementById('mv-'+prefix+'-phone').value=d.mobile;
+  // Dynamics-first: the contact's address fills the endpoint too (when present)
+  const set=(id,v)=>{const e=document.getElementById(id);if(e&&v)e.value=v;};
+  const a1=[d.address1,d.address2].filter(Boolean).join(', ');
+  if(a1)set('mv-'+prefix+'-addr1',a1);
+  if(d.town)set('mv-'+prefix+'-town',d.town);
+  if(d.postcode)set('mv-'+prefix+'-postcode',String(d.postcode).toUpperCase());
+  if(a1||d.postcode)toast('Contact + address filled from Dynamics'+(!d.town?'':''),'success');
+  else toast('Contact filled — no address on their Dynamics record, use 📮 Find addresses','error');
   document.getElementById('mv-'+prefix+'-contact-results').classList.remove('open');
 }
 // ── Movement request email (template in covase_config 'movement_booking_template') ──
