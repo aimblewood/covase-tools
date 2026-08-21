@@ -660,6 +660,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
   <div class="view active" id="view-hires-pipeline">
     <div class="topbar">
       <h1>Bookings</h1>
+      <button class="topbar-btn" onclick="openHireCardDesigner()" style="margin-left:10px">🎨 Design cards</button>
       <div style="display:flex;align-items:center;gap:10px;margin-right:auto;margin-left:14px;font-size:12px;color:var(--n500);">
         <div style="position:relative;display:flex;align-items:center">
           <span style="position:absolute;left:8px;color:var(--n400);font-size:12px;pointer-events:none">⌕</span>
@@ -1735,17 +1736,58 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <button class="btn-primary-modal" onclick="saveMvCardDesigner()">Save layout</button>
     </div>
   </div>
-  <!-- chip formatting popover (opens on chip click) -->
-  <div id="mvcd-fmt-pop" style="display:none;position:fixed;z-index:300;background:#fff;border:1px solid var(--n200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:7px;align-items:center;gap:6px">
-    <button type="button" id="mvcd-fmt-b" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 9px;cursor:pointer;font-weight:700" onclick="mvcdFmtApply(f=>{f.b=f.b?0:1;})">B</button>
-    <button type="button" id="mvcd-fmt-i" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 10px;cursor:pointer;font-style:italic" onclick="mvcdFmtApply(f=>{f.i=f.i?0:1;})">I</button>
-    <select id="mvcd-fmt-s" style="font-size:12px;padding:3px 5px;border:1px solid var(--n200);border-radius:5px" onchange="const v=this.value;mvcdFmtApply(f=>{if(v)f.s=v;else delete f.s;})">
-      <option value="">Size</option><option value="sm">Small</option><option value="lg">Large</option>
-    </select>
-    <input type="color" id="mvcd-fmt-c" value="#333333" title="Text colour" style="width:30px;height:26px;border:1px solid var(--n200);border-radius:5px;padding:1px;cursor:pointer" oninput="const v=this.value;mvcdFmtApply(f=>{f.c=v;})">
-    <button type="button" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--n500)" onclick="mvcdFmtApply(f=>{delete f.b;delete f.i;delete f.s;delete f.c;})">Clear</button>
-    <button type="button" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--n400)" onclick="mvcdFmtClose()">✕</button>
+</div>
+
+<!-- ─── HIRE CARD DESIGNER ─── -->
+<div class="modal-overlay" id="hire-card-designer-modal">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-header">
+      <div class="modal-title">Design booking card</div>
+      <button class="modal-close" onclick="closeCardDesigner()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Use 🏷 labels (Ref, →…) to structure the reading. Click a placed chip to format it (bold / italic / size / colour). Status badges and the advance buttons stay on the card automatically.</div>
+      <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="mvcd-zone-label">Available fields</div>
+          <div id="hcd-palette" class="mvcd-palette" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'palette')"></div>
+        </div>
+        <div>
+          <div class="mvcd-zone-label">Card layout</div>
+          <div class="mvcd-cardframe">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div class="mvcd-zone mvcd-zone-title" data-zone="title" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'title')"></div>
+                <div id="hcd-lines"></div>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLine()">＋ Add line</button>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLabel()">🏷 Add label</button>
+              </div>
+              <div class="mvcd-zone mvcd-zone-right" data-zone="right" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'right')"></div>
+            </div>
+          </div>
+          <div class="mvcd-zone-label" style="margin-top:16px">Live preview</div>
+          <div id="hcd-preview" class="kan-col-cards" style="max-width:340px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="resetHireCardDesigner()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="closeCardDesigner()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveHireCardDesigner()">Save layout</button>
+    </div>
   </div>
+</div>
+
+<!-- chip formatting popover (shared by both card designers; opens on chip click) -->
+<div id="mvcd-fmt-pop" style="display:none;position:fixed;z-index:300;background:#fff;border:1px solid var(--n200);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:7px;align-items:center;gap:6px">
+  <button type="button" id="mvcd-fmt-b" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 9px;cursor:pointer;font-weight:700" onclick="mvcdFmtApply(f=>{f.b=f.b?0:1;})">B</button>
+  <button type="button" id="mvcd-fmt-i" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 10px;cursor:pointer;font-style:italic" onclick="mvcdFmtApply(f=>{f.i=f.i?0:1;})">I</button>
+  <select id="mvcd-fmt-s" style="font-size:12px;padding:3px 5px;border:1px solid var(--n200);border-radius:5px" onchange="const v=this.value;mvcdFmtApply(f=>{if(v)f.s=v;else delete f.s;})">
+    <option value="">Size</option><option value="sm">Small</option><option value="lg">Large</option>
+  </select>
+  <input type="color" id="mvcd-fmt-c" value="#333333" title="Text colour" style="width:30px;height:26px;border:1px solid var(--n200);border-radius:5px;padding:1px;cursor:pointer" oninput="const v=this.value;mvcdFmtApply(f=>{f.c=v;})">
+  <button type="button" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--n500)" onclick="mvcdFmtApply(f=>{delete f.b;delete f.i;delete f.s;delete f.c;})">Clear</button>
+  <button type="button" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--n400)" onclick="mvcdFmtClose()">✕</button>
 </div>
 
 <!-- ─── ACCOUNT MODAL ─── -->
@@ -3117,18 +3159,58 @@ function populatePipeClientFilter(){
   // Restore selection if still valid
   if(current&&[...sel.options].some(o=>o.value===current))sel.value=current;
 }
+// ─── Booking (hire) card designer: field catalog + layout ───
+function hireStatusLabel(s){const L={pending:'Pending',requested:'Requested',booked:'Booked',active:'On hire',offhired:'Off-hired',cancelled:'Cancelled'};return L[s]||s||'';}
+const HIRE_CARD_FIELDS=[
+  {key:'customer',label:'Customer',get:h=>h.customer||'—'},
+  {key:'driver',label:'Driver',get:h=>h.driver||''},
+  {key:'driver_mobile',label:'Driver mobile',get:h=>h.driver_mobile||''},
+  {key:'vehicle_reg',label:'Vehicle reg',get:h=>h.vehicle_reg||''},
+  {key:'make_model',label:'Make / model',get:h=>h.make_model||''},
+  {key:'reg_make',label:'Reg · make/model',get:h=>[h.vehicle_reg||'—',h.make_model||''].filter(Boolean).join(' · ')},
+  {key:'reference',label:'Supplier booking ref',get:h=>h.reference||''},
+  {key:'job_ref',label:'Job ref',get:h=>h.job_ref||''},
+  {key:'supplier',label:'Supplier',get:h=>h.supplier||''},
+  {key:'status',label:'Status',get:h=>hireStatusLabel(h.hire_status)},
+  {key:'billing',label:'Billing status',get:h=>({'pending':'Billing pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'}[h.billing_status]||'')},
+  {key:'start_date',label:'Start date',get:h=>h.start_date?fmtD(h.start_date):''},
+  {key:'end_date',label:'End date',get:h=>h.end_date?fmtD(h.end_date):''},
+  {key:'dates',label:'Dates (start → end)',get:h=>(h.start_date?fmtD(h.start_date):'?')+' → '+(h.end_date?fmtD(h.end_date):'ongoing')},
+  {key:'days_on',label:'Days on hire',get:h=>{const d=daysOn(h);return d!=null?d+'d on hire':'—';}},
+  {key:'profit',label:'Profit to date (£)',money:true,get:h=>{const d=daysOn(h);return d!=null?fmtMoney(d*(parseFloat(h.upsell_per_day)||0)+suppUpsellTotal(h)):'—';}},
+  {key:'cost_per_day',label:'Cost/day (£)',money:true,get:h=>h.cost_per_day!=null?fmtMoney(parseFloat(h.cost_per_day)):''},
+  {key:'upsell_per_day',label:'Upsell/day (£)',money:true,get:h=>h.upsell_per_day!=null?fmtMoney(parseFloat(h.upsell_per_day)):''},
+  {key:'rft_per_day',label:'RFT/day (£)',money:true,get:h=>h.rft_per_day!=null?fmtMoney(parseFloat(h.rft_per_day)):''},
+  {key:'client_rate_day',label:'Client rate/day (£)',money:true,get:h=>{const c=(parseFloat(h.cost_per_day)||0)+(parseFloat(h.upsell_per_day)||0)+(parseFloat(h.rft_per_day)||0);return c?fmtMoney(c):'';}},
+  {key:'category',label:'Category',get:h=>h.category||''},
+  {key:'fuel_type',label:'Fuel',get:h=>h.fuel_type||''},
+  {key:'tariff',label:'Tariff',get:h=>h.tariff||''},
+  {key:'delivery_town',label:'Delivery town',get:h=>h.delivery_town||''},
+  {key:'delivery_postcode',label:'Delivery postcode',get:h=>h.delivery_postcode||''},
+  {key:'collection',label:'Collection (offhire)',get:h=>h.collection_date?fmtD(h.collection_date)+(h.collection_time?' '+String(h.collection_time).slice(0,5):''):''},
+  {key:'preferred_start_time',label:'Preferred start time',get:h=>h.preferred_start_time?String(h.preferred_start_time).slice(0,5):''},
+  {key:'notes',label:'Notes',get:h=>h.notes||''}
+];
+const HIRE_FIELD_MAP=Object.fromEntries(HIRE_CARD_FIELDS.map(f=>[f.key,f]));
+const DEFAULT_HIRE_CARD_LAYOUT={title:['customer'],lines:[['driver'],['reg_make'],['reference']],right:['days_on','profit']};
+let hireCardLayout=null; // null → default layout (matches the original card)
+const HIRECD_SAMPLE={id:'sample',customer:'Woodland Trust',driver:'Jane Doe',driver_mobile:'07700 900123',vehicle_reg:'AB12 CDE',make_model:'Nissan Juke',reference:'FVSL048267',job_ref:'CVB-0042',supplier:'Fourways',hire_status:'active',billing_status:'pending',start_date:'2026-08-10',end_date:null,cost_per_day:28.5,upsell_per_day:6,rft_per_day:2.5,category:'CAR3A',fuel_type:'Petrol',delivery_town:'Grantham',delivery_postcode:'NG31 6PZ',supplementaries:[]};
+async function loadHireCardLayout(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.hire_card_layout&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    if(v&&typeof v==='object'){
+      const L=mvcdCloneLayout(v);
+      const ok=k=>HIRE_FIELD_MAP[mvKeyBase(k)]||mvIsLabelKey(mvKeyBase(k));
+      L.title=L.title.filter(ok);L.right=L.right.filter(k=>HIRE_FIELD_MAP[mvKeyBase(k)]);L.lines=L.lines.map(l=>l.filter(ok));
+      hireCardLayout=L;
+      if(Array.isArray(allHires)&&allHires.length)loadHires();
+    }
+  }catch(e){/* covase_config may not exist yet — keep default */}
+}
 function kanCard(h){
   const bl=h.billing_status||'pending';
-  const blLabels={'pending':'Pending','invoiced-in':'Invoiced in','recharged':'Recharged','paid':'Paid'};
-  const days=daysOn(h);
-  const upd=parseFloat(h.upsell_per_day)||0;
-  const suppU=suppUpsellTotal(h);
-  // Profit to date = days × upsell_per_day + Σ supplementary upsell amounts
-  const profit=days!=null?days*upd+suppU:null;
-  const profitCls=profit==null?'profit-zero':(profit>0?'profit-pos':(profit<0?'profit-neg':'profit-zero'));
   const cls=['kan-card','bill-'+bl,h.hire_status==='cancelled'?'cancelled':''].filter(Boolean).join(' ');
-  // Build "Reg make/model" line — fall back gracefully if either side is missing
-  const regMake=[h.vehicle_reg||'—',h.make_model||''].filter(Boolean).join(' · ');
   // Advance button: which action makes sense next?
   const adv=nextAdvance(h);
   const advBtn=adv?`<button class="kan-advance ${adv.cls||''}" onclick="event.stopPropagation();advanceHire('${esc(h.id)}','${adv.action}')" title="${esc(adv.tip||'')}">→ ${esc(adv.label)}</button>`:'';
@@ -3140,15 +3222,32 @@ function kanCard(h){
   const replacesBadge=predecessor?`<span class="kan-replace-pill" title="Replaces ${esc(predecessor.vehicle_reg||'—')} (off-hired ${fmtD(predecessor.end_date)})">← Replaces ${esc(predecessor.vehicle_reg||'—')}</span>`:'';
   const offhireBadge=(h.offhire_requested_at&&!['offhired','cancelled'].includes(h.hire_status))?`<span class="kan-replace-pill" style="background:#b45309;color:#fff" title="Offhire requested — collection ${fmtD(h.collection_date)}${h.collection_time?' '+String(h.collection_time).slice(0,5):''}">📦 Offhire ${fmtD(h.collection_date)}${h.collection_time?' '+String(h.collection_time).slice(0,5):''}</span>`:'';
   const replaceRow=(replacedBadge||replacesBadge||offhireBadge)?`<div class="kan-card-replace-row">${replacedBadge}${replacesBadge}${offhireBadge}</div>`:'';
+  // Text content comes from the designed layout (Settings → 🎨 Design cards);
+  // badges, billing tint and action buttons stay put regardless of the design.
+  const L=hireCardLayout||DEFAULT_HIRE_CARD_LAYOUT;
+  const parts=keys=>mvResolvePartsHtml(keys,h,HIRE_FIELD_MAP);
+  const titleParts=parts(L.title);
+  const title=titleParts.length?titleParts.join(' '):'—';
+  const linesHtml=(Array.isArray(L.lines)?L.lines:[]).map((keys,i)=>{const p=parts(keys);return p.length?`<div style="font-size:11px;color:var(--${i===0?'n700':'n500'});margin-top:2px;overflow:hidden;text-overflow:ellipsis">${p.join(' ')}</div>`:'';}).join('');
+  const rightHtml=(L.right||[]).map(k=>{
+    const bk=mvKeyBase(k);const f=HIRE_FIELD_MAP[bk];if(!f)return '';
+    const v=f.get(h);if(v===''||v==null)return '';
+    const fs=mvFmtStyle(mvKeyFmt(k));
+    if(bk==='profit'){const d=daysOn(h);const p=d!=null?d*(parseFloat(h.upsell_per_day)||0)+suppUpsellTotal(h):null;const pc=p==null?'profit-zero':(p>0?'profit-pos':(p<0?'profit-neg':'profit-zero'));return `<div class="kan-card-r2 ${pc}" style="${fs}" title="Profit to date (upsell × days + supp upsell)">${esc(String(v))}</div>`;}
+    if(bk==='days_on')return `<div class="kan-card-r1" style="${fs}">${esc(String(v))}</div>`;
+    if(bk==='status'||bk==='billing')return `<div style="font-size:10px;color:var(--n500);margin-top:2px;text-transform:uppercase;letter-spacing:.3px;${fs}">${esc(String(v))}</div>`;
+    if(f.money)return `<div style="font-weight:700;font-size:13px;color:var(--covase);${fs}">${esc(String(v))}</div>`;
+    return `<div style="font-size:11px;color:var(--n600);margin-top:2px;${fs}">${esc(String(v))}</div>`;
+  }).filter(Boolean).join('');
+  const right=rightHtml?`<div style="text-align:right;white-space:nowrap;flex-shrink:0">${rightHtml}</div>`:'';
   return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
-    <div class="kan-card-grid">
-      <div class="kan-card-l1">${esc(h.customer||'—')}</div>
-      <div class="kan-card-r1">${days!=null?days+'d on hire':'—'}</div>
-      <div class="kan-card-l2">${esc(h.driver||'—')}</div>
-      <div class="kan-card-r2 ${profitCls}" title="Profit to date (upsell × days + supp upsell)">${fmtMoney(profit)}</div>
-      <div class="kan-card-l3">${esc(regMake)}</div>
-      <div class="kan-card-l4">${esc(h.reference||'—')}</div>
-      ${replaceRow}
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div class="kan-card-l1">${title}</div>
+        ${linesHtml}
+        ${replaceRow}
+      </div>
+      ${right}
     </div>
     <div class="kan-card-bottom">
       <div class="kan-card-actions" style="margin-left:auto">${advBtn}${cancelBtn}</div>
@@ -4283,12 +4382,12 @@ function mvFmtStyle(f){let s='';if(f.b)s+='font-weight:700;';if(f.i)s+='font-sty
 function mvFmtWrap(html,f){const st=mvFmtStyle(f);return st?'<span style="'+st+'">'+html+'</span>':html;}
 // Resolve layout keys → HTML parts (escaped values, formatting applied).
 // A label glues to the NEXT field's value; label before an empty field is dropped.
-function mvResolvePartsHtml(keys,m){
+function mvResolvePartsHtml(keys,m,map){
   const out=[];let pending=null;
   (keys||[]).forEach(k=>{
     const base=mvKeyBase(k),fmt=mvKeyFmt(k);
     if(mvIsLabelKey(base)){const lh=mvFmtWrap(esc(mvLabelText(base)),fmt);pending=pending?pending+' '+lh:lh;return;}
-    const f=MV_FIELD_MAP[base];if(!f)return;
+    const f=(map||MV_FIELD_MAP)[base];if(!f)return;
     const v=f.get(m);
     if(v!==''&&v!=null&&String(v)!==''){out.push((pending?pending+' ':'')+mvFmtWrap(esc(String(v)),fmt));}
     pending=null;
@@ -4354,9 +4453,25 @@ function movementCard(m){
 // ─── Designer modal state + drag-and-drop interactions ───
 const MVCD_SAMPLE={id:'sample',customer:'Woodland Trust',customer_reference:'PO-4471',pickup_postcode:'BN1 1AA',dropoff_postcode:'M1 2AB',pickup_town:'Brighton',dropoff_town:'Manchester',pickup_county:'East Sussex',dropoff_county:'Greater Manchester',mileage:264.3,drive_time_minutes:290,vehicle_reg:'AB12 CDE',vehicle_makemodel:'Ford Transit',driver_name:'Jane Doe',movement_date:'2026-08-20',quote_date:'2026-08-14',quote_total:512.4,invoice_total:0,actual_fuel_cost:0,movement_status:'booked'};
 let mvcdDraft=null,mvcdDrag=null;
-function openMvCardDesigner(){mvcdDraft=mvcdCloneLayout(movementCardLayout);mvcdRender();document.getElementById('mv-card-designer-modal').classList.add('open');}
-function closeMvCardDesigner(){mvcdFmtClose();document.getElementById('mv-card-designer-modal').classList.remove('open');}
+// ── Designer context: the same drag-drop machinery drives the movement card
+// designer and the booking (hire) card designer. cdCtx picks the active one. ──
+let cdCtx='mv';
+const CD_CONTEXTS={
+  mv:{modal:'mv-card-designer-modal',palette:'mvcd-palette',lines:'mvcd-lines',hasChip:true,fields:()=>MV_CARD_FIELDS,map:()=>MV_FIELD_MAP},
+  hire:{modal:'hire-card-designer-modal',palette:'hcd-palette',lines:'hcd-lines',hasChip:false,fields:()=>HIRE_CARD_FIELDS,map:()=>HIRE_FIELD_MAP}
+};
+function cdCfg(){return CD_CONTEXTS[cdCtx];}
+function closeCardDesigner(){mvcdFmtClose();document.getElementById(cdCfg().modal).classList.remove('open');}
+function openMvCardDesigner(){cdCtx='mv';mvcdDraft=mvcdCloneLayout(movementCardLayout);mvcdRender();document.getElementById('mv-card-designer-modal').classList.add('open');}
+function closeMvCardDesigner(){closeCardDesigner();}
 function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);mvcdRender();}
+function openHireCardDesigner(){cdCtx='hire';mvcdDraft=mvcdCloneLayout(hireCardLayout||DEFAULT_HIRE_CARD_LAYOUT);mvcdRender();document.getElementById('hire-card-designer-modal').classList.add('open');}
+function resetHireCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_HIRE_CARD_LAYOUT);mvcdRender();}
+async function saveHireCardDesigner(){
+  const layout=mvcdCloneLayout(mvcdDraft);hireCardLayout=layout;
+  try{await sbReq('covase_config',{method:'POST',body:{key:'hire_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Booking card layout saved','success');closeCardDesigner();if(Array.isArray(allHires)&&allHires.length){hiresLoaded=true;loadHires();}}
+  catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
+}
 // Chip text for the calendar view — driven by the designed layout's chip zone
 function mvChipHtml(m){
   const L=movementCardLayout||DEFAULT_MV_CARD_LAYOUT;
@@ -4387,7 +4502,7 @@ function mvcdRemoveLine(i){
 function mvcdChip(key,zone){
   const base=mvKeyBase(key),fmt=mvKeyFmt(key);
   const isL=mvIsLabelKey(base);
-  const f=isL?null:MV_FIELD_MAP[base];
+  const f=isL?null:cdCfg().map()[base];
   if(!isL&&!f)return '';
   const inZone=zone&&zone!=='palette';
   const label=isL?('🏷 '+mvLabelText(base)):f.label;
@@ -4434,12 +4549,13 @@ function mvcdAddLabel(){
 }
 function mvcdZonePlaceholder(z){if(z==='title')return 'Title';if(z==='right')return 'Right column';if(z==='chip')return 'Calendar chip — drag fields here (keep it short)';if(z&&z.indexOf('line:')===0)return 'Line '+(parseInt(z.slice(5),10)+1)+' — drag fields here';return z;}
 function mvcdRender(){
+  const cfg=cdCfg();
   const used=new Set(mvcdUsedKeys().map(mvKeyBase));
-  const pal=document.getElementById('mvcd-palette');
-  if(pal){const rest=MV_CARD_FIELDS.filter(f=>!used.has(f.key));pal.innerHTML=rest.length?rest.map(f=>mvcdChip(f.key,'palette')).join(''):'<span class="mvcd-zone-empty">All fields placed — drag one back here to remove it</span>';}
+  const pal=document.getElementById(cfg.palette);
+  if(pal){const rest=cfg.fields().filter(f=>!used.has(f.key));pal.innerHTML=rest.length?rest.map(f=>mvcdChip(f.key,'palette')).join(''):'<span class="mvcd-zone-empty">All fields placed — drag one back here to remove it</span>';}
   const zoneHtml=(zone,keys)=>keys.length?keys.map(k=>mvcdChip(k,zone)).join(''):'<span class="mvcd-zone-empty">'+mvcdZonePlaceholder(zone)+'</span>';
-  ['title','right','chip'].forEach(z=>{const el=document.querySelector('.mvcd-zone[data-zone="'+z+'"]');if(el)el.innerHTML=zoneHtml(z,mvcdDraft[z]||[]);});
-  const lw=document.getElementById('mvcd-lines');
+  (cfg.hasChip?['title','right','chip']:['title','right']).forEach(z=>{const el=document.querySelector('#'+cfg.modal+' .mvcd-zone[data-zone="'+z+'"]');if(el)el.innerHTML=zoneHtml(z,mvcdDraft[z]||[]);});
+  const lw=document.getElementById(cfg.lines);
   if(lw)lw.innerHTML=mvcdDraft.lines.map((keys,i)=>{
     const z='line:'+i;
     return '<div style="display:flex;align-items:center;gap:6px">'
@@ -4451,6 +4567,14 @@ function mvcdRender(){
   mvcdPreview();
 }
 function mvcdPreview(){
+  if(cdCtx==='hire'){
+    const sample=(Array.isArray(allHires)&&allHires[0])?allHires[0]:HIRECD_SAMPLE;
+    const prev=hireCardLayout;hireCardLayout=mvcdDraft;
+    let html='';try{html=kanCard(sample);}catch(e){}
+    hireCardLayout=prev;
+    const pv=document.getElementById('hcd-preview');if(pv)pv.innerHTML=html;
+    return;
+  }
   const sample=(Array.isArray(allMovements)&&allMovements[0])?allMovements[0]:MVCD_SAMPLE;
   const prev=movementCardLayout;movementCardLayout=mvcdDraft;
   let html='',chipTxt='';
@@ -6957,7 +7081,7 @@ const RT_TABLES={
   covase_accounts:()=>loadAccounts(),
   covase_contacts:()=>loadContacts(),
   covase_vehicles:()=>loadVehicles(),
-  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();loadMovementTemplate();loadOffhireTemplate();}
+  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadHireCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();loadMovementTemplate();loadOffhireTemplate();}
 };
 let _rtTimers={};
 function rtIndicator(on,msg){
@@ -7127,8 +7251,8 @@ loadHires();
 loadAccounts();
 // Load the shared supplier booking email template (falls back to default if unset)
 loadBookingTemplate();
-// Load the shared movement-card layout (drag-and-drop designer; falls back to default)
-loadMovementCardLayout();
+// Load the shared card layouts (drag-and-drop designers; fall back to defaults)
+loadMovementCardLayout();loadHireCardLayout();
 // Load the movement request email template
 loadMovementTemplate();loadOffhireTemplate();
 // Prime the supplier-replies review-queue badge
