@@ -4558,30 +4558,12 @@ async function lookupMovementMileage(){
     ]);
     if(!pRes.ok)throw new Error(`Pickup postcode not recognised (${pickupPc})`);
     if(!dRes.ok)throw new Error(`Dropoff postcode not recognised (${dropoffPc})`);
-    let pickup=(await pRes.json()).result;
-    let dropoff=(await dRes.json()).result;
+    const pickup=(await pRes.json()).result;
+    const dropoff=(await dRes.json()).result;
     if(!pickup||!dropoff)throw new Error('Could not resolve one of the postcodes');
-    // When a full address is present, refine the point via ORS geocoding —
-    // routes then start/end at the actual premises, not the postcode centroid.
-    const refine=async(prefix,fallback)=>{
-      const g=id=>(document.getElementById(id)?.value||'').trim();
-      const a1=g('mv-'+prefix+'-addr1');
-      // PAF-picked coordinates are the gold standard — use them directly when
-      // the address hasn't been edited since the pick
-      const st=(window._mvCoords||{})[prefix];
-      if(st&&st.sig===a1+'|'+g('mv-'+prefix+'-postcode').toUpperCase())return {longitude:st.longitude,latitude:st.latitude};
-      if(!a1)return fallback;
-      const text=[a1,g('mv-'+prefix+'-addr2'),g('mv-'+prefix+'-town'),g('mv-'+prefix+'-county'),g('mv-'+prefix+'-postcode')].filter(Boolean).join(', ');
-      try{
-        const r=await fetch('https://api.openrouteservice.org/geocode/search?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=1');
-        if(!r.ok)return fallback;
-        const j=await r.json();
-        const c=j.features&&j.features[0]&&j.features[0].geometry&&j.features[0].geometry.coordinates;
-        return c?{longitude:c[0],latitude:c[1]}:fallback;
-      }catch(e){return fallback;}
-    };
-    pickup=await refine('pickup',pickup);
-    dropoff=await refine('dropoff',dropoff);
+    // Routing is deliberately postcode-to-postcode (centroids): reliable and
+    // plenty accurate for pricing. The street address fields are for the
+    // supplier email and records, not the mileage calc.
     // OpenRouteService directions (driving-car). Returns distance in metres,
     // duration in seconds. Response shape can be either {routes:[...]} (json)
     // or {features:[...]} (geojson) — handle both defensively.
@@ -4729,6 +4711,7 @@ function pickEndContact(prefix,i){
   if(a1)set('mv-'+prefix+'-addr1',a1);
   if(d.address2)set('mv-'+prefix+'-addr2',d.address2);
   if(d.town)set('mv-'+prefix+'-town',d.town);
+  if(d.county)set('mv-'+prefix+'-county',d.county);
   if(d.postcode)set('mv-'+prefix+'-postcode',String(d.postcode).toUpperCase());
   if(a1||d.postcode)toast('Contact + address filled from Dynamics'+(!d.town?'':''),'success');
   else toast('Contact filled — no address on their Dynamics record, use 📮 Find addresses','error');
