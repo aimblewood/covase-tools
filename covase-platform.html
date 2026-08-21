@@ -606,6 +606,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <input type="password" id="idealpc-key" placeholder="ak_...">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 6px">Email templates</div>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff" onclick="openEmailTemplate()">✉ Hire booking request (rentals@)</button>
+    <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openOffhireTemplate()">📦 Offhire request (rentals@)</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openMovementTemplate()">🚚 Movement request (logistics@)</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openFineTemplates()">🚨 Fines driver emails</button>
     <button type="button" class="save-btn" style="background:rgba(255,255,255,.12);color:#fff;margin-top:6px" onclick="openAgentInstructions('hire')">🤖 Hire reply agent (rentals@)</button>
@@ -1043,7 +1044,65 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <button class="btn-secondary-modal" id="hf-replace-vehicle-btn" onclick="openReplaceVehicle()" style="display:none">Replace vehicle</button>
       <button class="btn-secondary-modal" id="hf-thread-btn" onclick="openThread(editHireId)" style="display:none">✉ Correspondence</button>
       <button class="btn-secondary-modal" id="hf-send-supplier-btn" onclick="openSendSupplier()" style="display:none">✉ Send to supplier</button>
+      <button class="btn-secondary-modal" id="hf-offhire-btn" onclick="openOffhire()" style="display:none">📦 Offhire</button>
       <button class="btn-primary-modal" onclick="saveHire()">Save hire</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── OFFHIRE MODAL ─── -->
+<div class="modal-overlay" id="offhire-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Offhire — arrange collection</div>
+      <button class="modal-close" onclick="document.getElementById('offhire-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="oh-summary" style="font-size:13px;margin-bottom:8px"></div>
+      <div id="oh-warn" style="display:none;font-size:12px;color:var(--tl-red-t);margin-bottom:8px"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0;cursor:pointer">
+        <input type="checkbox" id="oh-same" checked onchange="ohToggleSame()">
+        <span>Collect from the <strong>delivery address</strong> (<span id="oh-delivery-addr" style="color:var(--n500)"></span>)</span>
+      </label>
+      <div id="oh-addr-block" style="display:none;border:1px solid var(--n200);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div class="form-section-label">Collection address <span style="font-size:10px;color:var(--n400);font-weight:400">(🔍 Search Dynamics · 📮 PAF · or type manually)</span></div>
+        <div class="form-grid">
+          <div class="form-field lookup-wrap"><div class="label-row"><label>Contact</label><span class="dynamics-link">🔍 Dynamics (fills address)</span></div><input id="mv-offhire-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('offhire',this.value)" autocomplete="off"><div id="mv-offhire-contact-results" class="lookup-results"></div></div>
+          <div class="form-field"><label>Contact phone</label><input id="mv-offhire-phone" placeholder="07..."></div>
+          <div class="form-field lookup-wrap"><div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('offhire')">📮 Find addresses</span></div><input id="mv-offhire-postcode" placeholder="BN2 1TH" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('offhire');}"><div id="mv-offhire-postcode-results" class="lookup-results"></div></div>
+          <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-offhire-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('offhire',this.value)" autocomplete="off"><div id="mv-offhire-addr1-results" class="lookup-results"></div></div>
+          <div class="form-field"><label>Address line 2</label><input id="mv-offhire-addr2" placeholder="(optional)"></div>
+          <div class="form-field"><label>Town</label><input id="mv-offhire-town"></div>
+          <div class="form-field"><label>County</label><input id="mv-offhire-county"></div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-field"><label>Collection date</label><input type="date" id="oh-date"></div>
+        <div class="form-field"><label>Collection time</label><input type="time" id="oh-time"></div>
+      </div>
+      <div class="form-field"><label>Notes for the supplier</label><textarea id="oh-notes" style="width:100%;min-height:70px;font-size:13px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box" placeholder="Keys location, access restrictions, fuel, etc."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="openOffhireTemplate()">Edit template</button>
+      <button class="btn-secondary-modal" onclick="document.getElementById('offhire-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary-modal" id="oh-send-btn" onclick="doOffhireSend()">Send offhire request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── OFFHIRE EMAIL TEMPLATE ─── -->
+<div class="modal-overlay" id="offhire-template-modal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header"><div class="modal-title">Offhire request email template</div><button class="modal-close" onclick="document.getElementById('offhire-template-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--n500);margin-bottom:8px">Tokens: {supplierName} {customer} {driver} {vehicleReg} {makeModel} {reference} {collectionAddress} {collectionContact} {collectionPhone} {collectionDate} {collectionTime} {notes}</div>
+      <div class="form-field"><label>Subject</label><input id="oht-subject"></div>
+      <div class="form-field"><label>Body</label><textarea id="oht-body" style="width:100%;min-height:240px;font-size:12px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="offhireTemplateReset()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="document.getElementById('offhire-template-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveOffhireTemplate()">Save template</button>
     </div>
   </div>
 </div>
@@ -2900,6 +2959,17 @@ async function autoAdvanceHireStatuses(){
   const toOffhire=(allHires||[]).filter(h=>h.hire_status==='active'&&h.end_date&&String(h.end_date).slice(0,10)<todayStr);
   await bulkSetHireStatus(toActivate,'active');
   await bulkSetHireStatus(toOffhire,'offhired');
+  // Offhire-tagged bookings: once the requested collection date/time is reached,
+  // the booking advances to Off-hired with end_date = collection date.
+  const dueOffhire=(allHires||[]).filter(h=>h.offhire_requested_at&&h.collection_date&&!['offhired','cancelled'].includes(h.hire_status)&&new Date(String(h.collection_date).slice(0,10)+'T'+(h.collection_time?String(h.collection_time).slice(0,5):'23:59')).getTime()<=now.getTime());
+  for(const h of dueOffhire){
+    try{
+      const iso=new Date().toISOString();
+      await sbReq('covase_hires?id=eq.'+encodeURIComponent(h.id),{method:'PATCH',body:{hire_status:'offhired',end_date:String(h.collection_date).slice(0,10),updated_at:iso},prefer:'return=minimal'});
+      h.hire_status='offhired';h.end_date=String(h.collection_date).slice(0,10);h.updated_at=iso;
+    }catch(e){}
+  }
+  if(dueOffhire.length&&typeof console!=='undefined')console.log('[auto-advance] '+dueOffhire.length+' offhire-tagged hire(s) reached collection time -> offhired');
 }
 async function bulkSetHireStatus(rows,status){
   if(!rows||!rows.length)return;
@@ -3068,7 +3138,8 @@ function kanCard(h){
   const predecessor=h.replaces_hire_id?(allHires||[]).find(x=>x.id===h.replaces_hire_id):null;
   const replacedBadge=successor?`<span class="kan-replace-pill" title="Replaced by ${esc(successor.vehicle_reg||'—')} on ${fmtD(successor.start_date)}">Replaced → ${esc(successor.vehicle_reg||'—')}</span>`:'';
   const replacesBadge=predecessor?`<span class="kan-replace-pill" title="Replaces ${esc(predecessor.vehicle_reg||'—')} (off-hired ${fmtD(predecessor.end_date)})">← Replaces ${esc(predecessor.vehicle_reg||'—')}</span>`:'';
-  const replaceRow=(replacedBadge||replacesBadge)?`<div class="kan-card-replace-row">${replacedBadge}${replacesBadge}</div>`:'';
+  const offhireBadge=(h.offhire_requested_at&&!['offhired','cancelled'].includes(h.hire_status))?`<span class="kan-replace-pill" style="background:#b45309;color:#fff" title="Offhire requested — collection ${fmtD(h.collection_date)}${h.collection_time?' '+String(h.collection_time).slice(0,5):''}">📦 Offhire ${fmtD(h.collection_date)}${h.collection_time?' '+String(h.collection_time).slice(0,5):''}</span>`:'';
+  const replaceRow=(replacedBadge||replacesBadge||offhireBadge)?`<div class="kan-card-replace-row">${replacedBadge}${replacesBadge}${offhireBadge}</div>`:'';
   return `<div class="${cls}" onclick="openEditHire('${esc(h.id)}')">
     <div class="kan-card-grid">
       <div class="kan-card-l1">${esc(h.customer||'—')}</div>
@@ -3412,6 +3483,12 @@ function updateSendSupplierBtn(){
   btn.style.display='';
   const status=document.getElementById('hf-hire-status').value;
   const supplier=document.getElementById('hf-supplier').value;
+  const ohBtn=document.getElementById('hf-offhire-btn');
+  if(ohBtn){
+    const h=(allHires||[]).find(x=>x.id===editHireId);
+    ohBtn.style.display=(editHireId&&['booked','active'].includes(status))?'':'none';
+    ohBtn.textContent=(h&&h.offhire_requested_at)?'📦 Offhire (requested)':'📦 Offhire';
+  }
   const eligible=['pending','requested','booked'].includes(status)&&!!supplier;
   btn.disabled=!eligible;
   btn.style.opacity=eligible?'':'0.5';
@@ -3463,6 +3540,88 @@ async function doSendSupplier(){
   finally{btn.disabled=false;btn.textContent='Send request';}
 }
 function closeSendSupplier(){document.getElementById('send-supplier-modal').classList.remove('open');}
+
+// ─── Offhire: collection request to the supplier (template in covase_config 'offhire_booking_template') ───
+const DEFAULT_OFFHIRE_TEMPLATE={
+  subject:'Offhire request - {customer} - {vehicleReg}',
+  body:'Hi {supplierName},\n\nPlease can you arrange collection / offhire of the following vehicle:\n\nVehicle: {vehicleReg} {makeModel}\nDriver: {driver}\nYour reference: {reference}\n\nCOLLECT FROM\n{collectionAddress}\nContact: {collectionContact} — {collectionPhone}\n\nCollection date: {collectionDate}\nCollection time: {collectionTime}\n\n{notes}\n\nPlease confirm collection.\n\nMany thanks,\nCovase Rentals'
+};
+let offhireTemplate={...DEFAULT_OFFHIRE_TEMPLATE};
+async function loadOffhireTemplate(){try{const rows=await sbReq('covase_config?key=eq.offhire_booking_template&select=value');const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;if(v&&(v.subject||v.body))offhireTemplate={...DEFAULT_OFFHIRE_TEMPLATE,...v};}catch(e){}}
+function openOffhireTemplate(){document.getElementById('oht-subject').value=offhireTemplate.subject;document.getElementById('oht-body').value=offhireTemplate.body;const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');document.getElementById('offhire-template-modal').classList.add('open');}
+function offhireTemplateReset(){document.getElementById('oht-subject').value=DEFAULT_OFFHIRE_TEMPLATE.subject;document.getElementById('oht-body').value=DEFAULT_OFFHIRE_TEMPLATE.body;}
+async function saveOffhireTemplate(){
+  offhireTemplate={subject:document.getElementById('oht-subject').value,body:document.getElementById('oht-body').value};
+  try{await sbReq('covase_config',{method:'POST',body:{key:'offhire_booking_template',value:offhireTemplate,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Template saved','success');document.getElementById('offhire-template-modal').classList.remove('open');}
+  catch(e){toast('Save failed: '+e.message,'error');}
+}
+function ohToggleSame(){const same=document.getElementById('oh-same').checked;document.getElementById('oh-addr-block').style.display=same?'none':'';}
+function openOffhire(){
+  if(!editHireId){toast('Save the hire first','error');return;}
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h){toast('Hire not found','error');return;}
+  const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
+  const email=acc&&acc.booking_email?acc.booking_email:'';
+  document.getElementById('oh-summary').innerHTML='<strong>To: '+esc(acc?acc.company_name:'—')+(email?' &lt;'+esc(email)+'&gt;':'')+'</strong><br>'+[h.customer,h.vehicle_reg,h.reference].filter(Boolean).map(esc).join(' · ');
+  const warn=document.getElementById('oh-warn'),btn=document.getElementById('oh-send-btn');
+  if(!email){warn.style.display='';warn.textContent=acc?('No booking email on "'+acc.company_name+'" — add one in CRM → Accounts.'):'Pick a supplier on the booking first.';btn.disabled=true;btn.style.opacity='0.5';}
+  else{warn.style.display='none';btn.disabled=false;btn.style.opacity='';}
+  const delAddr=[h.delivery_address_line1,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
+  document.getElementById('oh-delivery-addr').textContent=delAddr||'no delivery address on record';
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+  // Prefill: saved collection details first, else delivery address; contact defaults to the driver
+  set('mv-offhire-contact',h.driver||'');set('mv-offhire-phone',h.driver_mobile||'');
+  set('mv-offhire-addr1',h.collection_address_line1||h.delivery_address_line1);
+  set('mv-offhire-addr2',h.collection_address_line2||h.delivery_address_line2);
+  set('mv-offhire-town',h.collection_town||h.delivery_town);
+  set('mv-offhire-county',h.collection_county);
+  set('mv-offhire-postcode',h.collection_postcode||h.delivery_postcode);
+  // Same-as-delivery unless a different collection address was previously saved
+  const differs=h.collection_postcode&&h.delivery_postcode&&String(h.collection_postcode).replace(/\s/g,'').toUpperCase()!==String(h.delivery_postcode).replace(/\s/g,'').toUpperCase();
+  document.getElementById('oh-same').checked=!differs&&!!delAddr;
+  ohToggleSame();
+  set('oh-date',h.collection_date?String(h.collection_date).slice(0,10):(h.end_date?String(h.end_date).slice(0,10):new Date().toISOString().slice(0,10)));
+  set('oh-time',h.collection_time?String(h.collection_time).slice(0,5):'');
+  set('oh-notes',h.offhire_notes||'');
+  document.getElementById('offhire-modal').classList.add('open');
+}
+async function doOffhireSend(){
+  if(!editHireId)return;
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h)return;
+  const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
+  const email=acc&&acc.booking_email;if(!email){toast('No supplier booking email','error');return;}
+  const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const same=document.getElementById('oh-same').checked;
+  const col=same
+    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:'',pc:h.delivery_postcode||''}
+    :{l1:g('mv-offhire-addr1'),l2:g('mv-offhire-addr2'),town:g('mv-offhire-town'),county:g('mv-offhire-county'),pc:g('mv-offhire-postcode').toUpperCase()};
+  const colDate=g('oh-date'),colTime=g('oh-time');
+  if(!colDate){toast('Set a collection date','error');return;}
+  if(!col.l1&&!col.pc){toast('No collection address — untick the box and enter one','error');return;}
+  const tokens={
+    supplierName:acc.company_name||'',customer:h.customer||'',driver:h.driver||'',
+    vehicleReg:h.vehicle_reg||'',makeModel:h.make_model||'',reference:h.reference||'',
+    collectionAddress:[col.l1,col.l2,col.town,col.county,col.pc].filter(Boolean).join(', '),
+    collectionContact:g('mv-offhire-contact')||h.driver||'—',collectionPhone:g('mv-offhire-phone')||h.driver_mobile||'—',
+    collectionDate:fmtUK(colDate),collectionTime:colTime||'anytime',notes:g('oh-notes')
+  };
+  const subject=fineRender(offhireTemplate.subject,tokens)+' ['+(h.job_ref||('CVB:'+editHireId))+']';
+  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(fineRender(offhireTemplate.body,tokens)).replace(/\n/g,'<br>')+'</div>';
+  const btn=document.getElementById('oh-send-btn');btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,subject:subject,bodyHtml:bodyHtml,customer:h.customer||''})});
+    if(!r.ok)throw new Error('Webhook returned '+r.status);
+    const now=new Date().toISOString();
+    const patch={collection_address_line1:col.l1||null,collection_address_line2:col.l2||null,collection_town:col.town||null,collection_county:col.county||null,collection_postcode:col.pc||null,collection_date:colDate,collection_time:colTime||null,offhire_notes:g('oh-notes')||null,offhire_requested_at:now,updated_at:now};
+    try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:patch,prefer:'return=minimal'});}catch(e){}
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'offhire_request',subject:subject,raw_body:fineRender(offhireTemplate.body,tokens),from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
+    Object.assign(h,patch);
+    toast('Offhire request sent to '+acc.company_name+' — collection '+fmtUK(colDate)+(colTime?' '+colTime:''),'success');
+    document.getElementById('offhire-modal').classList.remove('open');
+    hiresLoaded=false;loadHires();
+  }catch(e){toast('Send failed: '+e.message,'error');}
+  finally{btn.disabled=false;btn.textContent='Send offhire request';}
+}
 
 // ─── Supplier booking email template (WYSIWYG; shared via covase_config) ───
 const ET_FIELD_GROUPS=[
@@ -3546,7 +3705,7 @@ async function saveEmailTemplate(){
 }
 
 // ─── Reply agent instructions (hire + movement agents, shared via covase_config) ───
-const DEFAULT_AGENT_INSTRUCTIONS='Objectives: get each vehicle booking confirmed by the supplier and capture the assigned vehicle details.\n\nProcess:\n- If the supplier is only acknowledging or says they are working on it, send a brief thank-you and take no other action.\n- If they ask a question, flag it for the team to answer.\n- When they confirm, capture the reservation reference and the vehicle details (registration, make/model, P11D, fuel type, CO2, engine cc, date of first registration).\n- If they decline, flag it so we can re-source with another supplier.\n\nTone of replies: friendly, concise and professional. British English. Sign off as "Covase Rentals".';
+const DEFAULT_AGENT_INSTRUCTIONS='Objectives: get each vehicle booking confirmed by the supplier and capture the assigned vehicle details.\n\nProcess:\n- If the supplier is only acknowledging or says they are working on it, send a brief thank-you and take no other action.\n- If they ask a question, flag it for the team to answer.\n- When they confirm, capture the reservation reference and the vehicle details (registration, make/model, P11D, fuel type, CO2, engine cc, date of first registration).\n- If they decline, flag it so we can re-source with another supplier.\n- When they confirm collection of a vehicle we asked them to off-hire, capture the confirmed collection date.\n\nTone of replies: friendly, concise and professional. British English. Sign off as "Covase Rentals".';
 const DEFAULT_MOVEMENT_AGENT_INSTRUCTIONS='Objectives: get each vehicle movement job covered by the supplier at a sensible price, and capture their commitment.\n\nProcess:\n- When they confirm they can cover the job, capture their quoted price (ex VAT) and any collection/delivery dates they commit to.\n- If they decline or cannot cover it, flag it so we can re-source with another supplier.\n- If they ask a question (access, keys, timing, fuel), flag it for the team to answer.\n- A bare acknowledgement (checking availability, will come back to us) needs no action.\n\nBritish English throughout.';
 const AGENT_KINDS={
   hire:{key:'supplier_agent_instructions',title:'Supplier reply agent — instructions',def:DEFAULT_AGENT_INSTRUCTIONS},
@@ -3609,7 +3768,7 @@ function hireLabel(hireId){const h=(allHires||[]).find(x=>x.id===hireId);return 
 function renderSupplierReplies(){
   const el=document.getElementById('supplier-replies-list');if(!el)return;
   if(!allSupplierReplies.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">✉</div><div class="empty-title">Nothing to review</div><div class="empty-sub">Supplier replies needing action will appear here.</div></div>';return;}
-  const chips={confirmed:'#0a7a72',declined:'var(--tl-red-t)',needs_info:'#b45309',alternative:'#6d28d9',unclear:'var(--n500)'};
+  const chips={confirmed:'#0a7a72',offhire_confirmed:'#0a7a72',declined:'var(--tl-red-t)',needs_info:'#b45309',alternative:'#6d28d9',unclear:'var(--n500)'};
   // Sort newest → oldest so the chronology reads top-to-bottom. Falls back to
   // created_at when a row has no received_at, so nothing floats out of order.
   const rowsSorted=allSupplierReplies.slice().sort((a,b)=>{
@@ -3648,7 +3807,7 @@ function renderSupplierReplies(){
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="toggleRelink(\''+r.id+'\')">Re-link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }else{
-      if(['confirmed','needs_info','alternative'].includes(oc))a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">Apply to booking</button>';
+      if(['confirmed','needs_info','alternative','offhire_confirmed'].includes(oc))a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyReply(\''+r.id+'\')">'+(oc==='offhire_confirmed'?'Apply — collection confirmed':'Apply to booking')+'</button>';
       if(oc==='declined')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="resourceReply(\''+r.id+'\')">Keep Requested · re-source</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.hire_id)+'\')">View thread</button>';
@@ -3675,6 +3834,19 @@ async function applyReply(id){
   const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
   if(!r.hire_id){toast('No hire linked to this reply','error');return;}
   const now=new Date().toISOString();
+  if(r.outcome==='offhire_confirmed'){
+    // Collection confirmed: record any supplier-stated date/time; the booking
+    // only moves to Off-hired when the collection date/time actually arrives.
+    const p={updated_at:now};
+    if(r.agreed_end_date)p.collection_date=r.agreed_end_date;
+    try{
+      await sbReq('covase_hires?id=eq.'+encodeURIComponent(r.hire_id),{method:'PATCH',body:p,prefer:'return=minimal'});
+      await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:{status:'applied'},prefer:'return=minimal'});
+      toast('Collection confirmed'+(r.agreed_end_date?' for '+fmtUK(r.agreed_end_date):'')+' — booking will off-hire when the time arrives','success');
+      hiresLoaded=false;loadHires();loadSupplierReplies();
+    }catch(e){toast('Apply failed: '+e.message,'error');}
+    return;
+  }
   const patch={hire_status:'booked',updated_at:now};
   if(r.reservation_number)patch.reference=r.reservation_number;
   if(r.vehicle_reg)patch.vehicle_reg=r.vehicle_reg;
@@ -6785,7 +6957,7 @@ const RT_TABLES={
   covase_accounts:()=>loadAccounts(),
   covase_contacts:()=>loadContacts(),
   covase_vehicles:()=>loadVehicles(),
-  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();}
+  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();loadMovementTemplate();loadOffhireTemplate();}
 };
 let _rtTimers={};
 function rtIndicator(on,msg){
@@ -6958,7 +7130,7 @@ loadBookingTemplate();
 // Load the shared movement-card layout (drag-and-drop designer; falls back to default)
 loadMovementCardLayout();
 // Load the movement request email template
-loadMovementTemplate();
+loadMovementTemplate();loadOffhireTemplate();
 // Prime the supplier-replies review-queue badge
 loadSupplierReplies();
 // Prime the accident-claims badge (open-claim count)
