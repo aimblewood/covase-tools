@@ -4777,11 +4777,11 @@ async function openJourney(id){
     L.marker([B.lat,B.lng],{icon:dot('b','#0b1f2a')}).addTo(jvMap).bindTooltip(esc(m.dropoff_town||pc2),{direction:'top',offset:[0,-8]});
     L.polyline(latlngs,{color:'#9db8b3',weight:3,opacity:.45,dashArray:'6 8'}).addTo(jvMap); // ghost of the full route
     const prog=L.polyline([latlngs[0]],{color:brand,weight:4.5,opacity:.95}).addTo(jvMap);
-    const truck=L.marker(latlngs[0],{icon:L.divIcon({className:'',html:'<div class="jv-truck-icon">🚚</div>',iconSize:[1,1]})}).addTo(jvMap);
+    const truck=L.marker(latlngs[0],{icon:L.divIcon({className:'',html:'<div class="jv-truck-icon">🚗</div>',iconSize:[1,1]})}).addTo(jvMap);
     jvMap.fitBounds(L.latLngBounds(latlngs).pad(0.18));
     setTimeout(()=>{if(jvMap)jvMap.invalidateSize();},120);
     // Progressive draw over ~2.6s (ease-in-out), truck rides the tip
-    const t0=performance.now(),DUR=2600,N=latlngs.length;
+    const t0=performance.now(),DUR=5000,N=latlngs.length;
     const anim=now=>{
       if(tok!==jvToken)return;
       const p=Math.min(1,(now-t0)/DUR);
