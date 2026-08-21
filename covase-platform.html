@@ -383,6 +383,34 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 /* Movement card designer (drag-and-drop) */
 .mvcd-zone-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n400);font-weight:700;margin-bottom:6px}
 .mvcd-palette{border:1px solid var(--n200);border-radius:8px;padding:8px;min-height:120px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;background:var(--n50)}
+/* ── Journey view (movement route visualisation) ── */
+.mv-journey-btn{border:1px solid var(--n200);background:#fff;color:var(--covase);font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border-radius:20px;padding:3px 10px;cursor:pointer;transition:all .15s}
+.mv-journey-btn:hover{background:var(--covase);color:#fff;border-color:var(--covase)}
+.jv-shell{width:min(960px,94vw);background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.35);display:flex;flex-direction:column;max-height:92vh}
+.jv-head{background:linear-gradient(120deg,#0b1f2a 0%,#0e3a3a 55%,var(--covase) 130%);color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}
+.jv-title{font-size:18px;font-weight:700;letter-spacing:.2px}
+.jv-sub{font-size:12px;opacity:.75;margin-top:3px}
+.jv-body{display:grid;grid-template-columns:1fr 280px;min-height:440px}
+@media(max-width:760px){.jv-body{grid-template-columns:1fr}}
+#jv-map{min-height:440px;background:#eef2f1}
+.jv-map-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--n400);font-size:13px;text-align:center;padding:30px}
+.jv-stats{padding:18px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;background:var(--n50);border-left:1px solid var(--n200)}
+.jv-route{display:flex;flex-direction:column;gap:2px;margin-bottom:4px}
+.jv-endpoint{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--n700)}
+.jv-endpoint strong{font-size:12.5px}
+.jv-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;position:relative}
+.jv-dot.a{background:var(--covase)}
+.jv-dot.b{background:#0b1f2a}
+.jv-dot.a::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--covase);opacity:.5;animation:jvPulse 1.6s ease-out infinite}
+@keyframes jvPulse{0%{transform:scale(.6);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+.jv-leg{width:2px;height:16px;margin-left:5px;background:repeating-linear-gradient(to bottom,var(--n300) 0 3px,transparent 3px 6px)}
+.jv-stat{background:#fff;border:1px solid var(--n200);border-radius:10px;padding:10px 12px;opacity:0;transform:translateY(8px);animation:jvIn .45s ease forwards}
+.jv-stat .v{font-size:19px;font-weight:800;color:var(--covase);line-height:1.1;font-variant-numeric:tabular-nums}
+.jv-stat .l{font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--n400);margin-top:2px}
+.jv-stat.dark .v{color:#0b1f2a}
+@keyframes jvIn{to{opacity:1;transform:none}}
+.jv-chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,.16);color:#fff}
+.jv-truck-icon{font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transform:translate(-10px,-12px)}
 .mvcd-cardframe{border:1px dashed var(--n300);border-radius:10px;padding:12px;background:#fff}
 .mvcd-zone{min-height:26px;border:1px dashed var(--n200);border-radius:6px;padding:4px;margin:3px 0;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .mvcd-zone-title{min-height:30px}
@@ -1788,6 +1816,26 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
   <input type="color" id="mvcd-fmt-c" value="#333333" title="Text colour" style="width:30px;height:26px;border:1px solid var(--n200);border-radius:5px;padding:1px;cursor:pointer" oninput="const v=this.value;mvcdFmtApply(f=>{f.c=v;})">
   <button type="button" style="border:1px solid var(--n200);border-radius:5px;background:#fff;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--n500)" onclick="mvcdFmtApply(f=>{delete f.b;delete f.i;delete f.s;delete f.c;})">Clear</button>
   <button type="button" style="border:none;background:none;cursor:pointer;font-size:12px;color:var(--n400)" onclick="mvcdFmtClose()">✕</button>
+</div>
+
+<!-- ─── JOURNEY VIEW (movement route visualisation) ─── -->
+<div class="modal-overlay" id="journey-modal" onclick="if(event.target===this)closeJourney()">
+  <div class="jv-shell">
+    <div class="jv-head">
+      <div>
+        <div class="jv-title" id="jv-title">Journey</div>
+        <div class="jv-sub" id="jv-sub"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="jv-chip" id="jv-status"></span>
+        <button class="modal-close" style="color:#fff" onclick="closeJourney()">✕</button>
+      </div>
+    </div>
+    <div class="jv-body">
+      <div id="jv-map"></div>
+      <div class="jv-stats" id="jv-stats"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ─── ACCOUNT MODAL ─── -->
@@ -4448,6 +4496,7 @@ function movementCard(m){
       </div>
       ${right}
     </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:7px"><button class="mv-journey-btn" onclick="event.stopPropagation();openJourney('${esc(m.id)}')">🧭 Journey</button></div>
   </div>`;
 }
 // ─── Designer modal state + drag-and-drop interactions ───
@@ -4628,6 +4677,125 @@ function mvcdDropOnChip(e,zone,targetKey){
 }
 function mvcdRemove(e,zone,key){e.stopPropagation();const a=mvcdZoneArr(zone);if(!a)return;const i=a.indexOf(key);if(i>=0)a.splice(i,1);mvcdRender();}
 async function saveMvCardDesigner(){const layout=mvcdCloneLayout(mvcdDraft);movementCardLayout=layout;try{await sbReq('covase_config',{method:'POST',body:{key:'movement_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Movement card layout saved','success');closeMvCardDesigner();if(Array.isArray(allMovements))renderMovementsView();}catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}}
+
+// ─── Journey view: animated route + stats for a movement ───
+let jvMap=null,jvToken=0;
+function ensureLeaflet(){
+  if(window.L)return Promise.resolve();
+  if(window._leafletLoading)return window._leafletLoading;
+  window._leafletLoading=new Promise((res,rej)=>{
+    const css=document.createElement('link');css.rel='stylesheet';css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(css);
+    const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';s.onload=res;s.onerror=()=>rej(new Error('Leaflet failed to load'));document.head.appendChild(s);
+  });
+  return window._leafletLoading;
+}
+function closeJourney(){jvToken++;document.getElementById('journey-modal').classList.remove('open');}
+function jvBrand(){return (getComputedStyle(document.documentElement).getPropertyValue('--covase')||'#0a7a72').trim()||'#0a7a72';}
+// Count-up animation for a stat value
+function jvCount(el,target,fmt,dur){
+  const t0=performance.now();const tok=jvToken;
+  const step=now=>{
+    if(tok!==jvToken)return;
+    const p=Math.min(1,(now-t0)/dur);const e=1-Math.pow(1-p,3); // ease-out cubic
+    el.textContent=fmt(target*e);
+    if(p<1)requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+// Gentle curve between two points (fallback when no road route is available)
+function jvArc(a,b){
+  const pts=[];const n=64;
+  const mLat=(a.lat+b.lat)/2,mLng=(a.lng+b.lng)/2;
+  const dLat=b.lat-a.lat,dLng=b.lng-a.lng;
+  const cLat=mLat-dLng*0.18,cLng=mLng+dLat*0.18; // control point perpendicular to the chord
+  for(let i=0;i<=n;i++){const t=i/n;const u=1-t;
+    pts.push([u*u*a.lat+2*u*t*cLat+t*t*b.lat,u*u*a.lng+2*u*t*cLng+t*t*b.lng]);}
+  return pts;
+}
+function jvStat(v,l,extraCls,delay){return '<div class="jv-stat '+(extraCls||'')+'" style="animation-delay:'+delay+'ms"><div class="v">'+v+'</div><div class="l">'+esc(l)+'</div></div>';}
+async function openJourney(id){
+  const m=(allMovements||[]).find(x=>x.id===id);if(!m){toast('Movement not found','error');return;}
+  const tok=++jvToken;
+  document.getElementById('journey-modal').classList.add('open');
+  document.getElementById('jv-title').textContent=(m.job_ref?m.job_ref+' · ':'')+(m.customer||'Movement');
+  const from=[m.pickup_town,m.pickup_postcode].filter(Boolean).join(' ')||'?';
+  const to=[m.dropoff_town,m.dropoff_postcode].filter(Boolean).join(' ')||'?';
+  document.getElementById('jv-sub').textContent=from+'  →  '+to+(m.movement_date?'  ·  '+fmtUK(m.movement_date):'');
+  document.getElementById('jv-status').textContent=mvStatusLabel(m.movement_status);
+  // ── Stats panel (staggered entrance; numbers count up) ──
+  const total=(parseFloat(m.invoice_total)||parseFloat(m.quote_total)||null);
+  const mins=m.drive_time_minutes!=null?parseInt(m.drive_time_minutes,10):null;
+  const stats=document.getElementById('jv-stats');
+  stats.innerHTML=
+    '<div class="jv-route">'
+      +'<div class="jv-endpoint"><span class="jv-dot a"></span><div><strong>'+esc(m.pickup_town||m.pickup_postcode||'Pickup')+'</strong><div style="font-size:10.5px;color:var(--n400)">'+esc([m.pickup_address_line1,m.pickup_postcode].filter(Boolean).join(', '))+'</div></div></div>'
+      +'<div class="jv-leg"></div>'
+      +'<div class="jv-endpoint"><span class="jv-dot b"></span><div><strong>'+esc(m.dropoff_town||m.dropoff_postcode||'Dropoff')+'</strong><div style="font-size:10.5px;color:var(--n400)">'+esc([m.dropoff_address_line1,m.dropoff_postcode].filter(Boolean).join(', '))+'</div></div></div>'
+    +'</div>'
+    +jvStat('<span id="jv-n-miles">0</span>','Road miles','',60)
+    +jvStat('<span id="jv-n-time">—</span>','Drive time','dark',140)
+    +(total!=null?jvStat('<span id="jv-n-total">£0</span>','Job total (ex VAT)','',220):'')
+    +((m.vehicle_reg||m.vehicle_makemodel)?jvStat(esc([m.vehicle_reg,m.vehicle_makemodel].filter(Boolean).join(' · ')),'Vehicle','dark',300):'')
+    +(m.driver_name?jvStat(esc(m.driver_name),'Driver','dark',380):'')
+    +(m.supplier?jvStat(esc(m.supplier),'Supplier','dark',460):'');
+  if(m.mileage!=null)jvCount(document.getElementById('jv-n-miles'),parseFloat(m.mileage),v=>v.toFixed(1),1600);
+  if(mins!=null){const el=document.getElementById('jv-n-time');jvCount(el,mins,v=>{const h=Math.floor(v/60),mm=Math.round(v%60);return h?h+'h '+mm+'m':mm+' min';},1600);}
+  if(total!=null)jvCount(document.getElementById('jv-n-total'),total,v=>'£'+v.toFixed(0),1600);
+  // ── Map + animated route ──
+  const mapEl=document.getElementById('jv-map');
+  const pc1=(m.pickup_postcode||'').trim(),pc2=(m.dropoff_postcode||'').trim();
+  if(!pc1||!pc2){mapEl.innerHTML='<div class="jv-map-empty">Add pickup and dropoff postcodes to this movement to see the route.</div>';return;}
+  mapEl.innerHTML='<div class="jv-map-empty">Plotting route…</div>';
+  try{
+    await ensureLeaflet();
+    const [r1,r2]=await Promise.all([
+      fetch('https://api.postcodes.io/postcodes/'+encodeURIComponent(pc1)).then(r=>r.json()),
+      fetch('https://api.postcodes.io/postcodes/'+encodeURIComponent(pc2)).then(r=>r.json())
+    ]);
+    if(tok!==jvToken)return;
+    const A=r1.result&&{lat:r1.result.latitude,lng:r1.result.longitude},B=r2.result&&{lat:r2.result.latitude,lng:r2.result.longitude};
+    if(!A||!B){mapEl.innerHTML='<div class="jv-map-empty">Could not resolve one of the postcodes.</div>';return;}
+    // Real road geometry when an ORS key is present; branded arc otherwise
+    let latlngs=null;
+    const orsKey=localStorage.getItem('covase_ors_api_key');
+    if(orsKey){
+      try{
+        const rr=await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson',{method:'POST',headers:{'Authorization':orsKey,'Content-Type':'application/json'},body:JSON.stringify({coordinates:[[A.lng,A.lat],[B.lng,B.lat]]})});
+        if(rr.ok){const j=await rr.json();const cs=j.features&&j.features[0]&&j.features[0].geometry&&j.features[0].geometry.coordinates;
+          if(Array.isArray(cs)&&cs.length>1){const stepN=Math.max(1,Math.floor(cs.length/400));latlngs=cs.filter((_,i)=>i%stepN===0||i===cs.length-1).map(c=>[c[1],c[0]]);}}
+      }catch(e){}
+    }
+    if(!latlngs)latlngs=jvArc(A,B);
+    if(tok!==jvToken)return;
+    mapEl.innerHTML='';
+    if(jvMap){try{jvMap.remove();}catch(e){}jvMap=null;}
+    jvMap=L.map('jv-map',{zoomControl:false,attributionControl:false,scrollWheelZoom:true});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(jvMap);
+    const brand=jvBrand();
+    const dot=(cls,bg)=>L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+    L.marker([A.lat,A.lng],{icon:dot('a',brand)}).addTo(jvMap).bindTooltip(esc(m.pickup_town||pc1),{direction:'top',offset:[0,-8]});
+    L.marker([B.lat,B.lng],{icon:dot('b','#0b1f2a')}).addTo(jvMap).bindTooltip(esc(m.dropoff_town||pc2),{direction:'top',offset:[0,-8]});
+    L.polyline(latlngs,{color:'#9db8b3',weight:3,opacity:.45,dashArray:'6 8'}).addTo(jvMap); // ghost of the full route
+    const prog=L.polyline([latlngs[0]],{color:brand,weight:4.5,opacity:.95}).addTo(jvMap);
+    const truck=L.marker(latlngs[0],{icon:L.divIcon({className:'',html:'<div class="jv-truck-icon">🚚</div>',iconSize:[1,1]})}).addTo(jvMap);
+    jvMap.fitBounds(L.latLngBounds(latlngs).pad(0.18));
+    setTimeout(()=>{if(jvMap)jvMap.invalidateSize();},120);
+    // Progressive draw over ~2.6s (ease-in-out), truck rides the tip
+    const t0=performance.now(),DUR=2600,N=latlngs.length;
+    const anim=now=>{
+      if(tok!==jvToken)return;
+      const p=Math.min(1,(now-t0)/DUR);
+      const e=p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+      const upto=Math.max(1,Math.round(e*(N-1)));
+      prog.setLatLngs(latlngs.slice(0,upto+1));
+      truck.setLatLng(latlngs[upto]);
+      if(p<1)requestAnimationFrame(anim);
+    };
+    requestAnimationFrame(anim);
+  }catch(e){
+    mapEl.innerHTML='<div class="jv-map-empty">Map unavailable ('+esc(e.message||'network')+') — stats still stand ➡</div>';
+  }
+}
 
 function populateMovementSupplierDropdown(){
   const sel=document.getElementById('mv-supplier');if(!sel)return;
