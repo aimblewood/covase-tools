@@ -3950,6 +3950,7 @@ function renderSupplierReplies(){
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
     }else if(isMv){
       if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyMovementReply(\''+r.id+'\')">Apply to movement</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openMovementById(\''+esc(r.movement_id)+'\')">Open movement</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="toggleRelink(\''+r.id+'\')">Re-link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
@@ -4090,16 +4091,21 @@ async function openThread(hireId){
 }
 function closeThread(){document.getElementById('thread-modal').classList.remove('open');}
 
-// ─── Manual human reply to a supplier (sent from rentals@) ───
+// ─── Manual human reply to a supplier (rentals@ for hires, logistics@ for movements) ───
 let replyCtx=null;
-function openReplyModal(messageId,hireId,sourceReplyId,contextLabel){
+function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId){
   if(!messageId){toast('That message has no email id to reply to','error');return;}
-  replyCtx={messageId:messageId,hireId:hireId,sourceReplyId:sourceReplyId||null};
-  document.getElementById('reply-context').textContent=contextLabel||('Reply for '+hireLabel(hireId));
+  const from=movementId?'logistics@covase.co.uk':'rentals@covase.co.uk';
+  replyCtx={messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
+  document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from;
   document.getElementById('reply-text').value='';
   document.getElementById('reply-modal').classList.add('open');
 }
-function openReplyFromQueue(id){const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;openReplyModal(r.message_id,r.hire_id,r.id,'Reply to '+(r.from_email||'supplier')+' · '+hireLabel(r.hire_id));}
+function openReplyFromQueue(id){
+  const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
+  const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id));
+  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id);
+}
 function replyFromThread(){
   const msgs=window._threadMsgs||[];const hireId=window._threadHireId;
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
@@ -4115,10 +4121,10 @@ async function doManualReply(){
   const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
   const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,replyText:text})});
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,replyText:text})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     if(replyCtx.sourceReplyId){try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(replyCtx.sourceReplyId),{method:'PATCH',body:{status:'replied'},prefer:'return=minimal'});}catch(e){}}
-    toast('Reply sent from Covase Rentals','success');
+    toast('Reply sent from '+(replyCtx.from||'rentals@covase.co.uk'),'success');
     closeReplyModal();loadSupplierReplies();
   }catch(e){toast('Send failed: '+e.message,'error');}
   finally{btn.disabled=false;btn.textContent='Send reply';}
