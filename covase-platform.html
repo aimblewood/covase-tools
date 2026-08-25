@@ -1096,22 +1096,22 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div id="oh-addr-block" style="display:none;border:1px solid var(--n200);border-radius:10px;padding:12px;margin-bottom:10px">
         <div class="form-section-label">Collection address <span style="font-size:10px;color:var(--n400);font-weight:400">(🔍 Search Dynamics · 📮 PAF · or type manually)</span></div>
         <div class="form-grid">
-          <div class="form-field lookup-wrap"><div class="label-row"><label>Contact</label><span class="dynamics-link">🔍 Dynamics (fills address)</span></div><input id="mv-offhire-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('offhire',this.value)" autocomplete="off"><div id="mv-offhire-contact-results" class="lookup-results"></div></div>
-          <div class="form-field"><label>Contact phone</label><input id="mv-offhire-phone" placeholder="07..."></div>
-          <div class="form-field lookup-wrap"><div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('offhire')">📮 Find addresses</span></div><input id="mv-offhire-postcode" placeholder="BN2 1TH" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('offhire');}"><div id="mv-offhire-postcode-results" class="lookup-results"></div></div>
-          <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-offhire-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('offhire',this.value)" autocomplete="off"><div id="mv-offhire-addr1-results" class="lookup-results"></div></div>
-          <div class="form-field"><label>Address line 2</label><input id="mv-offhire-addr2" placeholder="(optional)"></div>
-          <div class="form-field"><label>Town</label><input id="mv-offhire-town"></div>
-          <div class="form-field"><label>County</label><input id="mv-offhire-county"></div>
+          <div class="form-field lookup-wrap"><div class="label-row"><label>Contact</label><span class="dynamics-link">🔍 Dynamics (fills address)</span></div><input id="mv-offhire-contact" placeholder="Name — type to search, or enter manually" oninput="lookupEndContact('offhire',this.value);ohFieldChanged()" autocomplete="off"><div id="mv-offhire-contact-results" class="lookup-results"></div></div>
+          <div class="form-field"><label>Contact phone</label><input id="mv-offhire-phone" placeholder="07..." oninput="ohFieldChanged()"></div>
+          <div class="form-field lookup-wrap"><div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('offhire')">📮 Find addresses</span></div><input id="mv-offhire-postcode" placeholder="BN2 1TH" style="text-transform:uppercase" oninput="ohFieldChanged()" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('offhire');}"><div id="mv-offhire-postcode-results" class="lookup-results"></div></div>
+          <div class="form-field lookup-wrap"><label>Address line 1</label><input id="mv-offhire-addr1" placeholder="Type to search addresses…" oninput="lookupMvAddress('offhire',this.value);ohFieldChanged()" autocomplete="off"><div id="mv-offhire-addr1-results" class="lookup-results"></div></div>
+          <div class="form-field"><label>Address line 2</label><input id="mv-offhire-addr2" placeholder="(optional)" oninput="ohFieldChanged()"></div>
+          <div class="form-field"><label>Town</label><input id="mv-offhire-town" oninput="ohFieldChanged()"></div>
+          <div class="form-field"><label>County</label><input id="mv-offhire-county" oninput="ohFieldChanged()"></div>
         </div>
       </div>
       <div class="form-grid">
-        <div class="form-field"><label>Collection date</label><input type="date" id="oh-date"></div>
-        <div class="form-field"><label>Collection time</label><input type="time" id="oh-time"></div>
+        <div class="form-field"><label>Collection date</label><input type="date" id="oh-date" onchange="ohFieldChanged()"></div>
+        <div class="form-field"><label>Collection time</label><input type="time" id="oh-time" onchange="ohFieldChanged()"></div>
       </div>
-      <div class="form-field"><label>Notes for the supplier</label><textarea id="oh-notes" style="width:100%;min-height:70px;font-size:13px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box" placeholder="Keys location, access restrictions, fuel, etc."></textarea></div>
+      <div class="form-field"><label>Notes for the supplier</label><textarea id="oh-notes" style="width:100%;min-height:70px;font-size:13px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box" placeholder="Keys location, access restrictions, fuel, etc." oninput="ohFieldChanged()"></textarea></div>
       <div class="form-field"><div class="label-row"><label>Subject <span style="font-weight:400;color:var(--n400)">(job ref added automatically)</span></label><span class="dynamics-link" onclick="ohRebuild()">↻ Rebuild from details above</span></div><input id="oh-subject-line"></div>
-      <div class="form-field"><label>Email body — edit freely before sending</label><textarea id="oh-body" style="width:100%;min-height:180px;max-height:300px;font-size:13px;padding:12px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box;white-space:pre-wrap"></textarea></div>
+      <div class="form-field"><label>Email body — edits are kept; details changed above stop flowing in once you edit</label><textarea id="oh-body" oninput="ohDirty=true" style="width:100%;min-height:180px;max-height:300px;font-size:13px;padding:12px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box;white-space:pre-wrap"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="openOffhireTemplate()">Edit template</button>
@@ -3726,7 +3726,7 @@ async function saveOffhireTemplate(){
   try{await sbReq('covase_config',{method:'POST',body:{key:'offhire_booking_template',value:offhireTemplate,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Template saved','success');document.getElementById('offhire-template-modal').classList.remove('open');}
   catch(e){toast('Save failed: '+e.message,'error');}
 }
-function ohToggleSame(){const same=document.getElementById('oh-same').checked;document.getElementById('oh-addr-block').style.display=same?'none':'';}
+function ohToggleSame(){const same=document.getElementById('oh-same').checked;document.getElementById('oh-addr-block').style.display=same?'none':'';if(typeof ohFieldChanged==='function')ohFieldChanged();}
 function openOffhire(){
   if(!editHireId){toast('Save the hire first','error');return;}
   const h=(allHires||[]).find(x=>x.id===editHireId);if(!h){toast('Hire not found','error');return;}
@@ -3773,12 +3773,17 @@ function ohTokens(){
     collectionDate:g('oh-date')?fmtUK(g('oh-date')):'TBC',collectionTime:g('oh-time')||'anytime',notes:g('oh-notes')
   }};
 }
+let ohDirty=false;
 function ohRebuild(){
   const ctx=ohTokens();if(!ctx)return;
   const se=document.getElementById('oh-subject-line'),be=document.getElementById('oh-body');
   if(se)se.value=fineRender(offhireTemplate.subject,ctx.tokens);
   if(be)be.value=fineRender(offhireTemplate.body,ctx.tokens);
+  ohDirty=false;
 }
+// Field changes above re-render the email live UNTIL the body is hand-edited;
+// after that the user's text wins and only the ↻ link overwrites it.
+function ohFieldChanged(){if(!ohDirty)ohRebuild();}
 async function doOffhireSend(){
   if(!editHireId)return;
   const h=(allHires||[]).find(x=>x.id===editHireId);if(!h)return;
@@ -3792,6 +3797,10 @@ async function doOffhireSend(){
   if(!col.l1&&!col.pc){toast('No collection address — untick the box and enter one','error');return;}
   const subjEdited=g('oh-subject-line'),bodyText=g('oh-body');
   if(!subjEdited||!bodyText){toast('Subject and body needed — hit ↻ Rebuild if they are empty','error');return;}
+  // Safety net: the email must actually mention the collection address. Catches
+  // the body being edited/rendered before the address was filled in.
+  const addrMentioned=(col.l1&&bodyText.includes(col.l1))||(col.pc&&bodyText.toUpperCase().includes(col.pc.toUpperCase()));
+  if(!addrMentioned&&!confirm('The email body does not mention the collection address ('+(col.l1||col.pc)+').\n\nOK = send anyway.\nCancel = go back (tip: press "↻ Rebuild from details above" to refresh the email, then re-apply any wording changes).'))return;
   const subject=subjEdited+' ['+(h.job_ref||('CVB:'+editHireId))+']';
   const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(bodyText).replace(/\n/g,'<br>')+'</div>';
   const btn=document.getElementById('oh-send-btn');btn.disabled=true;btn.textContent='Sending…';
@@ -5206,6 +5215,7 @@ function pickPafAddress(prefix,i){
   if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
   else delete window._mvCoords[prefix];
   document.getElementById('mv-'+prefix+'-postcode-results').classList.remove('open');
+  if(prefix==='offhire')ohFieldChanged();
   toast('Address filled from Royal Mail PAF','success');
 }
 // ── Address autocomplete (ORS/Pelias): suggestions as you type in Address
@@ -5246,6 +5256,7 @@ function pickMvAddress(prefix,i){
   set('mv-'+prefix+'-county',p.county||p.region||'');
   if(p.postalcode)set('mv-'+prefix+'-postcode',p.postalcode.toUpperCase());
   document.getElementById('mv-'+prefix+'-addr1-results').classList.remove('open');
+  if(prefix==='offhire')ohFieldChanged();
 }
 // ── End-point contact lookup (pickup/dropoff): Dynamics typeahead, manual always allowed ──
 let _endContactTimers={};
@@ -5281,6 +5292,7 @@ function pickEndContact(prefix,i){
   if(a1||d.postcode)toast('Contact + address filled from Dynamics'+(!d.town?'':''),'success');
   else toast('Contact filled — no address on their Dynamics record, use 📮 Find addresses','error');
   document.getElementById('mv-'+prefix+'-contact-results').classList.remove('open');
+  if(prefix==='offhire')ohFieldChanged();
 }
 // ── Movement request email (template in covase_config 'movement_booking_template') ──
 const DEFAULT_MOVEMENT_TEMPLATE={
