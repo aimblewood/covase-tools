@@ -1110,6 +1110,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Collection time</label><input type="time" id="oh-time"></div>
       </div>
       <div class="form-field"><label>Notes for the supplier</label><textarea id="oh-notes" style="width:100%;min-height:70px;font-size:13px;padding:10px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box" placeholder="Keys location, access restrictions, fuel, etc."></textarea></div>
+      <div class="form-field"><div class="label-row"><label>Subject <span style="font-weight:400;color:var(--n400)">(job ref added automatically)</span></label><span class="dynamics-link" onclick="ohRebuild()">↻ Rebuild from details above</span></div><input id="oh-subject-line"></div>
+      <div class="form-field"><label>Email body — edit freely before sending</label><textarea id="oh-body" style="width:100%;min-height:180px;max-height:300px;font-size:13px;padding:12px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box;white-space:pre-wrap"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="openOffhireTemplate()">Edit template</button>
@@ -1345,6 +1347,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     </div>
     <div class="modal-footer">
       <span id="mv-supplier-sent" style="font-size:11px;color:var(--n500);margin-right:auto;align-self:center"></span>
+      <button class="btn-secondary-modal" id="mv-thread-btn" onclick="openThread(editMovementId,'mv')" style="display:none">✉ Correspondence</button>
       <button class="btn-secondary-modal" id="mv-send-btn" onclick="openMovementSend()">✉ Send to supplier</button>
       <button class="btn-secondary-modal" onclick="closeMovementModal()">Cancel</button>
       <button class="btn-secondary-modal" id="mv-delete-btn" onclick="deleteMovementFromModal()" style="display:none;color:var(--tl-red-t)">Delete</button>
@@ -1362,7 +1365,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     </div>
     <div class="modal-body">
       <div id="ss-summary" style="font-size:13px;color:var(--n700);line-height:1.5;background:var(--n50);border:1px solid var(--n200);border-radius:8px;padding:10px 12px;margin-bottom:12px"></div>
-      <div class="form-field"><label>Notes to supplier (optional)</label><textarea id="ss-notes" placeholder="Anything to add to the request…"></textarea></div>
+      <div class="form-field"><label>Notes to supplier (optional)</label><textarea id="ss-notes" placeholder="Anything to add to the request…" oninput="ssRebuild(false)"></textarea></div>
+      <div class="form-field"><div class="label-row"><label>Subject <span style="font-weight:400;color:var(--n400)">(job ref added automatically)</span></label><span class="dynamics-link" onclick="ssRebuild(true)">↻ Rebuild from template</span></div><input id="ss-subject"></div>
+      <div class="form-field"><label>Email body — edit freely before sending</label><div id="ss-body" contenteditable="true" oninput="ssDirty=true" style="border:1px solid var(--n200);border-radius:8px;padding:12px;font-size:13px;min-height:160px;max-height:300px;overflow-y:auto;background:#fff;outline:none"></div></div>
       <div id="ss-warn" style="font-size:12px;color:var(--tl-red-t);margin-top:8px;display:none"></div>
     </div>
     <div class="modal-footer">
@@ -1419,6 +1424,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div class="modal-body" id="thread-body"></div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeThread()">Close</button>
+      <button class="btn-secondary-modal" onclick="threadNewMessage()">✉ New message / chase</button>
       <button class="btn-primary-modal" onclick="replyFromThread()">Reply to supplier</button>
     </div>
   </div>
@@ -1695,8 +1701,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div class="modal-body">
       <div id="mvs-summary" style="font-size:12px;color:var(--n700);margin-bottom:8px"></div>
       <div id="mvs-warn" style="display:none;background:var(--tl-orange-l);color:var(--tl-orange-t);font-size:12px;padding:8px 10px;border-radius:8px;margin-bottom:8px"></div>
-      <div id="mvs-preview" style="border:1px solid var(--n200);border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;max-height:320px;overflow-y:auto"></div>
-      <div class="form-field" style="margin-top:8px"><label>Add a note (optional)</label><input id="mvs-notes"></div>
+      <div class="form-field"><label>Add a note (optional)</label><input id="mvs-notes" oninput="mvsRebuild(false)"></div>
+      <div class="form-field"><div class="label-row"><label>Subject <span style="font-weight:400;color:var(--n400)">(job ref added automatically)</span></label><span class="dynamics-link" onclick="mvsRebuild(true)">↻ Rebuild from template</span></div><input id="mvs-subject"></div>
+      <div class="form-field"><label>Email body — edit freely before sending</label><textarea id="mvs-body" oninput="mvsDirty=true" style="width:100%;min-height:200px;max-height:320px;font-size:13px;padding:12px;border:1px solid var(--n200);border-radius:8px;box-sizing:border-box;white-space:pre-wrap"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="openMovementTemplate()">Edit template</button>
@@ -3653,7 +3660,25 @@ function openSendSupplier(){
   if(!email){warn.style.display='';warn.textContent=acc?('No booking email on the "'+acc.company_name+'" supplier account — add one in CRM → Accounts first.'):('No supplier account matches "'+(supplierEnum||'')+'". Add a supplier account with a booking email in CRM → Accounts.');sendBtn.disabled=true;sendBtn.style.opacity='0.5';}
   else{warn.style.display='none';sendBtn.disabled=false;sendBtn.style.opacity='';}
   document.getElementById('ss-notes').value='';
+  ssRebuild(true);
   document.getElementById('send-supplier-modal').classList.add('open');
+}
+function hireEmailTokens(h,acc,notes){
+  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
+  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
+}
+// Render the template into the editable subject/body. Typing in the body sets
+// ssDirty so note edits stop clobbering manual work; ↻ link forces a rebuild.
+let ssDirty=false;
+function ssRebuild(force){
+  if(ssDirty&&!force)return;
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h)return;
+  const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
+  const rendered=renderBookingTemplate(hireEmailTokens(h,acc,document.getElementById('ss-notes').value.trim()));
+  const se=document.getElementById('ss-subject'),be=document.getElementById('ss-body');
+  if(se)se.value=rendered.subject;
+  if(be)be.innerHTML=rendered.html;
+  ssDirty=false;
 }
 async function doSendSupplier(){
   if(!editHireId)return;
@@ -3661,21 +3686,20 @@ async function doSendSupplier(){
   const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
   const email=acc&&acc.booking_email;if(!email){toast('No supplier booking email','error');return;}
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
-  const notes=document.getElementById('ss-notes').value.trim();
-  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
-  const tokens={customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc.company_name||'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes};
-  const rendered=renderBookingTemplate(tokens);
+  const subjEdited=(document.getElementById('ss-subject')?.value||'').trim();
+  const bodyEdited=document.getElementById('ss-body')?.innerHTML||'';
+  if(!subjEdited||!bodyEdited.trim()){toast('Subject and body needed — hit ↻ Rebuild if they are empty','error');return;}
   // Carry a machine-readable booking code in the subject so the reply agent can
   // match the supplier's response back to this exact hire.
-  const subjectCoded=rendered.subject+' ['+(h.job_ref||('CVB:'+editHireId))+']';
-  const payload={to:email,subject:subjectCoded,bodyHtml:rendered.html,customer:h.customer||''};
+  const subjectCoded=subjEdited+' ['+(h.job_ref||('CVB:'+editHireId))+']';
+  const payload={to:email,subject:subjectCoded,bodyHtml:bodyEdited,customer:h.customer||''};
   const btn=document.getElementById('ss-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     const now=new Date().toISOString();
     try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:{supplier_email_sent_at:now,hire_status:'requested'},prefer:'return=minimal'});}catch(e){}
-    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'booking_request',subject:subjectCoded,raw_body:rendered.html,from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'booking_request',subject:subjectCoded,raw_body:bodyEdited,from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
     const idx=(allHires||[]).findIndex(x=>x.id===editHireId);if(idx>=0){allHires[idx].supplier_email_sent_at=now;allHires[idx].hire_status='requested';}
     const stSel=document.getElementById('hf-hire-status');if(stSel)stSel.value='requested';
     renderSupplierSentState(idx>=0?allHires[idx]:h);
@@ -3729,7 +3753,31 @@ function openOffhire(){
   set('oh-date',h.collection_date?String(h.collection_date).slice(0,10):(h.end_date?String(h.end_date).slice(0,10):new Date().toISOString().slice(0,10)));
   set('oh-time',h.collection_time?String(h.collection_time).slice(0,5):'');
   set('oh-notes',h.offhire_notes||'');
+  ohRebuild();
   document.getElementById('offhire-modal').classList.add('open');
+}
+// Build the offhire email tokens from the current modal fields
+function ohTokens(){
+  const h=(allHires||[]).find(x=>x.id===editHireId);if(!h)return null;
+  const acc=findSupplierAccount(document.getElementById('hf-supplier').value);
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const same=document.getElementById('oh-same').checked;
+  const col=same
+    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:'',pc:h.delivery_postcode||''}
+    :{l1:g('mv-offhire-addr1'),l2:g('mv-offhire-addr2'),town:g('mv-offhire-town'),county:g('mv-offhire-county'),pc:g('mv-offhire-postcode').toUpperCase()};
+  return {h:h,acc:acc,col:col,colDate:g('oh-date'),colTime:g('oh-time'),tokens:{
+    supplierName:acc?(acc.company_name||''):'',customer:h.customer||'',driver:h.driver||'',
+    vehicleReg:h.vehicle_reg||'',makeModel:h.make_model||'',reference:h.reference||'',
+    collectionAddress:[col.l1,col.l2,col.town,col.county,col.pc].filter(Boolean).join(', '),
+    collectionContact:g('mv-offhire-contact')||h.driver||'—',collectionPhone:g('mv-offhire-phone')||h.driver_mobile||'—',
+    collectionDate:g('oh-date')?fmtUK(g('oh-date')):'TBC',collectionTime:g('oh-time')||'anytime',notes:g('oh-notes')
+  }};
+}
+function ohRebuild(){
+  const ctx=ohTokens();if(!ctx)return;
+  const se=document.getElementById('oh-subject-line'),be=document.getElementById('oh-body');
+  if(se)se.value=fineRender(offhireTemplate.subject,ctx.tokens);
+  if(be)be.value=fineRender(offhireTemplate.body,ctx.tokens);
 }
 async function doOffhireSend(){
   if(!editHireId)return;
@@ -3738,22 +3786,14 @@ async function doOffhireSend(){
   const email=acc&&acc.booking_email;if(!email){toast('No supplier booking email','error');return;}
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
   const g=id=>(document.getElementById(id)?.value||'').trim();
-  const same=document.getElementById('oh-same').checked;
-  const col=same
-    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:'',pc:h.delivery_postcode||''}
-    :{l1:g('mv-offhire-addr1'),l2:g('mv-offhire-addr2'),town:g('mv-offhire-town'),county:g('mv-offhire-county'),pc:g('mv-offhire-postcode').toUpperCase()};
-  const colDate=g('oh-date'),colTime=g('oh-time');
+  const ctx=ohTokens();if(!ctx)return;
+  const col=ctx.col,colDate=ctx.colDate,colTime=ctx.colTime;
   if(!colDate){toast('Set a collection date','error');return;}
   if(!col.l1&&!col.pc){toast('No collection address — untick the box and enter one','error');return;}
-  const tokens={
-    supplierName:acc.company_name||'',customer:h.customer||'',driver:h.driver||'',
-    vehicleReg:h.vehicle_reg||'',makeModel:h.make_model||'',reference:h.reference||'',
-    collectionAddress:[col.l1,col.l2,col.town,col.county,col.pc].filter(Boolean).join(', '),
-    collectionContact:g('mv-offhire-contact')||h.driver||'—',collectionPhone:g('mv-offhire-phone')||h.driver_mobile||'—',
-    collectionDate:fmtUK(colDate),collectionTime:colTime||'anytime',notes:g('oh-notes')
-  };
-  const subject=fineRender(offhireTemplate.subject,tokens)+' ['+(h.job_ref||('CVB:'+editHireId))+']';
-  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(fineRender(offhireTemplate.body,tokens)).replace(/\n/g,'<br>')+'</div>';
+  const subjEdited=g('oh-subject-line'),bodyText=g('oh-body');
+  if(!subjEdited||!bodyText){toast('Subject and body needed — hit ↻ Rebuild if they are empty','error');return;}
+  const subject=subjEdited+' ['+(h.job_ref||('CVB:'+editHireId))+']';
+  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(bodyText).replace(/\n/g,'<br>')+'</div>';
   const btn=document.getElementById('oh-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,subject:subject,bodyHtml:bodyHtml,customer:h.customer||''})});
@@ -3761,7 +3801,7 @@ async function doOffhireSend(){
     const now=new Date().toISOString();
     const patch={collection_address_line1:col.l1||null,collection_address_line2:col.l2||null,collection_town:col.town||null,collection_county:col.county||null,collection_postcode:col.pc||null,collection_date:colDate,collection_time:colTime||null,offhire_notes:g('oh-notes')||null,offhire_requested_at:now,updated_at:now};
     try{await sbReq('covase_hires?id=eq.'+encodeURIComponent(editHireId),{method:'PATCH',body:patch,prefer:'return=minimal'});}catch(e){}
-    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'offhire_request',subject:subject,raw_body:fineRender(offhireTemplate.body,tokens),from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-out-'+Date.now(),hire_id:editHireId,direction:'outbound',outcome:'offhire_request',subject:subject,raw_body:bodyText,from_email:'rentals@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
     Object.assign(h,patch);
     toast('Offhire request sent to '+acc.company_name+' — collection '+fmtUK(colDate)+(colTime?' '+colTime:''),'success');
     document.getElementById('offhire-modal').classList.remove('open');
@@ -3951,6 +3991,7 @@ function renderSupplierReplies(){
     }else if(isMv){
       if(oc==='confirmed')a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="applyMovementReply(\''+r.id+'\')">Apply to movement</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openReplyFromQueue(\''+r.id+'\')">Reply</button>';
+      a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openThread(\''+esc(r.movement_id)+'\',\'mv\')">View thread</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openMovementById(\''+esc(r.movement_id)+'\')">Open movement</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="toggleRelink(\''+r.id+'\')">Re-link</button>';
       a+='<button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="dismissReply(\''+r.id+'\')">Dismiss</button>';
@@ -4054,23 +4095,27 @@ function mvJobLabel(id){
 }
 function cleanReplyText(t){if(!t)return '';const s=String(t);const cut=s.search(/\bFrom:\s/);return (cut>20?s.slice(0,cut):s).trim();}
 function toggleThreadMsg(i){const b=document.getElementById('thread-body-'+i);const c=document.getElementById('thread-chev-'+i);if(!b)return;const open=b.style.display==='none';b.style.display=open?'block':'none';if(c)c.textContent=open?'▾':'▸';}
-async function openThread(hireId){
-  if(!hireId){toast('No hire linked','error');return;}
-  document.getElementById('thread-title').textContent='Correspondence — '+hireLabel(hireId);
+async function openThread(id,kind){
+  kind=(kind==='mv')?'mv':'hire';
+  if(!id){toast('Nothing linked','error');return;}
+  document.getElementById('thread-title').textContent='Correspondence — '+(kind==='mv'?mvJobLabel(id):hireLabel(id));
   const body=document.getElementById('thread-body');body.innerHTML='<div class="loading">Loading…</div>';
   document.getElementById('thread-modal').classList.add('open');
   try{
-    const rows=await sbReq('covase_supplier_replies?hire_id=eq.'+encodeURIComponent(hireId)+'&order=received_at.asc&limit=200');
+    const col=kind==='mv'?'movement_id':'hire_id';
+    const rows=await sbReq('covase_supplier_replies?'+col+'=eq.'+encodeURIComponent(id)+'&order=received_at.asc&limit=200');
     const msgs=Array.isArray(rows)?rows:[];
-    window._threadMsgs=msgs;window._threadHireId=hireId;
-    if(!msgs.length){body.innerHTML='<div class="empty-state"><div class="empty-title">No emails yet</div><div class="empty-sub">The booking request and any replies will show here.</div></div>';return;}
+    window._threadMsgs=msgs;window._threadKind=kind;
+    window._threadHireId=kind==='hire'?id:null;window._threadMvId=kind==='mv'?id:null;
+    if(!msgs.length){body.innerHTML='<div class="empty-state"><div class="empty-title">No emails yet</div><div class="empty-sub">Requests and replies for this job will show here. Use ✉ New message to start the conversation.</div></div>';return;}
     const last=msgs.length-1;
     body.innerHTML=msgs.map((m,i)=>{
       const outbound=m.direction==='outbound';
-      const who=outbound?'Covase Rentals':(m.from_email||'Supplier');
+      const who=outbound?(kind==='mv'?'Covase Logistics':'Covase Rentals'):(m.from_email||'Supplier');
       const arrow=outbound?'↑':'↓';
       const when=m.received_at?new Date(m.received_at).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-      const label=outbound?(m.outcome==='booking_request'?'Booking request':(m.outcome==='acknowledgement_sent'?'Acknowledgement':'Sent')):(m.outcome||'reply');
+      const OUT_LABELS={booking_request:'Booking request',movement_request:'Movement request',offhire_request:'Offhire request',acknowledgement_sent:'Acknowledgement',manual_reply:'Reply',chase:'Chase / message'};
+      const label=outbound?(OUT_LABELS[m.outcome]||'Sent'):(m.outcome||'reply');
       const snippet=m.summary?m.summary:(outbound?'':cleanReplyText(m.raw_body||'').slice(0,100));
       const content=outbound?(m.raw_body||''):esc(cleanReplyText(m.raw_body||''));
       const open=false;
@@ -4096,7 +4141,7 @@ let replyCtx=null;
 function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId){
   if(!messageId){toast('That message has no email id to reply to','error');return;}
   const from=movementId?'logistics@covase.co.uk':'rentals@covase.co.uk';
-  replyCtx={messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
+  replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
   document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from;
   document.getElementById('reply-text').value='';
   document.getElementById('reply-modal').classList.add('open');
@@ -4107,17 +4152,65 @@ function openReplyFromQueue(id){
   openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id);
 }
 function replyFromThread(){
-  const msgs=window._threadMsgs||[];const hireId=window._threadHireId;
+  const msgs=window._threadMsgs||[];const kind=window._threadKind||'hire';
+  const id=kind==='mv'?window._threadMvId:window._threadHireId;
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
   const latest=inbound.length?inbound[inbound.length-1]:null;
-  if(!latest){toast('No supplier email in this thread to reply to yet','error');return;}
-  openReplyModal(latest.message_id,hireId,null,'Reply to '+(latest.from_email||'supplier'));
+  if(!latest){threadNewMessage();return;} // nothing to thread onto yet — send a fresh chase instead
+  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null);
+}
+function threadNewMessage(){
+  const kind=window._threadKind||'hire';
+  composeToSupplier(kind==='mv'?window._threadMvId:window._threadHireId,kind);
+}
+// Fresh email to the supplier (chase/nudge) — no inbound message required.
+// Threads on the supplier's side via 'Re:' + the original subject, and always
+// carries the job ref so the reply agents can match the answer.
+function composeToSupplier(id,kind){
+  if(!id){toast('Nothing linked','error');return;}
+  let to='',from='',label='',subjBase='';
+  if(kind==='mv'){
+    const m=(allMovements||[]).find(x=>x.id===id);if(!m){toast('Movement not loaded — open Movements and retry','error');return;}
+    const sup=(allAccounts||[]).find(a=>a.id===m.supplier_account_id);
+    to=(sup&&sup.booking_email)||'';from='logistics@covase.co.uk';label=mvJobLabel(id);
+    subjBase='Vehicle movement - '+(m.customer||'')+' ['+(m.job_ref||('CVM:'+id))+']';
+  }else{
+    const h=(allHires||[]).find(x=>x.id===id);if(!h){toast('Booking not loaded — open Bookings and retry','error');return;}
+    const acc=findSupplierAccount(h.supplier);
+    to=(acc&&acc.booking_email)||'';from='rentals@covase.co.uk';label=hireLabel(id);
+    subjBase='Booking - '+(h.customer||'')+' ['+(h.job_ref||('CVB:'+id))+']';
+  }
+  if(!to){toast('No booking email on the supplier account — add one in CRM → Accounts','error');return;}
+  const msgs=(window._threadMsgs||[]);
+  const lastOut=[...msgs].reverse().find(x=>x.direction==='outbound'&&x.subject);
+  const subject=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
+  replyCtx={mode:'new',to:to,from:from,subject:subject,hireId:kind==='hire'?id:null,movementId:kind==='mv'?id:null,messageId:null,sourceReplyId:null};
+  document.getElementById('reply-context').textContent='New message to '+to+' · '+label+' · from '+from;
+  document.getElementById('reply-text').value='';
+  document.getElementById('reply-modal').classList.add('open');
 }
 function closeReplyModal(){document.getElementById('reply-modal').classList.remove('open');}
 async function doManualReply(){
   if(!replyCtx)return;
   const text=document.getElementById('reply-text').value.trim();
   if(!text){toast('Type a reply first','error');return;}
+  // Fresh outbound (chase/nudge) — goes via the send webhook, not the Graph reply
+  if(replyCtx.mode==='new'){
+    const url2=getConfig().n8nSupplierBooking;if(!url2){toast('Set the supplier booking webhook in Settings','error');return;}
+    const btn2=document.getElementById('reply-send-btn');btn2.disabled=true;btn2.textContent='Sending…';
+    try{
+      const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(text).replace(/\n/g,'<br>')+'</div>';
+      const r2=await fetch(url2,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:replyCtx.to,from:replyCtx.from,subject:replyCtx.subject,bodyHtml:bodyHtml})});
+      if(!r2.ok)throw new Error('Webhook returned '+r2.status);
+      const now2=new Date().toISOString();
+      try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-chase-'+Date.now(),hire_id:replyCtx.hireId,movement_id:replyCtx.movementId,direction:'outbound',outcome:'chase',subject:replyCtx.subject,raw_body:text,from_email:replyCtx.from,message_id:'manual-'+Date.now(),received_at:now2,status:'sent'},prefer:'return=minimal'});}catch(e){}
+      toast('Message sent from '+replyCtx.from,'success');
+      closeReplyModal();
+      if(document.getElementById('thread-modal').classList.contains('open'))openThread(replyCtx.movementId||replyCtx.hireId,replyCtx.movementId?'mv':'hire');
+    }catch(e){toast('Send failed: '+e.message,'error');}
+    finally{btn2.disabled=false;btn2.textContent='Send reply';}
+    return;
+  }
   const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
   const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
@@ -4834,6 +4927,7 @@ function clearMovementForm(){
   movementSupps=[];renderMovementSupps();
   document.getElementById('mv-reconciliation').style.display='none';
   document.getElementById('mv-delete-btn').style.display='none';
+  {const tb=document.getElementById('mv-thread-btn');if(tb)tb.style.display='none';}
   renderMovementSentState(null);
   window._mvCoords={};
   updateMovementCalc();
@@ -4883,6 +4977,7 @@ function openEditMovement(id){
   const showReco=['completed_pending_fuel','invoiced','paid'].includes(m.movement_status);
   document.getElementById('mv-reconciliation').style.display=showReco?'':'none';
   document.getElementById('mv-delete-btn').style.display='';
+  {const tb=document.getElementById('mv-thread-btn');if(tb)tb.style.display='';}
   updateMovementCalc();
   document.getElementById('movement-modal').classList.add('open');
 }
@@ -5226,23 +5321,34 @@ function openMovementSend(){
   else{warn.style.display='none';sb.disabled=false;sb.style.opacity='';}
   const t=movementTokens(document.getElementById('mvs-notes')?.value||'');
   document.getElementById('mvs-summary').innerHTML='<strong>To: '+esc(t.supplierName||'—')+(email?' &lt;'+esc(email)+'&gt;':'')+'</strong><div style="font-size:11px;color:var(--n500)">From: logistics@covase.co.uk</div>';
-  document.getElementById('mvs-preview').textContent=fineRender(movementTemplate.body,t);
+  mvsRebuild(true);
   document.getElementById('mv-send-modal').classList.add('open');
+}
+let mvsDirty=false;
+function mvsRebuild(force){
+  if(mvsDirty&&!force)return;
+  const t=movementTokens((document.getElementById('mvs-notes')?.value||'').trim());
+  const se=document.getElementById('mvs-subject'),be=document.getElementById('mvs-body');
+  if(se)se.value=fineRender(movementTemplate.subject,t);
+  if(be)be.value=fineRender(movementTemplate.body,t);
+  mvsDirty=false;
 }
 async function doMovementSend(){
   const m=(allMovements||[]).find(x=>x.id===editMovementId);if(!m)return;
   const sup=(allAccounts||[]).find(a=>a.id===document.getElementById('mv-supplier')?.value);
   const email=sup&&sup.booking_email;if(!email){toast('No supplier booking email','error');return;}
   const url=getConfig().n8nSupplierBooking;if(!url){toast('Set the supplier booking webhook in Settings','error');return;}
-  const t=movementTokens((document.getElementById('mvs-notes')?.value||'').trim());
-  const subject=fineRender(movementTemplate.subject,t)+' ['+(m.job_ref||('CVM:'+editMovementId))+']';
-  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(fineRender(movementTemplate.body,t)).replace(/\n/g,'<br>')+'</div>';
+  const subjEdited=(document.getElementById('mvs-subject')?.value||'').trim();
+  const bodyText=(document.getElementById('mvs-body')?.value||'').trim();
+  if(!subjEdited||!bodyText){toast('Subject and body needed — hit ↻ Rebuild if they are empty','error');return;}
+  const subject=subjEdited+' ['+(m.job_ref||('CVM:'+editMovementId))+']';
+  const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(bodyText).replace(/\n/g,'<br>')+'</div>';
   const btn=document.getElementById('mvs-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,from:'logistics@covase.co.uk',subject:subject,bodyHtml:bodyHtml,customer:t.customer})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     const now=new Date().toISOString();
-    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-mvout-'+Date.now(),movement_id:editMovementId,direction:'outbound',outcome:'movement_request',subject:subject,raw_body:fineRender(movementTemplate.body,t),from_email:'logistics@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
+    try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-mvout-'+Date.now(),movement_id:editMovementId,direction:'outbound',outcome:'movement_request',subject:subject,raw_body:bodyText,from_email:'logistics@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
     try{await sbReq('covase_movements?id=eq.'+encodeURIComponent(editMovementId),{method:'PATCH',body:{supplier_email_sent_at:now,updated_at:now},prefer:'return=minimal'});}catch(e){}
     if(m)m.supplier_email_sent_at=now;
     renderMovementSentState(m);
