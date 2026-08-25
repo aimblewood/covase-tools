@@ -5357,7 +5357,7 @@ async function doMovementSend(){
   const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(bodyText).replace(/\n/g,'<br>')+'</div>';
   const btn=document.getElementById('mvs-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,from:'logistics@covase.co.uk',subject:subject,bodyHtml:bodyHtml,customer:t.customer})});
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:email,from:'logistics@covase.co.uk',subject:subject,bodyHtml:bodyHtml,customer:m.customer||''})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     const now=new Date().toISOString();
     try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-mvout-'+Date.now(),movement_id:editMovementId,direction:'outbound',outcome:'movement_request',subject:subject,raw_body:bodyText,from_email:'logistics@covase.co.uk',received_at:now,status:'sent'},prefer:'return=minimal'});}catch(e){}
