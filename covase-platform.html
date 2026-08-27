@@ -805,6 +805,15 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div class="topbar">
       <h1>Fines &amp; penalties</h1>
       <input class="search-box" type="text" id="fine-search" placeholder="Search driver, reg, issuer, ref, COIN…" oninput="renderFinesView()">
+      <select id="fine-sort" onchange="localStorage.setItem('covase_fine_sort',this.value);renderFinesView()" title="Sort order" style="font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:8px;background:#fff">
+        <option value="received_desc">Received — newest first</option>
+        <option value="received_asc">Received — oldest first</option>
+        <option value="offence_desc">Offence date — newest</option>
+        <option value="offence_asc">Offence date — oldest</option>
+        <option value="amount_desc">Amount — high → low</option>
+        <option value="driver_asc">Driver A–Z</option>
+        <option value="status">Status (workflow order)</option>
+      </select>
       <select id="fine-status-filter" onchange="renderFinesView()" style="font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:8px;background:#fff">
         <option value="">All statuses</option>
       </select>
@@ -6576,11 +6585,28 @@ function finesFiltered(){
   let rows=(allFines||[]).slice();
   if(st)rows=rows.filter(f=>f.status===st);
   if(q)rows=rows.filter(f=>[f.driver_name,f.vehicle_reg,f.issuer,f.issuer_ref,f.coin_invoice_no,f.location,f.vehicle_desc].map(x=>String(x||'').toLowerCase()).join(' ').includes(q));
+  // Sort: 'received' = created_at (when the fine entered the system, via email
+  // intake or COIN import); 'offence' = the contravention date on the notice.
+  const sort=document.getElementById('fine-sort')?.value||'received_desc';
+  const ts=v=>{const t=new Date(v||0).getTime();return isNaN(t)?0:t;};
+  const statusOrder=Object.fromEntries((typeof FINE_STATUSES!=='undefined'?FINE_STATUSES:[]).map(([k],i)=>[k,i]));
+  const cmp={
+    received_desc:(a,b)=>ts(b.created_at)-ts(a.created_at),
+    received_asc:(a,b)=>ts(a.created_at)-ts(b.created_at),
+    offence_desc:(a,b)=>ts(b.offence_datetime)-ts(a.offence_datetime),
+    offence_asc:(a,b)=>ts(a.offence_datetime)-ts(b.offence_datetime),
+    amount_desc:(a,b)=>(fineTotal(b)||0)-(fineTotal(a)||0),
+    driver_asc:(a,b)=>String(a.driver_name||'zzz').localeCompare(String(b.driver_name||'zzz'),undefined,{sensitivity:'base'}),
+    status:(a,b)=>(statusOrder[a.status]??99)-(statusOrder[b.status]??99)||ts(b.created_at)-ts(a.created_at)
+  }[sort];
+  if(cmp)rows.sort(cmp);
   return rows;
 }
 function renderFinesView(){
   const sf=document.getElementById('fine-status-filter');
   if(sf&&sf.options.length<2)sf.innerHTML='<option value="">All statuses</option>'+FINE_STATUSES.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('');
+  const so=document.getElementById('fine-sort');
+  if(so&&!so.dataset.init){so.dataset.init='1';const saved=localStorage.getItem('covase_fine_sort');if(saved&&[...so.options].some(o=>o.value===saved))so.value=saved;}
   if(fineView==='dashboard')renderFinesDashboard();
   else if(fineView==='reports')renderFinesReports();
   else renderFinesRegister();
