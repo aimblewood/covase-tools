@@ -6843,8 +6843,10 @@ function fineEmail(kind){
   const t=fineTokens(f);
   const subj=fineRender(kind==='speeding'?fineTemplates.spSubject:fineTemplates.apSubject,t);
   let body=fineRender(kind==='speeding'?fineTemplates.spBody:fineTemplates.apBody,t);
-  // mailto: cannot attach files — link the stored notice PDF instead
-  if(f.pdf_url)body+='\n\nA copy of the notice is here:\n'+f.pdf_url;
+  // mailto: cannot attach files — link the stored notice PDF instead.
+  // (mailto drafts are plain text, so the URL itself must appear; Outlook
+  // renders it clickable automatically.)
+  if(f.pdf_url)body+='\n\nYou can view and download a copy of the fine by clicking this link:\n'+f.pdf_url;
   const ct=f.driver_contact_id?(allContacts||[]).find(c=>c.id===f.driver_contact_id):null;
   const to=ct&&ct.email?ct.email:'';
   document.getElementById('fpe-title').textContent=(kind==='speeding'?'Speeding / nomination email':'Auto-pay notification email');
