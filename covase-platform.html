@@ -804,6 +804,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
   <div class="view" id="view-fines">
     <div class="topbar">
       <h1>Fines &amp; penalties</h1>
+      <button class="topbar-btn" onclick="openFineCardDesigner()">🎨 Design card</button>
       <input class="search-box" type="text" id="fine-search" placeholder="Search driver, reg, issuer, ref, COIN…" oninput="renderFinesView()">
       <select id="fine-sort" onchange="localStorage.setItem('covase_fine_sort',this.value);renderFinesView()" title="Sort order" style="font-size:12px;padding:6px 8px;border:1px solid var(--n200);border-radius:8px;background:#fff">
         <option value="received_desc">Received — newest first</option>
@@ -1414,7 +1415,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     </div>
     <div class="modal-body">
       <div id="reply-context" style="font-size:12px;color:var(--n500);margin-bottom:8px"></div>
-      <div class="form-field"><label>Your reply (sent from rentals@covase.co.uk, in-thread)</label><textarea id="reply-text" style="min-height:170px" placeholder="Type your reply to the supplier…"></textarea></div>
+      <div class="form-field"><label>To <span style="font-weight:400;color:var(--n400)">(edit to send to a different address; comma-separate for several)</span></label><input id="reply-to" placeholder="supplier@example.co.uk"></div>
+      <div class="form-field"><label>Your message</label><textarea id="reply-text" style="min-height:170px" placeholder="Type your reply to the supplier…"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary-modal" onclick="closeReplyModal()">Cancel</button>
@@ -1818,6 +1820,46 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <button class="btn-secondary-modal" onclick="resetHireCardDesigner()">Reset to default</button>
       <button class="btn-secondary-modal" onclick="closeCardDesigner()">Cancel</button>
       <button class="btn-primary-modal" onclick="saveHireCardDesigner()">Save layout</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FINE CARD DESIGNER ─── -->
+<div class="modal-overlay" id="fine-card-designer-modal">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-header">
+      <div class="modal-title">Design fine card</div>
+      <button class="modal-close" onclick="closeCardDesigner()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--n500);margin-bottom:12px">Drag fields from the palette into the card zones. Drop a chip onto another to reorder, or drag it back to the palette (or click ✕) to remove it. Use 🏷 labels to structure the reading. Click a placed chip to format it (bold / italic / size / colour). The status badge keeps its colour coding wherever you place it in the right column.</div>
+      <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="mvcd-zone-label">Available fields</div>
+          <div id="fcd-palette" class="mvcd-palette" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'palette')"></div>
+        </div>
+        <div>
+          <div class="mvcd-zone-label">Card layout</div>
+          <div class="mvcd-cardframe">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div class="mvcd-zone mvcd-zone-title" data-zone="title" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'title')"></div>
+                <div id="fcd-lines"></div>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLine()">＋ Add line</button>
+                <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:5px" onclick="mvcdAddLabel()">🏷 Add label</button>
+              </div>
+              <div class="mvcd-zone mvcd-zone-right" data-zone="right" ondragover="mvcdAllowDrop(event)" ondragleave="mvcdDragLeave(event)" ondrop="mvcdDrop(event,'right')"></div>
+            </div>
+          </div>
+          <div class="mvcd-zone-label" style="margin-top:16px">Live preview</div>
+          <div id="fcd-preview" class="card-list" style="max-width:420px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="resetFineCardDesigner()">Reset to default</button>
+      <button class="btn-secondary-modal" onclick="closeCardDesigner()">Cancel</button>
+      <button class="btn-primary-modal" onclick="saveFineCardDesigner()">Save layout</button>
     </div>
   </div>
 </div>
@@ -4156,18 +4198,19 @@ function closeThread(){document.getElementById('thread-modal').classList.remove(
 
 // ─── Manual human reply to a supplier (rentals@ for hires, logistics@ for movements) ───
 let replyCtx=null;
-function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId){
+function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,toEmail){
   if(!messageId){toast('That message has no email id to reply to','error');return;}
   const from=movementId?'logistics@covase.co.uk':'rentals@covase.co.uk';
   replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
-  document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from;
+  document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from+' · in-thread';
+  document.getElementById('reply-to').value=toEmail||'';
   document.getElementById('reply-text').value='';
   document.getElementById('reply-modal').classList.add('open');
 }
 function openReplyFromQueue(id){
   const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
   const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id));
-  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id);
+  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email);
 }
 function replyFromThread(){
   const msgs=window._threadMsgs||[];const kind=window._threadKind||'hire';
@@ -4175,7 +4218,7 @@ function replyFromThread(){
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
   const latest=inbound.length?inbound[inbound.length-1]:null;
   if(!latest){threadNewMessage();return;} // nothing to thread onto yet — send a fresh chase instead
-  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null);
+  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email);
 }
 function threadNewMessage(){
   const kind=window._threadKind||'hire';
@@ -4203,7 +4246,8 @@ function composeToSupplier(id,kind){
   const lastOut=[...msgs].reverse().find(x=>x.direction==='outbound'&&x.subject);
   const subject=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
   replyCtx={mode:'new',to:to,from:from,subject:subject,hireId:kind==='hire'?id:null,movementId:kind==='mv'?id:null,messageId:null,sourceReplyId:null};
-  document.getElementById('reply-context').textContent='New message to '+to+' · '+label+' · from '+from;
+  document.getElementById('reply-context').textContent='New message · '+label+' · from '+from;
+  document.getElementById('reply-to').value=to;
   document.getElementById('reply-text').value='';
   document.getElementById('reply-modal').classList.add('open');
 }
@@ -4212,13 +4256,19 @@ async function doManualReply(){
   if(!replyCtx)return;
   const text=document.getElementById('reply-text').value.trim();
   if(!text){toast('Type a reply first','error');return;}
+  const toRaw=(document.getElementById('reply-to')?.value||'').trim();
+  const toList=toRaw.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!toList.length){toast('Enter at least one recipient address','error');return;}
+  const bad=toList.filter(e=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if(bad.length){toast('Invalid address: '+bad.join(', '),'error');return;}
+  const toValue=toList.join(',');
   // Fresh outbound (chase/nudge) — goes via the send webhook, not the Graph reply
   if(replyCtx.mode==='new'){
     const url2=getConfig().n8nSupplierBooking;if(!url2){toast('Set the supplier booking webhook in Settings','error');return;}
     const btn2=document.getElementById('reply-send-btn');btn2.disabled=true;btn2.textContent='Sending…';
     try{
       const bodyHtml='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.5">'+esc(text).replace(/\n/g,'<br>')+'</div>';
-      const r2=await fetch(url2,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:replyCtx.to,from:replyCtx.from,subject:replyCtx.subject,bodyHtml:bodyHtml})});
+      const r2=await fetch(url2,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:toValue,from:replyCtx.from,subject:replyCtx.subject,bodyHtml:bodyHtml})});
       if(!r2.ok)throw new Error('Webhook returned '+r2.status);
       const now2=new Date().toISOString();
       try{await sbReq('covase_supplier_replies',{method:'POST',body:{id:'sr-chase-'+Date.now(),hire_id:replyCtx.hireId,movement_id:replyCtx.movementId,direction:'outbound',outcome:'chase',subject:replyCtx.subject,raw_body:text,from_email:replyCtx.from,message_id:'manual-'+Date.now(),received_at:now2,status:'sent'},prefer:'return=minimal'});}catch(e){}
@@ -4232,7 +4282,7 @@ async function doManualReply(){
   const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
   const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,replyText:text})});
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,to:toValue,replyText:text})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     if(replyCtx.sourceReplyId){try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(replyCtx.sourceReplyId),{method:'PATCH',body:{status:'replied'},prefer:'return=minimal'});}catch(e){}}
     toast('Reply sent from '+(replyCtx.from||'rentals@covase.co.uk'),'success');
@@ -4624,7 +4674,8 @@ let mvcdDraft=null,mvcdDrag=null;
 let cdCtx='mv';
 const CD_CONTEXTS={
   mv:{modal:'mv-card-designer-modal',palette:'mvcd-palette',lines:'mvcd-lines',hasChip:true,fields:()=>MV_CARD_FIELDS,map:()=>MV_FIELD_MAP},
-  hire:{modal:'hire-card-designer-modal',palette:'hcd-palette',lines:'hcd-lines',hasChip:false,fields:()=>HIRE_CARD_FIELDS,map:()=>HIRE_FIELD_MAP}
+  hire:{modal:'hire-card-designer-modal',palette:'hcd-palette',lines:'hcd-lines',hasChip:false,fields:()=>HIRE_CARD_FIELDS,map:()=>HIRE_FIELD_MAP},
+  fine:{modal:'fine-card-designer-modal',palette:'fcd-palette',lines:'fcd-lines',hasChip:false,fields:()=>FINE_CARD_FIELDS,map:()=>FINE_FIELD_MAP}
 };
 function cdCfg(){return CD_CONTEXTS[cdCtx];}
 function closeCardDesigner(){mvcdFmtClose();document.getElementById(cdCfg().modal).classList.remove('open');}
@@ -4633,6 +4684,13 @@ function closeMvCardDesigner(){closeCardDesigner();}
 function resetMvCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_MV_CARD_LAYOUT);mvcdRender();}
 function openHireCardDesigner(){cdCtx='hire';mvcdDraft=mvcdCloneLayout(hireCardLayout||DEFAULT_HIRE_CARD_LAYOUT);mvcdRender();document.getElementById('hire-card-designer-modal').classList.add('open');}
 function resetHireCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_HIRE_CARD_LAYOUT);mvcdRender();}
+function openFineCardDesigner(){cdCtx='fine';mvcdDraft=mvcdCloneLayout(fineCardLayout||DEFAULT_FINE_CARD_LAYOUT);mvcdRender();document.getElementById('fine-card-designer-modal').classList.add('open');}
+function resetFineCardDesigner(){mvcdDraft=mvcdCloneLayout(DEFAULT_FINE_CARD_LAYOUT);mvcdRender();}
+async function saveFineCardDesigner(){
+  const layout=mvcdCloneLayout(mvcdDraft);fineCardLayout=layout;
+  try{await sbReq('covase_config',{method:'POST',body:{key:'fine_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Fine card layout saved','success');closeCardDesigner();if(typeof renderFinesView==='function')renderFinesView();}
+  catch(e){toast('Save failed: '+e.message+' (is covase_config applied?)','error');}
+}
 async function saveHireCardDesigner(){
   const layout=mvcdCloneLayout(mvcdDraft);hireCardLayout=layout;
   try{await sbReq('covase_config',{method:'POST',body:{key:'hire_card_layout',value:layout,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});toast('Booking card layout saved','success');closeCardDesigner();if(Array.isArray(allHires)&&allHires.length){hiresLoaded=true;loadHires();}}
@@ -4733,6 +4791,14 @@ function mvcdRender(){
   mvcdPreview();
 }
 function mvcdPreview(){
+  if(cdCtx==='fine'){
+    const sample=(Array.isArray(allFines)&&allFines[0])?allFines[0]:FINECD_SAMPLE;
+    const prev=fineCardLayout;fineCardLayout=mvcdDraft;
+    let html='';try{html=fineCardHtml(sample);}catch(e){}
+    fineCardLayout=prev;
+    const pv=document.getElementById('fcd-preview');if(pv)pv.innerHTML=html;
+    return;
+  }
   if(cdCtx==='hire'){
     const sample=(Array.isArray(allHires)&&allHires[0])?allHires[0]:HIRECD_SAMPLE;
     const prev=hireCardLayout;hireCardLayout=mvcdDraft;
@@ -6612,25 +6678,80 @@ function renderFinesView(){
   else renderFinesRegister();
 }
 function fineStatusBadge(s){const cls={new:'badge-requested',driver_notified:'badge-booked',address_requested:'badge-ordered',nominated:'badge-booked',on_coin:'badge-invoiced',to_be_charged:'badge-ordered',charged:'badge-paid',query:'badge-cancelled',appeal_upheld:'badge-active',refunded:'badge-paid',cancelled:'badge-cancelled'}[s]||'badge-unknown';return '<span class="badge '+cls+'">'+esc(FINE_STATUS_LABEL[s]||s)+'</span>';}
+// ─── Fine card designer: field catalog + layout-driven register cards ───
+const fineWhenTxt=f=>f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const FINE_CARD_FIELDS=[
+  {key:'driver_reg',label:'Driver · reg',get:f=>(f.driver_name||'Driver unknown')+' · '+(f.vehicle_reg||'—')},
+  {key:'driver',label:'Driver',get:f=>f.driver_name||''},
+  {key:'reg',label:'Vehicle reg',get:f=>f.vehicle_reg||''},
+  {key:'vehicle_desc',label:'Vehicle description',get:f=>f.vehicle_desc||''},
+  {key:'client',label:'Client account',get:f=>{const a=(allAccounts||[]).find(x=>x.id===f.client_account_id);return a?a.company_name:'';}},
+  {key:'offence',label:'Offence type',get:f=>FINE_OFFENCE_LABEL[f.offence_type]||f.offence_type||''},
+  {key:'offence_loc',label:'Offence — location',get:f=>(FINE_OFFENCE_LABEL[f.offence_type]||f.offence_type||'—')+(f.location?' — '+f.location:'')},
+  {key:'location',label:'Location',get:f=>f.location||''},
+  {key:'notice_class',label:'Notice class',get:f=>({pcn_private:'Private PCN',pcn_authority:'Authority PCN',noip:'NoIP'}[f.notice_class]||'')},
+  {key:'offence_when',label:'Offence date/time',get:f=>fineWhenTxt(f)},
+  {key:'received',label:'Received (into system)',get:f=>f.created_at?fmtD(String(f.created_at).slice(0,10)):''},
+  {key:'source',label:'Source',get:f=>({lex:'Lex email',coin:'COIN import',manual:'Manual'}[f.source]||f.source||'')},
+  {key:'issuer',label:'Issuer',get:f=>f.issuer||''},
+  {key:'issuer_ref',label:'Issuer ref',get:f=>f.issuer_ref||''},
+  {key:'coin_no',label:'COIN invoice no',get:f=>f.coin_invoice_no||''},
+  {key:'coin_date',label:'COIN invoice date',get:f=>f.coin_invoice_date?fmtD(String(f.coin_invoice_date).slice(0,10)):''},
+  {key:'charge_month',label:'Charge month',get:f=>f.charge_month||''},
+  {key:'total',label:'Total (£, incl admin)',money:true,get:f=>fmtMoney(fineTotal(f)||null)},
+  {key:'fine_amount',label:'Fine amount (£)',money:true,get:f=>f.fine_amount!=null?fmtMoney(parseFloat(f.fine_amount)):''},
+  {key:'full_amount',label:'Full amount (£, undiscounted)',money:true,get:f=>f.full_amount!=null?fmtMoney(parseFloat(f.full_amount)):''},
+  {key:'admin_fee',label:'Admin fee (£)',money:true,get:f=>f.admin_fee!=null?fmtMoney(parseFloat(f.admin_fee)):''},
+  {key:'status',label:'Status badge',get:f=>FINE_STATUS_LABEL[f.status]||f.status||''},
+  {key:'appeal',label:'Appeal status',get:f=>f.appeal_status||''},
+  {key:'pdf',label:'📄 PDF indicator',get:f=>f.pdf_url?'📄 Notice attached':''},
+  {key:'notified',label:'Driver notified date',get:f=>f.driver_notified_at?'Notified '+fmtUK(String(f.driver_notified_at).slice(0,10)):''},
+  {key:'nominated',label:'Nominated date',get:f=>f.nominated_at?'Nominated '+fmtUK(String(f.nominated_at).slice(0,10)):''},
+  {key:'exported',label:'Exported to WT sheet',get:f=>f.exported_at?'Exported '+fmtUK(String(f.exported_at).slice(0,10)):''},
+  {key:'notes',label:'Notes',get:f=>f.notes||''}
+];
+const FINE_FIELD_MAP=Object.fromEntries(FINE_CARD_FIELDS.map(f=>[f.key,f]));
+const DEFAULT_FINE_CARD_LAYOUT={title:['driver_reg'],lines:[['offence_loc'],['offence_when','issuer','issuer_ref','coin_no','pdf']],right:['total','status']};
+let fineCardLayout=null; // null → default layout (matches the original card)
+const FINECD_SAMPLE={id:'sample',driver_name:'Jane Doe',vehicle_reg:'AB12 CDE',vehicle_desc:'Nissan Juke',offence_type:'parking',notice_class:'pcn_authority',location:'High St, Merton',offence_datetime:'2026-08-03T15:48:00Z',issuer:'London Borough of Merton',issuer_ref:'MN12345678',source:'lex',fine_amount:80,full_amount:160,admin_fee:15,status:'new',created_at:'2026-08-20',pdf_url:'x',notes:''};
+async function loadFineCardLayout(){
+  try{
+    const rows=await sbReq('covase_config?key=eq.fine_card_layout&select=value');
+    const v=Array.isArray(rows)&&rows[0]?rows[0].value:null;
+    if(v&&typeof v==='object'){
+      const L=mvcdCloneLayout(v);
+      const ok=k=>FINE_FIELD_MAP[mvKeyBase(k)]||mvIsLabelKey(mvKeyBase(k));
+      L.title=L.title.filter(ok);L.right=L.right.filter(k=>FINE_FIELD_MAP[mvKeyBase(k)]);L.lines=L.lines.map(l=>l.filter(ok));
+      fineCardLayout=L;
+      if(Array.isArray(allFines)&&allFines.length)renderFinesView();
+    }
+  }catch(e){/* covase_config may not exist yet — keep default */}
+}
+function fineCardHtml(f){
+  const L=fineCardLayout||DEFAULT_FINE_CARD_LAYOUT;
+  const parts=keys=>mvResolvePartsHtml(keys,f,FINE_FIELD_MAP);
+  const titleParts=parts(L.title);
+  const title=titleParts.length?titleParts.join(' '):'—';
+  const linesHtml=(Array.isArray(L.lines)?L.lines:[]).map((keys,i)=>{const p=parts(keys);return p.length?'<div style="font-size:11px;color:var(--'+(i===0?'n600':'n500')+');margin-top:2px">'+p.join(' ')+'</div>':'';}).join('');
+  const rightHtml=(L.right||[]).map(k=>{
+    const bk=mvKeyBase(k);const fld=FINE_FIELD_MAP[bk];if(!fld)return '';
+    const v=fld.get(f);if(v===''||v==null)return '';
+    const fs=mvFmtStyle(mvKeyFmt(k));
+    if(bk==='status')return '<div style="margin-top:4px;'+fs+'">'+fineStatusBadge(f.status)+'</div>';
+    if(fld.money)return '<div style="font-weight:700;font-size:13px;color:var(--covase);'+fs+'">'+esc(String(v))+'</div>';
+    return '<div style="font-size:11px;color:var(--n600);margin-top:2px;'+fs+'">'+esc(String(v))+'</div>';
+  }).filter(Boolean).join('');
+  const right=rightHtml?'<div style="text-align:right;white-space:nowrap;flex-shrink:0">'+rightHtml+'</div>':'';
+  return '<div class="card" onclick="openFineModal(\''+esc(f.id)+'\')">'
+    +'<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'
+    +'<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;color:var(--n800)">'+title+'</div>'+linesHtml+'</div>'
+    +right+'</div></div>';
+}
 function renderFinesRegister(){
   const el=document.getElementById('fines-register');if(!el)return;
   const rows=finesFiltered();
   if(!rows.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-title">No fines'+((allFines||[]).length?' match':' yet')+'</div><div class="empty-sub">Import a COIN file or add a fine manually.</div></div>';return;}
-  el.innerHTML=rows.map(f=>{
-    const when=f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-    const typeTxt=(FINE_OFFENCE_LABEL[f.offence_type]||f.offence_type||'—')+(f.location?' — '+f.location:'');
-    return '<div class="card" onclick="openFineModal(\''+esc(f.id)+'\')">'
-      +'<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-weight:600;font-size:13px;color:var(--n800)">'+esc(f.driver_name||'Driver unknown')+' · '+esc(f.vehicle_reg||'—')+'</div>'
-      +'<div style="font-size:11px;color:var(--n600);margin-top:2px">'+esc(typeTxt)+'</div>'
-      +'<div style="font-size:11px;color:var(--n500);margin-top:2px">'+esc(when)+(f.issuer?' · '+esc(f.issuer):'')+(f.issuer_ref?' · Ref '+esc(f.issuer_ref):'')+(f.coin_invoice_no?' · '+esc(f.coin_invoice_no):'')+(f.pdf_url?' · 📄':'')+'</div>'
-      +'</div>'
-      +'<div style="text-align:right;white-space:nowrap">'
-      +'<div style="font-weight:700;font-size:13px;color:var(--covase)">'+fmtMoney(fineTotal(f)||null)+'</div>'
-      +'<div style="margin-top:4px">'+fineStatusBadge(f.status)+'</div>'
-      +'</div></div></div>';
-  }).join('');
+  el.innerHTML=rows.map(fineCardHtml).join('');
 }
 // ── Fine modal ──
 let editFineId=null;
@@ -7399,7 +7520,7 @@ const RT_TABLES={
   covase_accounts:()=>loadAccounts(),
   covase_contacts:()=>loadContacts(),
   covase_vehicles:()=>loadVehicles(),
-  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadHireCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();loadMovementTemplate();loadOffhireTemplate();}
+  covase_config:()=>{loadBookingTemplate();loadAgentInstructions();loadMovementCardLayout();loadHireCardLayout();loadFineCardLayout();loadSidebarLayout();loadTheme();loadFontOverrides();loadFineTemplates();loadFineDash();loadMovementTemplate();loadOffhireTemplate();}
 };
 let _rtTimers={};
 function rtIndicator(on,msg){
@@ -7570,7 +7691,7 @@ loadAccounts();
 // Load the shared supplier booking email template (falls back to default if unset)
 loadBookingTemplate();
 // Load the shared card layouts (drag-and-drop designers; fall back to defaults)
-loadMovementCardLayout();loadHireCardLayout();
+loadMovementCardLayout();loadHireCardLayout();loadFineCardLayout();
 // Load the movement request email template
 loadMovementTemplate();loadOffhireTemplate();
 // Prime the supplier-replies review-queue badge
