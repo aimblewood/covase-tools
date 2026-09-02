@@ -820,6 +820,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       </select>
       <div class="seg" id="fine-view-seg">
         <button class="seg-btn active" data-fv="register" onclick="setFineView('register')">Register</button>
+        <button class="seg-btn" data-fv="kanban" onclick="setFineView('kanban')">Kanban</button>
         <button class="seg-btn" data-fv="dashboard" onclick="setFineView('dashboard')">Dashboard</button>
         <button class="seg-btn" data-fv="reports" onclick="setFineView('reports')">Reports</button>
       </div>
@@ -838,6 +839,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     </div>
     <div class="content">
       <div class="card-list" id="fines-register"></div>
+      <div id="fines-kanban" class="kanban" style="display:none;grid-template-columns:repeat(4,1fr)"></div>
       <div id="fines-dashboard" style="display:none"></div>
       <div id="fines-reports" style="display:none"></div>
     </div>
@@ -6641,7 +6643,7 @@ function updateFineStats(){
   const b=document.getElementById('badge-fines');if(b)b.textContent=String(open.length||0);
 }
 function applyFineViewVis(){
-  const m={'register':'fines-register','dashboard':'fines-dashboard','reports':'fines-reports'};
+  const m={'register':'fines-register','kanban':'fines-kanban','dashboard':'fines-dashboard','reports':'fines-reports'};
   Object.entries(m).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.style.display=fineView===k?'':'none';});
 }
 function setFineView(v){fineView=v;document.querySelectorAll('#fine-view-seg .seg-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-fv')===v));applyFineViewVis();renderFinesView();}
@@ -6675,6 +6677,7 @@ function renderFinesView(){
   if(so&&!so.dataset.init){so.dataset.init='1';const saved=localStorage.getItem('covase_fine_sort');if(saved&&[...so.options].some(o=>o.value===saved))so.value=saved;}
   if(fineView==='dashboard')renderFinesDashboard();
   else if(fineView==='reports')renderFinesReports();
+  else if(fineView==='kanban')renderFinesKanban();
   else renderFinesRegister();
 }
 function fineStatusBadge(s){const cls={new:'badge-requested',driver_notified:'badge-booked',address_requested:'badge-ordered',nominated:'badge-booked',on_coin:'badge-invoiced',to_be_charged:'badge-ordered',charged:'badge-paid',query:'badge-cancelled',appeal_upheld:'badge-active',refunded:'badge-paid',cancelled:'badge-cancelled'}[s]||'badge-unknown';return '<span class="badge '+cls+'">'+esc(FINE_STATUS_LABEL[s]||s)+'</span>';}
@@ -6752,6 +6755,50 @@ function renderFinesRegister(){
   const rows=finesFiltered();
   if(!rows.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-title">No fines'+((allFines||[]).length?' match':' yet')+'</div><div class="empty-sub">Import a COIN file or add a fine manually.</div></div>';return;}
   el.innerHTML=rows.map(fineCardHtml).join('');
+}
+// ── Fines kanban: workflow lanes + drag to change status + per-card advance ──
+const FINE_KAN_MAIN=['new','driver_notified','address_requested','nominated','on_coin','to_be_charged','charged'];
+const FINE_KAN_PARKED=['query','appeal_upheld','refunded','cancelled'];
+const FINE_NEXT={new:'driver_notified',driver_notified:'address_requested',address_requested:'nominated',nominated:'on_coin',on_coin:'to_be_charged',to_be_charged:'charged'};
+let fineKanDragId=null;
+function fineKanCard(f){
+  const next=FINE_NEXT[f.status];
+  const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();fineSetStatus('${esc(f.id)}','${next}')" title="Move to ${esc(FINE_STATUS_LABEL[next])}">→ ${esc(FINE_STATUS_LABEL[next])}</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="fineKanDragStart(event,'${esc(f.id)}')" ondragend="fineKanDragEnd(event)">${fineCardHtml(f)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+}
+function renderFinesKanban(){
+  const wrap=document.getElementById('fines-kanban');if(!wrap)return;
+  const rows=finesFiltered();
+  const buckets={};rows.forEach(f=>{(buckets[f.status]=buckets[f.status]||[]).push(f);});
+  const col=(s,extra)=>{
+    const items=buckets[s]||[];
+    return `<div class="kan-col${extra||''}" ondragover="fineKanAllow(event)" ondragleave="fineKanLeave(event)" ondrop="fineKanDrop(event,'${s}')">
+      <div class="kan-col-header"><span class="kan-col-title">${esc(FINE_STATUS_LABEL[s]||s)}</span><span class="kan-col-count">${items.length}</span></div>
+      <div class="kan-col-body">${items.map(fineKanCard).join('')||'<div style="font-size:11px;color:var(--n300);text-align:center;padding:14px 0">—</div>'}</div>
+    </div>`;
+  };
+  let out=FINE_KAN_MAIN.map(s=>col(s)).join('');
+  const parkedCount=FINE_KAN_PARKED.reduce((n,s)=>n+(buckets[s]||[]).length,0);
+  out+=`<div style="grid-column:1/-1;margin-top:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px">${FINE_KAN_PARKED.map(s=>col(s)).join('')}</div>`;
+  wrap.innerHTML=out;
+}
+function fineKanDragStart(e,id){fineKanDragId=id;try{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';}catch(_){}}
+function fineKanDragEnd(e){fineKanDragId=null;document.querySelectorAll('#fines-kanban .kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));}
+function fineKanAllow(e){e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}const c=e.currentTarget;if(c&&c.classList)c.classList.add('mvkan-over');}
+function fineKanLeave(e){const c=e.currentTarget;if(c&&c.classList)c.classList.remove('mvkan-over');}
+async function fineKanDrop(e,status){e.preventDefault();document.querySelectorAll('#fines-kanban .kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));const id=fineKanDragId;fineKanDragId=null;if(!id)return;await fineSetStatus(id,status);}
+async function fineSetStatus(id,status){
+  const f=(allFines||[]).find(x=>x.id===id);if(!f||f.status===status)return;
+  const prev=f.status;const now=new Date().toISOString();
+  const patch={status:status,updated_at:now};
+  // Landing in a milestone stamps its date if not already set (mirrors the modal flows)
+  if(status==='driver_notified'&&!f.driver_notified_at)patch.driver_notified_at=now;
+  if(status==='address_requested'&&!f.address_requested_at)patch.address_requested_at=now;
+  if(status==='nominated'&&!f.nominated_at)patch.nominated_at=now;
+  Object.assign(f,patch);
+  renderFinesView();updateFineStats();
+  try{await sbReq('covase_fines?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:patch,prefer:'return=minimal'});toast('Moved to '+(FINE_STATUS_LABEL[status]||status),'success');}
+  catch(e2){f.status=prev;renderFinesView();updateFineStats();toast('Update failed: '+e2.message,'error');}
 }
 // ── Fine modal ──
 let editFineId=null;
