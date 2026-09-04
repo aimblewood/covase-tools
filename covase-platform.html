@@ -3075,7 +3075,17 @@ async function markHireRecharged(hireId){
 
 // ─── HIRES ───
 let allHires=[],hiresLoaded=false,hireStatusFilter='all';
-function daysOn(h){if(!h.start_date)return null;const end=h.end_date?new Date(h.end_date):new Date();return Math.max(0,Math.round((end-new Date(h.start_date))/86400000));}
+// Days actually on hire TO DATE: 0 before the start date; start→today while
+// running; start→end once finished. (Planned duration is a different number.)
+function daysOn(h){
+  if(!h.start_date)return null;
+  const start=new Date(h.start_date),today=new Date();
+  if(start>today)return 0; // not started yet
+  const end=h.end_date&&new Date(h.end_date)<today?new Date(h.end_date):today;
+  return Math.max(0,Math.round((end-start)/86400000));
+}
+// Planned duration (start→end) — what a future booking is FOR, not time elapsed
+function daysPlanned(h){if(!h.start_date||!h.end_date)return null;return Math.max(0,Math.round((new Date(h.end_date)-new Date(h.start_date))/86400000));}
 function fmtMoney(n){if(n==null||isNaN(n))return'—';return'£'+parseFloat(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtD(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-GB');}
 async function loadHires(){
@@ -3284,7 +3294,15 @@ const HIRE_CARD_FIELDS=[
   {key:'start_date',label:'Start date',get:h=>h.start_date?fmtD(h.start_date):''},
   {key:'end_date',label:'End date',get:h=>h.end_date?fmtD(h.end_date):''},
   {key:'dates',label:'Dates (start → end)',get:h=>(h.start_date?fmtD(h.start_date):'?')+' → '+(h.end_date?fmtD(h.end_date):'ongoing')},
-  {key:'days_on',label:'Days on hire',get:h=>{const d=daysOn(h);return d!=null?d+'d on hire':'—';}},
+  {key:'days_on',label:'Days on hire',get:h=>{
+    if(h.start_date&&new Date(h.start_date)>new Date()){
+      const inD=Math.ceil((new Date(h.start_date)-new Date())/86400000);
+      const plan=daysPlanned(h);
+      return 'Starts in '+inD+'d'+(plan?' ('+plan+'d hire)':'');
+    }
+    const d=daysOn(h);return d!=null?d+'d on hire':'—';
+  }},
+  {key:'days_planned',label:'Planned duration',get:h=>{const p=daysPlanned(h);return p?p+'d hire':'';}},
   {key:'profit',label:'Profit to date (£)',money:true,get:h=>{const d=daysOn(h);return d!=null?fmtMoney(d*(parseFloat(h.upsell_per_day)||0)+suppUpsellTotal(h)):'—';}},
   {key:'cost_per_day',label:'Cost/day (£)',money:true,get:h=>h.cost_per_day!=null?fmtMoney(parseFloat(h.cost_per_day)):''},
   {key:'upsell_per_day',label:'Upsell/day (£)',money:true,get:h=>h.upsell_per_day!=null?fmtMoney(parseFloat(h.upsell_per_day)):''},
