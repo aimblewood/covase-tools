@@ -778,8 +778,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <button class="filter-pill active" onclick="setMovementFilter('all',this)">All</button>
         <button class="filter-pill" onclick="setMovementFilter('quoted',this)">Quoted</button>
         <button class="filter-pill" onclick="setMovementFilter('booked',this)">Booked</button>
-        <button class="filter-pill" onclick="setMovementFilter('in_progress',this)">In progress</button>
-        <button class="filter-pill" onclick="setMovementFilter('completed_pending_fuel',this)">Awaiting fuel</button>
+        <button class="filter-pill" onclick="setMovementFilter('completed_pending_fuel',this)">Awaiting invoice</button>
         <button class="filter-pill" onclick="setMovementFilter('invoiced',this)">Invoiced</button>
         <button class="filter-pill" onclick="setMovementFilter('paid',this)">Paid</button>
       </div>
@@ -819,8 +818,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <option value="">All statuses</option>
       </select>
       <div class="seg" id="fine-view-seg">
-        <button class="seg-btn active" data-fv="register" onclick="setFineView('register')">Register</button>
-        <button class="seg-btn" data-fv="kanban" onclick="setFineView('kanban')">Kanban</button>
+        <button class="seg-btn" data-fv="register" onclick="setFineView('register')">Register</button>
+        <button class="seg-btn active" data-fv="kanban" onclick="setFineView('kanban')">Kanban</button>
         <button class="seg-btn" data-fv="dashboard" onclick="setFineView('dashboard')">Dashboard</button>
         <button class="seg-btn" data-fv="reports" onclick="setFineView('reports')">Reports</button>
       </div>
@@ -838,8 +837,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="stat-card stat-red"><div class="stat-label">Queries</div><div class="stat-val" id="sf-query">—</div><div class="stat-sub">parked for review</div></div>
     </div>
     <div class="content">
-      <div class="card-list" id="fines-register"></div>
-      <div id="fines-kanban" class="kanban" style="display:none;grid-template-columns:repeat(4,1fr)"></div>
+      <div class="card-list" id="fines-register" style="display:none"></div>
+      <div id="fines-kanban" class="kanban" style="grid-template-columns:repeat(4,1fr)"></div>
       <div id="fines-dashboard" style="display:none"></div>
       <div id="fines-reports" style="display:none"></div>
     </div>
@@ -1229,7 +1228,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
             <option value="quoted">Quoted</option>
             <option value="booked">Booked</option>
             <option value="in_progress">In progress</option>
-            <option value="completed_pending_fuel">Completed — awaiting fuel</option>
+            <option value="completed_pending_fuel">Completed — awaiting invoice</option>
             <option value="invoiced">Invoiced</option>
             <option value="paid">Paid</option>
             <option value="cancelled">Cancelled</option>
@@ -4470,18 +4469,18 @@ function renderMovementsView(){
 const MV_KANBAN_COLS=[
   {key:'quoted',label:'Quoted'},
   {key:'booked',label:'Booked'},
-  {key:'in_progress',label:'In progress'},
-  {key:'completed_pending_fuel',label:'Awaiting fuel'},
+  {key:'in_progress',label:'In progress',hideEmpty:true}, // lane retired from the flow; only shows if legacy cards still sit in it
+  {key:'completed_pending_fuel',label:'Awaiting invoice'},
   {key:'invoiced',label:'Invoiced'},
   {key:'paid',label:'Paid'}
 ];
-const MV_NEXT={quoted:'booked',booked:'in_progress',in_progress:'completed_pending_fuel',completed_pending_fuel:'invoiced',invoiced:'paid'};
+const MV_NEXT={quoted:'booked',booked:'completed_pending_fuel',in_progress:'completed_pending_fuel',completed_pending_fuel:'invoiced',invoiced:'paid'};
 function renderMovementKanban(){
   const wrap=document.getElementById('movement-kanban');if(!wrap)return;
   const rows=movementRowsFiltered(false);
   const buckets={};MV_KANBAN_COLS.forEach(c=>buckets[c.key]=[]);const cancelled=[];
   rows.forEach(m=>{if(m.movement_status==='cancelled'){cancelled.push(m);return;}(buckets[m.movement_status]||(buckets[m.movement_status]=[])).push(m);});
-  let cols=MV_KANBAN_COLS.map(c=>{
+  let cols=MV_KANBAN_COLS.filter(c=>!c.hideEmpty||(buckets[c.key]||[]).length).map(c=>{
     const items=buckets[c.key]||[];
     const body=items.length?items.map(m=>mvKanCard(m)).join(''):'<div class="kan-col-empty">Nothing here</div>';
     return `<div class="kan-col" ondragover="mvKanAllow(event)" ondragleave="mvKanLeave(event)" ondrop="mvKanDrop(event,'${c.key}')">
@@ -4555,7 +4554,7 @@ function renderMovements(){
 }
 
 // ─── Movement card designer (drag-and-drop; layout shared via covase_config) ───
-function mvStatusLabel(s){const L={quoted:'Quoted',booked:'Booked',in_progress:'In progress',completed_pending_fuel:'Awaiting fuel',invoiced:'Invoiced',paid:'Paid',cancelled:'Cancelled'};return L[s]||s||'';}
+function mvStatusLabel(s){const L={quoted:'Quoted',booked:'Booked',in_progress:'In progress',completed_pending_fuel:'Awaiting invoice',invoiced:'Invoiced',paid:'Paid',cancelled:'Cancelled'};return L[s]||s||'';}
 const MV_CARD_FIELDS=[
   {key:'customer',label:'Customer',get:m=>m.customer||'—'},
   {key:'customer_reference',label:'Customer ref',get:m=>m.customer_reference||''},
@@ -6616,7 +6615,7 @@ async function importClaimsFile(file){
 // Register of motoring fines (Lex notifications → driver comms → nomination →
 // COIN reconciliation → WT-sheet export → charging/appeals). Templates +
 // dashboard config in covase_config; COIN import parses Lex's xlsx client-side.
-let allFines=[],finesLoaded=false,fineView='register',fineDashCfg=null;
+let allFines=[],finesLoaded=false,fineView='kanban',fineDashCfg=null;
 const FINE_STATUSES=[['new','New'],['driver_notified','Driver notified'],['address_requested','Address requested'],['nominated','Nominated'],['on_coin','On COIN'],['to_be_charged','To be charged'],['charged','Charged'],['query','Query (parked)'],['appeal_upheld','Appeal upheld'],['refunded','Refunded'],['cancelled','Cancelled']];
 const FINE_STATUS_LABEL=Object.fromEntries(FINE_STATUSES);
 const FINE_OFFENCE_LABEL={parking:'Parking',speeding:'Speeding',toll:'Toll violation',congestion:'Congestion charge',bus_lane:'Bus lane violation',route:'Route restriction',other:'Other'};
