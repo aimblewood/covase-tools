@@ -1503,6 +1503,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Issuer</label><input id="ff-issuer" placeholder="e.g. Parking Eye Ltd"></div>
         <div class="form-field"><label>Issuer ref</label><input id="ff-ref" placeholder="559900/789997"></div>
         <div class="form-field"><label>Issuer portal URL</label><input id="ff-portal" placeholder="https:// (for nominations/appeals)"></div>
+        <div class="form-field"><label>PIN <span style="font-weight:400;color:var(--n400)">(speeding/NoIP — for online nomination)</span></label><input id="ff-pin" placeholder="Code printed on the notice"></div>
       </div>
       <div class="form-row trio">
         <div class="form-field" style="grid-column:1/3"><label>Location</label><input id="ff-location" placeholder="Royal Bolton Hospital - Chadwick"></div>
@@ -6035,7 +6036,7 @@ function updateBadges(){
   setBadge('badge-contacts',(typeof allContacts!=='undefined'?(allContacts||[]):[]).filter(c=>c.employee_status==='employed').length);
   setBadge('badge-vehicles',(typeof allVehicles!=='undefined'?(allVehicles||[]):[]).filter(v=>v.status==='active').length);
   setBadge('badge-claims',(typeof allClaims!=='undefined'?(allClaims||[]):[]).filter(c=>{try{return claimOpen(c);}catch(e){return false;}}).length);
-  setBadge('badge-fines',(typeof allFines!=='undefined'?(allFines||[]):[]).filter(f=>{try{return FINE_OPEN(f.status);}catch(e){return false;}}).length);
+  setBadge('badge-fines',(typeof allFines!=='undefined'?(allFines||[]):[]).filter(f=>f.status==='new').length);
   setBadge('badge-supplier-replies',(typeof allSupplierReplies!=='undefined'?(allSupplierReplies||[]):[]).length);
   updatePipelineBadge();
 }
@@ -6652,7 +6653,7 @@ function updateFineStats(){
   const q=(allFines||[]).filter(f=>f.status==='query').length;
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   set('sf-open',open.length);set('sf-nom',nom.length);set('sf-cost',fmtMoney(cost||null));set('sf-query',q);
-  const b=document.getElementById('badge-fines');if(b)b.textContent=String(open.length||0);
+  const b=document.getElementById('badge-fines');if(b)b.textContent=String((allFines||[]).filter(f=>f.status==='new').length||0);
 }
 function applyFineViewVis(){
   const m={'register':'fines-register','kanban':'fines-kanban','dashboard':'fines-dashboard','reports':'fines-reports'};
@@ -6710,6 +6711,7 @@ const FINE_CARD_FIELDS=[
   {key:'source',label:'Source',get:f=>({lex:'Lex email',coin:'COIN import',manual:'Manual'}[f.source]||f.source||'')},
   {key:'issuer',label:'Issuer',get:f=>f.issuer||''},
   {key:'issuer_ref',label:'Issuer ref',get:f=>f.issuer_ref||''},
+  {key:'pin',label:'PIN (nomination code)',get:f=>f.pin?'PIN '+f.pin:''},
   {key:'coin_no',label:'COIN invoice no',get:f=>f.coin_invoice_no||''},
   {key:'coin_date',label:'COIN invoice date',get:f=>f.coin_invoice_date?fmtD(String(f.coin_invoice_date).slice(0,10)):''},
   {key:'charge_month',label:'Charge month',get:f=>f.charge_month||''},
@@ -6826,7 +6828,7 @@ function openFineModal(id){
   if(dl)dl.innerHTML=(allContacts||[]).map(c=>'<option value="'+esc(((c.first_name||'')+' '+(c.last_name||'')).trim())+'">').join('');
   const v=(id2,val)=>{const e=document.getElementById(id2);if(e)e.value=val==null?'':val;};
   v('ff-status',f?.status||'new');v('ff-offence',f?.offence_type||'parking');v('ff-class',f?.notice_class||'');
-  v('ff-issuer',f?.issuer);v('ff-ref',f?.issuer_ref);v('ff-portal',f?.issuer_portal);v('ff-location',f?.location);
+  v('ff-issuer',f?.issuer);v('ff-ref',f?.issuer_ref);v('ff-portal',f?.issuer_portal);v('ff-pin',f?.pin);v('ff-location',f?.location);
   v('ff-when',f?.offence_datetime?String(new Date(f.offence_datetime).toISOString()).slice(0,16):'');
   v('ff-reg',f?.vehicle_reg);v('ff-vehdesc',f?.vehicle_desc);v('ff-driver',f?.driver_name);v('ff-client',f?.client_account_id||'');
   v('ff-fine',f?.fine_amount);v('ff-fine-vat',f?.fine_vat);v('ff-admin',f?f.admin_fee:15);v('ff-admin-vat',f?.admin_fee_vat);
@@ -6855,7 +6857,7 @@ function fineFormPayload(){
   const veh=reg?(allVehicles||[]).find(x=>normReg(x.reg)===reg):null;
   return {
     status:g('ff-status')||'new',offence_type:g('ff-offence')||null,notice_class:g('ff-class')||null,
-    issuer:g('ff-issuer').trim()||null,issuer_ref:g('ff-ref').trim()||null,issuer_portal:g('ff-portal').trim()||null,
+    issuer:g('ff-issuer').trim()||null,issuer_ref:g('ff-ref').trim()||null,issuer_portal:g('ff-portal').trim()||null,pin:g('ff-pin').trim()||null,
     location:g('ff-location').trim()||null,
     offence_datetime:g('ff-when')?new Date(g('ff-when')).toISOString():null,
     vehicle_reg:reg,vehicle_desc:g('ff-vehdesc').trim()||null,
@@ -6892,7 +6894,7 @@ async function deleteFine(){
 let _fineEmailKind=null;
 function fineTokens(f){
   const first=(f.driver_name||'').trim().split(/\s+/)[0]||'there';
-  return {firstName:first,driverName:f.driver_name||'',fineAmount:(parseFloat(f.fine_amount)||0).toFixed(2),adminFee:(parseFloat(f.admin_fee)||15).toFixed(2),regNo:f.vehicle_reg||'',vehicleDesc:f.vehicle_desc||'',issuer:f.issuer||'',location:f.location||'',offenceDate:f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',ref:f.issuer_ref||''};
+  return {firstName:first,driverName:f.driver_name||'',fineAmount:(parseFloat(f.fine_amount)||0).toFixed(2),adminFee:(parseFloat(f.admin_fee)||15).toFixed(2),regNo:f.vehicle_reg||'',vehicleDesc:f.vehicle_desc||'',issuer:f.issuer||'',location:f.location||'',offenceDate:f.offence_datetime?new Date(f.offence_datetime).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',ref:f.issuer_ref||'',pin:f.pin||'',portal:f.issuer_portal||''};
 }
 function fineRender(tpl,t){return String(tpl||'').replace(/\{(\w+)\}/g,(m,k)=>t[k]!=null?t[k]:'');}
 function fineEmail(kind){
