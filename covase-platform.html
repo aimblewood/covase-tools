@@ -446,7 +446,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .seg-btn.active{background:var(--covase);color:#fff}
 .mv-kan-wrap{position:relative;margin-bottom:8px;cursor:grab}
 .mv-kan-wrap .card{margin:0}
-.mv-kan-actions{display:flex;justify-content:flex-end;margin-top:4px}
+.mv-kan-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:4px}
+.kan-move{background:var(--n50);color:var(--n600);border:1px solid var(--n200);font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-body);min-height:26px;}
+.kan-move:active{background:var(--n100);border-color:var(--n300)}
 .kan-col.mvkan-over{outline:2px dashed var(--covase);outline-offset:-2px}
 .mvcal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .mvcal-title{font-family:var(--font-head);font-weight:700;font-size:15px;color:var(--n800);min-width:150px}
@@ -509,6 +511,93 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .kan-advance.green:hover{background:var(--tl-green-t);color:#fff;}
 .kan-cancel{background:transparent;color:var(--n400);border:1px solid var(--n200);font-size:10px;padding:2px 6px;border-radius:6px;cursor:pointer;}
 .kan-cancel:hover{color:var(--tl-red-t);border-color:var(--tl-red);}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet & phone  (iPhone / iPad)
+   ≤1024px : sidebar becomes an off-canvas drawer, kanban lanes swipe
+   ≤700px  : phone layout — stacked rows, full-screen modals, 16px inputs
+   Nothing below this comment affects the desktop layout.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Injected into every .topbar by initResponsiveNav(); hidden on desktop */
+.nav-toggle{display:none;width:38px;height:38px;flex:0 0 38px;align-items:center;justify-content:center;border:1px solid var(--n200);background:var(--n50);color:var(--n600);border-radius:9px;font-size:15px;cursor:pointer;font-family:var(--font-body);-webkit-tap-highlight-color:transparent;}
+.nav-toggle:active{background:var(--n100);border-color:var(--n300)}
+.nav-scrim{display:none;position:fixed;inset:0;background:rgba(36,34,84,.45);z-index:45;opacity:0;pointer-events:none;transition:opacity .22s ease;}
+
+@media(max-width:1024px){
+  .nav-toggle{display:flex}
+  .nav-scrim{display:block}
+  body.nav-open .nav-scrim{opacity:1;pointer-events:auto}
+  .sidebar{width:min(var(--sidebar-w),84vw);height:100dvh;transform:translateX(-100%);transition:transform .22s ease;will-change:transform;}
+  body.nav-open .sidebar{transform:none;box-shadow:0 0 44px rgba(0,0,0,.4)}
+  .main{margin-left:0;min-width:0}
+  body{min-height:100dvh}
+
+  /* Kanban: swipeable lanes instead of crushed columns.
+     display:flex also neutralises the inline/JS-set grid-template-columns
+     on #fines-kanban, #claims-kanban and renderClaimsKanban(). */
+  .kanban{display:flex;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding-bottom:10px;scroll-padding-left:2px;}
+  .kanban>.kan-col{flex:0 0 min(78vw,290px);scroll-snap-align:start;max-height:calc(100dvh - 200px);}
+
+  /* Toolbars carry search + filters + sort + actions; without wrapping they
+     push the page ~1110px wide even on iPad landscape. */
+  .topbar{flex-wrap:wrap;row-gap:8px}
+  .topbar > div{flex-wrap:wrap;row-gap:6px}
+  .topbar h1{flex:1 1 auto;min-width:110px}
+  .content{padding:0 18px 34px}
+}
+
+@media(max-width:700px){
+  .topbar{padding:10px 14px;gap:8px;row-gap:6px}
+  .topbar h1{font-size:16px}
+  .content{padding:0 14px 34px}
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+
+  /* Collapsed list rows: title spans full width, cells sit 2-up,
+     the expand arrow stays pinned to the top-right. */
+  .hire-header,.inv-header,.account-header,.contact-header,.vehicle-header{
+    grid-template-columns:1fr 1fr auto;align-items:start;gap:9px 10px;padding:12px 14px;}
+  .hire-header > :first-child,.inv-header > :first-child,.account-header > :first-child,
+  .contact-header > :first-child,.vehicle-header > :first-child{grid-column:1/3}
+  .hire-header > .expand-arrow,.inv-header > .expand-arrow,.account-header > .expand-arrow,
+  .contact-header > .expand-arrow,.vehicle-header > .expand-arrow{grid-column:3;grid-row:1;align-self:center}
+
+  .detail-grid,.detail-grid-4,.clm-detail-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .form-row,.form-row.trio,.form-row.quad,.reconcile-grid{grid-template-columns:1fr}
+
+  /* Modals fill the screen — 720px in a 393px viewport is unreadable */
+  .modal-overlay{align-items:stretch;justify-content:stretch;backdrop-filter:none}
+  .modal,.modal.wide{width:100%;max-width:100%;height:100dvh;max-height:100dvh;border-radius:0}
+  .modal-header{padding:14px 16px 12px}
+  .modal-body{padding:16px 16px 20px}
+  .modal-footer{padding:12px 16px;flex-wrap:wrap;gap:8px}
+  .modal-footer > *{flex:1 1 auto;justify-content:center}
+  .modal-tabs{padding:0 12px;overflow-x:auto;top:53px;scrollbar-width:none}
+  .modal-tabs::-webkit-scrollbar{display:none}
+
+  /* iOS auto-zooms any focused field under 16px — this stops the jump */
+  input,select,textarea{font-size:16px}
+
+  /* Touch targets (Apple minimum is 44px; 36-38 with padding is the practical floor here) */
+  .modal-close{width:38px;height:38px;font-size:15px}
+  .topbar-btn,.filter-pill{min-height:36px}
+  .sb-item{padding:12px 20px;font-size:14px}
+  .sb-new-btn{padding:11px 14px}
+
+  .mvcal-grid{gap:3px;font-size:10px}
+  .kanban > .kan-col{flex-basis:min(84vw,290px);max-height:calc(100dvh - 168px)}
+}
+
+/* Tap-to-move sheet (touch devices — HTML5 drag-and-drop does not fire on iOS) */
+.tapmove-sheet{position:fixed;inset:0;z-index:210;display:none;align-items:flex-end;justify-content:center;background:rgba(36,34,84,.45);}
+.tapmove-sheet.open{display:flex}
+.tapmove-panel{background:var(--card);width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:8px 0 max(10px,env(safe-area-inset-bottom));box-shadow:0 -8px 40px rgba(36,34,84,.28);max-height:78dvh;overflow-y:auto;}
+.tapmove-title{font-family:var(--font-head);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--n500);padding:12px 20px 8px;}
+.tapmove-opt{display:flex;align-items:center;gap:10px;padding:14px 20px;font-size:14px;font-weight:600;color:var(--n700);cursor:pointer;border-top:1px solid var(--n100);-webkit-tap-highlight-color:transparent;}
+.tapmove-opt:active{background:var(--n50)}
+.tapmove-opt.current{color:var(--n400);font-weight:500}
+.tapmove-opt.current::after{content:'current';margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n300)}
+.tapmove-cancel{padding:14px 20px;text-align:center;font-size:13px;font-weight:700;color:var(--n500);cursor:pointer;border-top:1px solid var(--n200);}
 </style>
 </head>
 <body>
@@ -4496,7 +4585,8 @@ function renderMovementKanban(){
 function mvKanCard(m){
   const next=MV_NEXT[m.movement_status];
   const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();mvAdvance('${esc(m.id)}')" title="Move to ${esc(mvStatusLabel(next))}">→ ${esc(mvStatusLabel(next))}</button>`:'';
-  return `<div class="mv-kan-wrap" draggable="true" ondragstart="mvKanDragStart(event,'${esc(m.id)}')" ondragend="mvKanDragEnd(event)">${movementCard(m)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+  const mvMoveBtn=IS_TOUCH?`<button type="button" class="kan-move" onclick="openTapMove(event,'mv','${esc(m.id)}')" title="Move to another lane">⇄ Move</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="mvKanDragStart(event,'${esc(m.id)}')" ondragend="mvKanDragEnd(event)">${movementCard(m)}${(advBtn||mvMoveBtn)?`<div class="mv-kan-actions">${mvMoveBtn}${advBtn}</div>`:''}</div>`;
 }
 function mvKanDragStart(e,id){mvKanDragId=id;try{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';}catch(_){}}
 function mvKanDragEnd(e){mvKanDragId=null;document.querySelectorAll('.kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));}
@@ -6778,7 +6868,8 @@ let fineKanDragId=null;
 function fineKanCard(f){
   const next=FINE_NEXT[f.status];
   const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();fineSetStatus('${esc(f.id)}','${next}')" title="Move to ${esc(FINE_STATUS_LABEL[next])}">→ ${esc(FINE_STATUS_LABEL[next])}</button>`:'';
-  return `<div class="mv-kan-wrap" draggable="true" ondragstart="fineKanDragStart(event,'${esc(f.id)}')" ondragend="fineKanDragEnd(event)">${fineCardHtml(f)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+  const fnMoveBtn=IS_TOUCH?`<button type="button" class="kan-move" onclick="openTapMove(event,'fine','${esc(f.id)}')" title="Move to another lane">⇄ Move</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="fineKanDragStart(event,'${esc(f.id)}')" ondragend="fineKanDragEnd(event)">${fineCardHtml(f)}${(advBtn||fnMoveBtn)?`<div class="mv-kan-actions">${fnMoveBtn}${advBtn}</div>`:''}</div>`;
 }
 function renderFinesKanban(){
   const wrap=document.getElementById('fines-kanban');if(!wrap)return;
@@ -7780,6 +7871,108 @@ loadTheme();
 // Element-level style overrides (Edit mode) + listeners
 loadFontOverrides();
 initEditMode();
+
+// ═══════════════════════════════════════════════════════════════════
+// RESPONSIVE / TOUCH  (iPhone / iPad)
+// Desktop behaviour is untouched: every branch below is gated on
+// IS_TOUCH or on the ≤1024px breakpoint.
+// ═══════════════════════════════════════════════════════════════════
+
+// Coarse pointer with no hover = phone/tablet. iOS Safari never fires
+// HTML5 drag events, so these devices get the tap-to-move sheet instead.
+// matchMedia is authoritative where present: a touchscreen laptop reports
+// hover:hover and keeps the desktop drag behaviour.
+const IS_TOUCH = window.matchMedia
+  ? window.matchMedia('(hover:none) and (pointer:coarse)').matches
+  : ('ontouchstart' in window && (navigator.maxTouchPoints||0) > 0);
+
+// ── Off-canvas sidebar ──────────────────────────────────────────────
+function setNav(open){
+  document.body.classList.toggle('nav-open', !!open);
+  document.querySelectorAll('.nav-toggle').forEach(b=>b.setAttribute('aria-expanded', open?'true':'false'));
+}
+function toggleNav(){ setNav(!document.body.classList.contains('nav-open')); }
+
+function initResponsiveNav(){
+  // One hamburger per view topbar — views are static markup, so this runs once.
+  document.querySelectorAll('.topbar').forEach(tb=>{
+    if(tb.querySelector('.nav-toggle')) return;
+    const b=document.createElement('button');
+    b.type='button'; b.className='nav-toggle'; b.innerHTML='☰';
+    b.setAttribute('aria-label','Menu'); b.setAttribute('aria-expanded','false');
+    b.onclick=e=>{e.stopPropagation();toggleNav();};
+    tb.insertBefore(b, tb.firstChild);
+  });
+  // Scrim closes the drawer
+  if(!document.querySelector('.nav-scrim')){
+    const sc=document.createElement('div');
+    sc.className='nav-scrim';
+    sc.onclick=()=>setNav(false);
+    document.body.appendChild(sc);
+  }
+  // Picking a destination closes the drawer. Delegated, because the sidebar
+  // is re-rendered by the organiser (loadSidebarLayout).
+  const sb=document.querySelector('.sidebar');
+  if(sb && !sb.dataset.navBound){
+    sb.dataset.navBound='1';
+    sb.addEventListener('click', e=>{
+      if(e.target.closest('.sb-item') && !e.target.closest('.sb-item').classList.contains('disabled')) setNav(false);
+    });
+  }
+  // Escape closes it; widening past the breakpoint resets state
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') setNav(false); });
+  if(window.matchMedia) window.matchMedia('(max-width:1024px)').addEventListener('change', ev=>{ if(!ev.matches) setNav(false); });
+}
+
+// ── Tap-to-move sheet (replaces drag on touch) ──────────────────────
+let tapMoveCtx=null;
+
+function openTapMove(e,kind,id){
+  if(e){e.stopPropagation();e.preventDefault();}
+  let title,lanes,current,apply;
+  if(kind==='mv'){
+    const m=(allMovements||[]).find(x=>x.id===id); if(!m) return;
+    current=m.movement_status;
+    // 'in_progress' is retired — only offer it if the card is already sitting there
+    lanes=MV_KANBAN_COLS.filter(c=>c.key!=='in_progress'||current==='in_progress')
+                        .map(c=>({key:c.key,label:c.label}));
+    title='Move movement to'; apply=mvSetStatus;
+  }else{
+    const f=(allFines||[]).find(x=>x.id===id); if(!f) return;
+    current=f.status;
+    lanes=FINE_KAN_MAIN.concat(FINE_KAN_PARKED).map(k=>({key:k,label:FINE_STATUS_LABEL[k]||k}));
+    title='Move fine to'; apply=fineSetStatus;
+  }
+  tapMoveCtx={id,apply};
+  let sheet=document.getElementById('tapmove-sheet');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.id='tapmove-sheet'; sheet.className='tapmove-sheet';
+    sheet.addEventListener('click',ev=>{ if(ev.target===sheet) closeTapMove(); });
+    document.body.appendChild(sheet);
+  }
+  sheet.innerHTML='<div class="tapmove-panel">'
+    +'<div class="tapmove-title">'+esc(title)+'</div>'
+    + lanes.map(l=>l.key===current
+        ? '<div class="tapmove-opt current">'+esc(l.label)+'</div>'
+        : '<div class="tapmove-opt" onclick="tapMoveApply(\''+l.key+'\')">'+esc(l.label)+'</div>').join('')
+    +'<div class="tapmove-cancel" onclick="closeTapMove()">Cancel</div>'
+    +'</div>';
+  sheet.classList.add('open');
+}
+function closeTapMove(){
+  const sheet=document.getElementById('tapmove-sheet');
+  if(sheet) sheet.classList.remove('open');
+  tapMoveCtx=null;
+}
+async function tapMoveApply(status){
+  const ctx=tapMoveCtx; closeTapMove();
+  if(!ctx) return;
+  await ctx.apply(ctx.id,status);   // same code path drag-and-drop uses
+}
+
+// Mobile/tablet chrome: hamburger + off-canvas sidebar + tap-to-move
+initResponsiveNav();
 </script>
 </body>
 </html>
