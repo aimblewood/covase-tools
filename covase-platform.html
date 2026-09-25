@@ -1088,8 +1088,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Address line 1</label><input id="hf-addr1" placeholder="Street / building"></div>
         <div class="form-field"><label>Address line 2</label><input id="hf-addr2" placeholder="(optional)"></div>
       </div>
-      <div class="form-row">
+      <div class="form-row trio">
         <div class="form-field"><label>Town / city</label><input id="hf-town" placeholder=""></div>
+        <div class="form-field"><label>County</label><input id="hf-county" placeholder=""></div>
         <div class="form-field"><label>Postcode</label><input id="hf-postcode" placeholder="" style="text-transform:uppercase"></div>
       </div>
       <div class="form-row">
@@ -2546,17 +2547,19 @@ function prefillDeliveryFromDynamics(d){
   const line1=pick('address1','addressLine1','address1_line1','street','streetAddress');
   const line2=pick('address2','addressLine2','address1_line2','address1_line3');
   const town =pick('town','city','address1_city');
+  const cnty =pick('county','address1_stateorprovince','stateOrProvince','state','address1_county');
   const post =pick('postcode','postCode','postal_code','address1_postalcode','zip');
   const mob  =pick('mobile','mobilePhone','mobilephone','phone','telephone1');
   // Only overwrite fields we have data for — preserves anything user already typed
   if(line1)document.getElementById('hf-addr1').value=line1;
   if(line2)document.getElementById('hf-addr2').value=line2;
   if(town) document.getElementById('hf-town').value=town;
+  if(cnty) document.getElementById('hf-county').value=cnty;
   if(post) document.getElementById('hf-postcode').value=post.toUpperCase();
   if(mob)  document.getElementById('hf-mobile').value=mob;
   // Visual cue
   const tag=document.getElementById('hf-delivery-source');
-  if(tag&&(line1||town||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
+  if(tag&&(line1||town||cnty||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
 }
 // Resolve the account a Dynamics-matched driver should belong to: prefer the
 // Dynamics parent account (if it exists in Covase), else the customer picked on
@@ -3396,6 +3399,7 @@ const HIRE_CARD_FIELDS=[
   {key:'fuel_type',label:'Fuel',get:h=>h.fuel_type||''},
   {key:'tariff',label:'Tariff',get:h=>h.tariff||''},
   {key:'delivery_town',label:'Delivery town',get:h=>h.delivery_town||''},
+  {key:'delivery_county',label:'Delivery county',get:h=>h.delivery_county||''},
   {key:'delivery_postcode',label:'Delivery postcode',get:h=>h.delivery_postcode||''},
   {key:'collection',label:'Collection (offhire)',get:h=>h.collection_date?fmtD(h.collection_date)+(h.collection_time?' '+String(h.collection_time).slice(0,5):''):''},
   {key:'preferred_start_time',label:'Preferred start time',get:h=>h.preferred_start_time?String(h.preferred_start_time).slice(0,5):''},
@@ -3404,7 +3408,7 @@ const HIRE_CARD_FIELDS=[
 const HIRE_FIELD_MAP=Object.fromEntries(HIRE_CARD_FIELDS.map(f=>[f.key,f]));
 const DEFAULT_HIRE_CARD_LAYOUT={title:['customer'],lines:[['driver'],['reg_make'],['reference']],right:['days_on','profit']};
 let hireCardLayout=null; // null → default layout (matches the original card)
-const HIRECD_SAMPLE={id:'sample',customer:'Woodland Trust',driver:'Jane Doe',driver_mobile:'07700 900123',vehicle_reg:'AB12 CDE',make_model:'Nissan Juke',reference:'FVSL048267',job_ref:'CVB-0042',supplier:'Fourways',hire_status:'active',billing_status:'pending',start_date:'2026-08-10',end_date:null,cost_per_day:28.5,upsell_per_day:6,rft_per_day:2.5,category:'CAR3A',fuel_type:'Petrol',delivery_town:'Grantham',delivery_postcode:'NG31 6PZ',supplementaries:[]};
+const HIRECD_SAMPLE={id:'sample',customer:'Woodland Trust',driver:'Jane Doe',driver_mobile:'07700 900123',vehicle_reg:'AB12 CDE',make_model:'Nissan Juke',reference:'FVSL048267',job_ref:'CVB-0042',supplier:'Fourways',hire_status:'active',billing_status:'pending',start_date:'2026-08-10',end_date:null,cost_per_day:28.5,upsell_per_day:6,rft_per_day:2.5,category:'CAR3A',fuel_type:'Petrol',delivery_town:'Grantham',delivery_county:'Lincolnshire',delivery_postcode:'NG31 6PZ',supplementaries:[]};
 async function loadHireCardLayout(){
   try{
     const rows=await sbReq('covase_config?key=eq.hire_card_layout&select=value');
@@ -3580,7 +3584,7 @@ function buildHireCard(h){
         <div><span>Total sell</span><strong>${fmtMoney(totalSell)}</strong></div>
         <div><span>Margin</span><strong class="${pClass}">${fmtMoney(margin)}</strong></div>
       </div>
-      ${(h.delivery_address_line1||h.delivery_town||h.delivery_postcode)?`<div class="notes-box">📍 Deliver to: ${[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).map(esc).join(', ')}</div>`:''}
+      ${(h.delivery_address_line1||h.delivery_town||h.delivery_county||h.delivery_postcode)?`<div class="notes-box">📍 Deliver to: ${[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).map(esc).join(', ')}</div>`:''}
       ${Array.isArray(h.supplementaries)&&h.supplementaries.length?`<div class="notes-box">📎 Supplementary: cost ${fmtMoney(suppC)} + upsell ${fmtMoney(suppU)} — ${h.supplementaries.map(s=>{const c=parseFloat(s.cost_amount!=null?s.cost_amount:s.amount)||0;const u=parseFloat(s.upsell_amount)||0;return esc(s.type)+' £'+c.toFixed(2)+(u?'+£'+u.toFixed(2)+' upsell':'')+(s.vat_status==='outside_of_scope'?' (OoS)':'');}).join(', ')}</div>`:''}
       ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
       ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Supplier invoice: <span style="color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
@@ -3649,7 +3653,7 @@ function openEditHire(id){
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-county',h.delivery_county);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   // Driver FK + Dynamics id (if contact exists with dynamics_id)
   f('hf-driver-contact-id',h.driver_contact_id||'');
   const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
@@ -3674,7 +3678,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-county','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -3764,7 +3768,7 @@ async function saveHire(){
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_county:document.getElementById('hf-county').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
@@ -3819,8 +3823,8 @@ function openSendSupplier(){
   document.getElementById('send-supplier-modal').classList.add('open');
 }
 function hireEmailTokens(h,acc,notes){
-  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
-  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
+  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).join(', ');
+  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
 }
 // Render the template into the editable subject/body. Typing in the body sets
 // ssDirty so note edits stop clobbering manual work; ↻ link forces a rebuild.
@@ -3891,7 +3895,7 @@ function openOffhire(){
   const warn=document.getElementById('oh-warn'),btn=document.getElementById('oh-send-btn');
   if(!email){warn.style.display='';warn.textContent=acc?('No booking email on "'+acc.company_name+'" — add one in CRM → Accounts.'):'Pick a supplier on the booking first.';btn.disabled=true;btn.style.opacity='0.5';}
   else{warn.style.display='none';btn.disabled=false;btn.style.opacity='';}
-  const delAddr=[h.delivery_address_line1,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
+  const delAddr=[h.delivery_address_line1,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).join(', ');
   document.getElementById('oh-delivery-addr').textContent=delAddr||'no delivery address on record';
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   // Prefill: saved collection details first, else delivery address; contact defaults to the driver
@@ -3899,7 +3903,7 @@ function openOffhire(){
   set('mv-offhire-addr1',h.collection_address_line1||h.delivery_address_line1);
   set('mv-offhire-addr2',h.collection_address_line2||h.delivery_address_line2);
   set('mv-offhire-town',h.collection_town||h.delivery_town);
-  set('mv-offhire-county',h.collection_county);
+  set('mv-offhire-county',h.collection_county||h.delivery_county);
   set('mv-offhire-postcode',h.collection_postcode||h.delivery_postcode);
   // Same-as-delivery unless a different collection address was previously saved
   const differs=h.collection_postcode&&h.delivery_postcode&&String(h.collection_postcode).replace(/\s/g,'').toUpperCase()!==String(h.delivery_postcode).replace(/\s/g,'').toUpperCase();
@@ -3918,7 +3922,7 @@ function ohTokens(){
   const g=id=>(document.getElementById(id)?.value||'').trim();
   const same=document.getElementById('oh-same').checked;
   const col=same
-    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:'',pc:h.delivery_postcode||''}
+    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',pc:h.delivery_postcode||''}
     :{l1:g('mv-offhire-addr1'),l2:g('mv-offhire-addr2'),town:g('mv-offhire-town'),county:g('mv-offhire-county'),pc:g('mv-offhire-postcode').toUpperCase()};
   return {h:h,acc:acc,col:col,colDate:g('oh-date'),colTime:g('oh-time'),tokens:{
     supplierName:acc?(acc.company_name||''):'',customer:h.customer||'',driver:h.driver||'',
@@ -3980,7 +3984,7 @@ const ET_FIELD_GROUPS=[
   {g:'Driver',f:[['driver','Driver name'],['driverMobile','Driver mobile']]},
   {g:'Dates',f:[['startDate','Start date'],['endDate','End date (blank shows TBC)'],['tariff','Tariff (duration band)'],['preferredStartTime','Preferred delivery time']]},
   {g:'Vehicle',f:[['vehicleReg','Registration'],['vehicleMakeModel','Make / model'],['category','Category'],['fuelType','Fuel type'],['dateOfRegistration','Date of registration'],['engineCc','Engine (cc)'],['co2','CO2 (g/km)'],['p11d','P11D value']]},
-  {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['postcode','Postcode']]},
+  {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['county','County'],['postcode','Postcode']]},
   {g:'Supplier',f:[['supplierName','Supplier name'],['supplierRef','Supplier invoice ref']]},
   {g:'Rates',f:[['costPerDay','Cost/day (supplier)'],['rftPerDay','RFT/day']]},
   {g:'Notes',f:[['hireNotes','Hire notes'],['notes','Note added when sending']]}
@@ -4016,7 +4020,7 @@ function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSave
 function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
 function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
-function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
+function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, East Sussex, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',county:'East Sussex',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
 // Email clients add margins around block elements, so the editor's <div>/<p>
 // per-line output comes out double-spaced. Zero the block margins and turn
 // empty blocks into a single <br> so the email renders like the editor.
@@ -4443,7 +4447,7 @@ async function saveReplacement(){
     driver:old.driver,driver_contact_id:old.driver_contact_id,driver_mobile:old.driver_mobile,
     reference:old.reference,
     delivery_address_line1:old.delivery_address_line1,delivery_address_line2:old.delivery_address_line2,
-    delivery_town:old.delivery_town,delivery_postcode:old.delivery_postcode,
+    delivery_town:old.delivery_town,delivery_county:old.delivery_county,delivery_postcode:old.delivery_postcode,
     supplier:old.supplier,
     preferred_start_time:old.preferred_start_time,
     upsell_per_day:old.upsell_per_day,rft_per_day:old.rft_per_day,
