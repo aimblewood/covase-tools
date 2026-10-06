@@ -446,7 +446,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .seg-btn.active{background:var(--covase);color:#fff}
 .mv-kan-wrap{position:relative;margin-bottom:8px;cursor:grab}
 .mv-kan-wrap .card{margin:0}
-.mv-kan-actions{display:flex;justify-content:flex-end;margin-top:4px}
+.mv-kan-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:4px}
+.kan-move{background:var(--n50);color:var(--n600);border:1px solid var(--n200);font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-body);min-height:26px;}
+.kan-move:active{background:var(--n100);border-color:var(--n300)}
 .kan-col.mvkan-over{outline:2px dashed var(--covase);outline-offset:-2px}
 .mvcal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .mvcal-title{font-family:var(--font-head);font-weight:700;font-size:15px;color:var(--n800);min-width:150px}
@@ -509,6 +511,93 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .kan-advance.green:hover{background:var(--tl-green-t);color:#fff;}
 .kan-cancel{background:transparent;color:var(--n400);border:1px solid var(--n200);font-size:10px;padding:2px 6px;border-radius:6px;cursor:pointer;}
 .kan-cancel:hover{color:var(--tl-red-t);border-color:var(--tl-red);}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet & phone  (iPhone / iPad)
+   ≤1024px : sidebar becomes an off-canvas drawer, kanban lanes swipe
+   ≤700px  : phone layout — stacked rows, full-screen modals, 16px inputs
+   Nothing below this comment affects the desktop layout.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Injected into every .topbar by initResponsiveNav(); hidden on desktop */
+.nav-toggle{display:none;width:38px;height:38px;flex:0 0 38px;align-items:center;justify-content:center;border:1px solid var(--n200);background:var(--n50);color:var(--n600);border-radius:9px;font-size:15px;cursor:pointer;font-family:var(--font-body);-webkit-tap-highlight-color:transparent;}
+.nav-toggle:active{background:var(--n100);border-color:var(--n300)}
+.nav-scrim{display:none;position:fixed;inset:0;background:rgba(36,34,84,.45);z-index:45;opacity:0;pointer-events:none;transition:opacity .22s ease;}
+
+@media(max-width:1024px){
+  .nav-toggle{display:flex}
+  .nav-scrim{display:block}
+  body.nav-open .nav-scrim{opacity:1;pointer-events:auto}
+  .sidebar{width:min(var(--sidebar-w),84vw);height:100dvh;transform:translateX(-100%);transition:transform .22s ease;will-change:transform;}
+  body.nav-open .sidebar{transform:none;box-shadow:0 0 44px rgba(0,0,0,.4)}
+  .main{margin-left:0;min-width:0}
+  body{min-height:100dvh}
+
+  /* Kanban: swipeable lanes instead of crushed columns.
+     display:flex also neutralises the inline/JS-set grid-template-columns
+     on #fines-kanban, #claims-kanban and renderClaimsKanban(). */
+  .kanban{display:flex;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding-bottom:10px;scroll-padding-left:2px;}
+  .kanban>.kan-col{flex:0 0 min(78vw,290px);scroll-snap-align:start;max-height:calc(100dvh - 200px);}
+
+  /* Toolbars carry search + filters + sort + actions; without wrapping they
+     push the page ~1110px wide even on iPad landscape. */
+  .topbar{flex-wrap:wrap;row-gap:8px}
+  .topbar > div{flex-wrap:wrap;row-gap:6px}
+  .topbar h1{flex:1 1 auto;min-width:110px}
+  .content{padding:0 18px 34px}
+}
+
+@media(max-width:700px){
+  .topbar{padding:10px 14px;gap:8px;row-gap:6px}
+  .topbar h1{font-size:16px}
+  .content{padding:0 14px 34px}
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+
+  /* Collapsed list rows: title spans full width, cells sit 2-up,
+     the expand arrow stays pinned to the top-right. */
+  .hire-header,.inv-header,.account-header,.contact-header,.vehicle-header{
+    grid-template-columns:1fr 1fr auto;align-items:start;gap:9px 10px;padding:12px 14px;}
+  .hire-header > :first-child,.inv-header > :first-child,.account-header > :first-child,
+  .contact-header > :first-child,.vehicle-header > :first-child{grid-column:1/3}
+  .hire-header > .expand-arrow,.inv-header > .expand-arrow,.account-header > .expand-arrow,
+  .contact-header > .expand-arrow,.vehicle-header > .expand-arrow{grid-column:3;grid-row:1;align-self:center}
+
+  .detail-grid,.detail-grid-4,.clm-detail-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .form-row,.form-row.trio,.form-row.quad,.reconcile-grid{grid-template-columns:1fr}
+
+  /* Modals fill the screen — 720px in a 393px viewport is unreadable */
+  .modal-overlay{align-items:stretch;justify-content:stretch;backdrop-filter:none}
+  .modal,.modal.wide{width:100%;max-width:100%;height:100dvh;max-height:100dvh;border-radius:0}
+  .modal-header{padding:14px 16px 12px}
+  .modal-body{padding:16px 16px 20px}
+  .modal-footer{padding:12px 16px;flex-wrap:wrap;gap:8px}
+  .modal-footer > *{flex:1 1 auto;justify-content:center}
+  .modal-tabs{padding:0 12px;overflow-x:auto;top:53px;scrollbar-width:none}
+  .modal-tabs::-webkit-scrollbar{display:none}
+
+  /* iOS auto-zooms any focused field under 16px — this stops the jump */
+  input,select,textarea{font-size:16px}
+
+  /* Touch targets (Apple minimum is 44px; 36-38 with padding is the practical floor here) */
+  .modal-close{width:38px;height:38px;font-size:15px}
+  .topbar-btn,.filter-pill{min-height:36px}
+  .sb-item{padding:12px 20px;font-size:14px}
+  .sb-new-btn{padding:11px 14px}
+
+  .mvcal-grid{gap:3px;font-size:10px}
+  .kanban > .kan-col{flex-basis:min(84vw,290px);max-height:calc(100dvh - 168px)}
+}
+
+/* Tap-to-move sheet (touch devices — HTML5 drag-and-drop does not fire on iOS) */
+.tapmove-sheet{position:fixed;inset:0;z-index:210;display:none;align-items:flex-end;justify-content:center;background:rgba(36,34,84,.45);}
+.tapmove-sheet.open{display:flex}
+.tapmove-panel{background:var(--card);width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:8px 0 max(10px,env(safe-area-inset-bottom));box-shadow:0 -8px 40px rgba(36,34,84,.28);max-height:78dvh;overflow-y:auto;}
+.tapmove-title{font-family:var(--font-head);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--n500);padding:12px 20px 8px;}
+.tapmove-opt{display:flex;align-items:center;gap:10px;padding:14px 20px;font-size:14px;font-weight:600;color:var(--n700);cursor:pointer;border-top:1px solid var(--n100);-webkit-tap-highlight-color:transparent;}
+.tapmove-opt:active{background:var(--n50)}
+.tapmove-opt.current{color:var(--n400);font-weight:500}
+.tapmove-opt.current::after{content:'current';margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n300)}
+.tapmove-cancel{padding:14px 20px;text-align:center;font-size:13px;font-weight:700;color:var(--n500);cursor:pointer;border-top:1px solid var(--n200);}
 </style>
 </head>
 <body>
@@ -999,8 +1088,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         <div class="form-field"><label>Address line 1</label><input id="hf-addr1" placeholder="Street / building"></div>
         <div class="form-field"><label>Address line 2</label><input id="hf-addr2" placeholder="(optional)"></div>
       </div>
-      <div class="form-row">
+      <div class="form-row trio">
         <div class="form-field"><label>Town / city</label><input id="hf-town" placeholder=""></div>
+        <div class="form-field"><label>County</label><input id="hf-county" placeholder=""></div>
         <div class="form-field"><label>Postcode</label><input id="hf-postcode" placeholder="" style="text-transform:uppercase"></div>
       </div>
       <div class="form-row">
@@ -2457,17 +2547,19 @@ function prefillDeliveryFromDynamics(d){
   const line1=pick('address1','addressLine1','address1_line1','street','streetAddress');
   const line2=pick('address2','addressLine2','address1_line2','address1_line3');
   const town =pick('town','city','address1_city');
+  const cnty =pick('county','address1_stateorprovince','stateOrProvince','state','address1_county');
   const post =pick('postcode','postCode','postal_code','address1_postalcode','zip');
   const mob  =pick('mobile','mobilePhone','mobilephone','phone','telephone1');
   // Only overwrite fields we have data for — preserves anything user already typed
   if(line1)document.getElementById('hf-addr1').value=line1;
   if(line2)document.getElementById('hf-addr2').value=line2;
   if(town) document.getElementById('hf-town').value=town;
+  if(cnty) document.getElementById('hf-county').value=cnty;
   if(post) document.getElementById('hf-postcode').value=post.toUpperCase();
   if(mob)  document.getElementById('hf-mobile').value=mob;
   // Visual cue
   const tag=document.getElementById('hf-delivery-source');
-  if(tag&&(line1||town||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
+  if(tag&&(line1||town||cnty||post))tag.textContent='✓ Filled from Dynamics — edit if needed';
 }
 // Resolve the account a Dynamics-matched driver should belong to: prefer the
 // Dynamics parent account (if it exists in Covase), else the customer picked on
@@ -3307,6 +3399,7 @@ const HIRE_CARD_FIELDS=[
   {key:'fuel_type',label:'Fuel',get:h=>h.fuel_type||''},
   {key:'tariff',label:'Tariff',get:h=>h.tariff||''},
   {key:'delivery_town',label:'Delivery town',get:h=>h.delivery_town||''},
+  {key:'delivery_county',label:'Delivery county',get:h=>h.delivery_county||''},
   {key:'delivery_postcode',label:'Delivery postcode',get:h=>h.delivery_postcode||''},
   {key:'collection',label:'Collection (offhire)',get:h=>h.collection_date?fmtD(h.collection_date)+(h.collection_time?' '+String(h.collection_time).slice(0,5):''):''},
   {key:'preferred_start_time',label:'Preferred start time',get:h=>h.preferred_start_time?String(h.preferred_start_time).slice(0,5):''},
@@ -3315,7 +3408,7 @@ const HIRE_CARD_FIELDS=[
 const HIRE_FIELD_MAP=Object.fromEntries(HIRE_CARD_FIELDS.map(f=>[f.key,f]));
 const DEFAULT_HIRE_CARD_LAYOUT={title:['customer'],lines:[['driver'],['reg_make'],['reference']],right:['days_on','profit']};
 let hireCardLayout=null; // null → default layout (matches the original card)
-const HIRECD_SAMPLE={id:'sample',customer:'Woodland Trust',driver:'Jane Doe',driver_mobile:'07700 900123',vehicle_reg:'AB12 CDE',make_model:'Nissan Juke',reference:'FVSL048267',job_ref:'CVB-0042',supplier:'Fourways',hire_status:'active',billing_status:'pending',start_date:'2026-08-10',end_date:null,cost_per_day:28.5,upsell_per_day:6,rft_per_day:2.5,category:'CAR3A',fuel_type:'Petrol',delivery_town:'Grantham',delivery_postcode:'NG31 6PZ',supplementaries:[]};
+const HIRECD_SAMPLE={id:'sample',customer:'Woodland Trust',driver:'Jane Doe',driver_mobile:'07700 900123',vehicle_reg:'AB12 CDE',make_model:'Nissan Juke',reference:'FVSL048267',job_ref:'CVB-0042',supplier:'Fourways',hire_status:'active',billing_status:'pending',start_date:'2026-08-10',end_date:null,cost_per_day:28.5,upsell_per_day:6,rft_per_day:2.5,category:'CAR3A',fuel_type:'Petrol',delivery_town:'Grantham',delivery_county:'Lincolnshire',delivery_postcode:'NG31 6PZ',supplementaries:[]};
 async function loadHireCardLayout(){
   try{
     const rows=await sbReq('covase_config?key=eq.hire_card_layout&select=value');
@@ -3491,7 +3584,7 @@ function buildHireCard(h){
         <div><span>Total sell</span><strong>${fmtMoney(totalSell)}</strong></div>
         <div><span>Margin</span><strong class="${pClass}">${fmtMoney(margin)}</strong></div>
       </div>
-      ${(h.delivery_address_line1||h.delivery_town||h.delivery_postcode)?`<div class="notes-box">📍 Deliver to: ${[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).map(esc).join(', ')}</div>`:''}
+      ${(h.delivery_address_line1||h.delivery_town||h.delivery_county||h.delivery_postcode)?`<div class="notes-box">📍 Deliver to: ${[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).map(esc).join(', ')}</div>`:''}
       ${Array.isArray(h.supplementaries)&&h.supplementaries.length?`<div class="notes-box">📎 Supplementary: cost ${fmtMoney(suppC)} + upsell ${fmtMoney(suppU)} — ${h.supplementaries.map(s=>{const c=parseFloat(s.cost_amount!=null?s.cost_amount:s.amount)||0;const u=parseFloat(s.upsell_amount)||0;return esc(s.type)+' £'+c.toFixed(2)+(u?'+£'+u.toFixed(2)+' upsell':'')+(s.vat_status==='outside_of_scope'?' (OoS)':'');}).join(', ')}</div>`:''}
       ${h.notes?`<div class="notes-box">${esc(h.notes)}</div>`:''}
       ${h.incoming_invoice_id?`<div style="font-size:11px;color:var(--n400);margin-bottom:12px">📄 Supplier invoice: <span style="color:var(--covase)">${esc(h.incoming_invoice_id)}</span></div>`:''}
@@ -3560,7 +3653,7 @@ function openEditHire(id){
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-county',h.delivery_county);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   // Driver FK + Dynamics id (if contact exists with dynamics_id)
   f('hf-driver-contact-id',h.driver_contact_id||'');
   const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
@@ -3585,7 +3678,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-county','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -3675,7 +3768,7 @@ async function saveHire(){
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_county:document.getElementById('hf-county').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
@@ -3730,8 +3823,8 @@ function openSendSupplier(){
   document.getElementById('send-supplier-modal').classList.add('open');
 }
 function hireEmailTokens(h,acc,notes){
-  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
-  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
+  const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).join(', ');
+  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
 }
 // Render the template into the editable subject/body. Typing in the body sets
 // ssDirty so note edits stop clobbering manual work; ↻ link forces a rebuild.
@@ -3802,7 +3895,7 @@ function openOffhire(){
   const warn=document.getElementById('oh-warn'),btn=document.getElementById('oh-send-btn');
   if(!email){warn.style.display='';warn.textContent=acc?('No booking email on "'+acc.company_name+'" — add one in CRM → Accounts.'):'Pick a supplier on the booking first.';btn.disabled=true;btn.style.opacity='0.5';}
   else{warn.style.display='none';btn.disabled=false;btn.style.opacity='';}
-  const delAddr=[h.delivery_address_line1,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ');
+  const delAddr=[h.delivery_address_line1,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).join(', ');
   document.getElementById('oh-delivery-addr').textContent=delAddr||'no delivery address on record';
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   // Prefill: saved collection details first, else delivery address; contact defaults to the driver
@@ -3810,7 +3903,7 @@ function openOffhire(){
   set('mv-offhire-addr1',h.collection_address_line1||h.delivery_address_line1);
   set('mv-offhire-addr2',h.collection_address_line2||h.delivery_address_line2);
   set('mv-offhire-town',h.collection_town||h.delivery_town);
-  set('mv-offhire-county',h.collection_county);
+  set('mv-offhire-county',h.collection_county||h.delivery_county);
   set('mv-offhire-postcode',h.collection_postcode||h.delivery_postcode);
   // Same-as-delivery unless a different collection address was previously saved
   const differs=h.collection_postcode&&h.delivery_postcode&&String(h.collection_postcode).replace(/\s/g,'').toUpperCase()!==String(h.delivery_postcode).replace(/\s/g,'').toUpperCase();
@@ -3829,7 +3922,7 @@ function ohTokens(){
   const g=id=>(document.getElementById(id)?.value||'').trim();
   const same=document.getElementById('oh-same').checked;
   const col=same
-    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:'',pc:h.delivery_postcode||''}
+    ?{l1:h.delivery_address_line1||'',l2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',pc:h.delivery_postcode||''}
     :{l1:g('mv-offhire-addr1'),l2:g('mv-offhire-addr2'),town:g('mv-offhire-town'),county:g('mv-offhire-county'),pc:g('mv-offhire-postcode').toUpperCase()};
   return {h:h,acc:acc,col:col,colDate:g('oh-date'),colTime:g('oh-time'),tokens:{
     supplierName:acc?(acc.company_name||''):'',customer:h.customer||'',driver:h.driver||'',
@@ -3891,7 +3984,7 @@ const ET_FIELD_GROUPS=[
   {g:'Driver',f:[['driver','Driver name'],['driverMobile','Driver mobile']]},
   {g:'Dates',f:[['startDate','Start date'],['endDate','End date (blank shows TBC)'],['tariff','Tariff (duration band)'],['preferredStartTime','Preferred delivery time']]},
   {g:'Vehicle',f:[['vehicleReg','Registration'],['vehicleMakeModel','Make / model'],['category','Category'],['fuelType','Fuel type'],['dateOfRegistration','Date of registration'],['engineCc','Engine (cc)'],['co2','CO2 (g/km)'],['p11d','P11D value']]},
-  {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['postcode','Postcode']]},
+  {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['county','County'],['postcode','Postcode']]},
   {g:'Supplier',f:[['supplierName','Supplier name'],['supplierRef','Supplier invoice ref']]},
   {g:'Rates',f:[['costPerDay','Cost/day (supplier)'],['rftPerDay','RFT/day']]},
   {g:'Notes',f:[['hireNotes','Hire notes'],['notes','Note added when sending']]}
@@ -3927,7 +4020,7 @@ function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSave
 function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
 function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
-function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
+function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, East Sussex, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',county:'East Sussex',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
 // Email clients add margins around block elements, so the editor's <div>/<p>
 // per-line output comes out double-spaced. Zero the block margins and turn
 // empty blocks into a single <br> so the email renders like the editor.
@@ -4213,10 +4306,10 @@ function closeThread(){document.getElementById('thread-modal').classList.remove(
 
 // ─── Manual human reply to a supplier (rentals@ for hires, logistics@ for movements) ───
 let replyCtx=null;
-function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,toEmail){
+function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,toEmail,origSubject){
   if(!messageId){toast('That message has no email id to reply to','error');return;}
   const from=movementId?'logistics@covase.co.uk':'rentals@covase.co.uk';
-  replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
+  replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null,subject:origSubject||''};
   document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from+' · in-thread';
   document.getElementById('reply-to').value=toEmail||'';
   document.getElementById('reply-text').value='';
@@ -4225,7 +4318,7 @@ function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,t
 function openReplyFromQueue(id){
   const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
   const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id));
-  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email);
+  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email,r.subject);
 }
 function replyFromThread(){
   const msgs=window._threadMsgs||[];const kind=window._threadKind||'hire';
@@ -4233,7 +4326,7 @@ function replyFromThread(){
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
   const latest=inbound.length?inbound[inbound.length-1]:null;
   if(!latest){threadNewMessage();return;} // nothing to thread onto yet — send a fresh chase instead
-  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email);
+  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email,latest.subject);
 }
 function threadNewMessage(){
   const kind=window._threadKind||'hire';
@@ -4242,24 +4335,35 @@ function threadNewMessage(){
 // Fresh email to the supplier (chase/nudge) — no inbound message required.
 // Threads on the supplier's side via 'Re:' + the original subject, and always
 // carries the job ref so the reply agents can match the answer.
+// The job ref is the reply agents' primary match key. A thread subject can be
+// inherited from a manual-reply or auto-ack row, which carry no ref, so every
+// outbound subject gets checked and re-stamped before it leaves.
+function withJobRef(subject,ref){
+  if(!ref)return subject;
+  const bare=String(ref).replace(/^\[|\]$/g,'');
+  return String(subject).indexOf(bare)!==-1?subject:subject+' ['+bare+']';
+}
 function composeToSupplier(id,kind){
   if(!id){toast('Nothing linked','error');return;}
-  let to='',from='',label='',subjBase='';
+  let to='',from='',label='',subjBase='',jobRef='';
   if(kind==='mv'){
     const m=(allMovements||[]).find(x=>x.id===id);if(!m){toast('Movement not loaded — open Movements and retry','error');return;}
     const sup=(allAccounts||[]).find(a=>a.id===m.supplier_account_id);
     to=(sup&&sup.booking_email)||'';from='logistics@covase.co.uk';label=mvJobLabel(id);
-    subjBase='Vehicle movement - '+(m.customer||'')+' ['+(m.job_ref||('CVM:'+id))+']';
+    jobRef=m.job_ref||('CVM:'+id);
+    subjBase='Vehicle movement - '+(m.customer||'')+' ['+jobRef+']';
   }else{
     const h=(allHires||[]).find(x=>x.id===id);if(!h){toast('Booking not loaded — open Bookings and retry','error');return;}
     const acc=findSupplierAccount(h.supplier);
     to=(acc&&acc.booking_email)||'';from='rentals@covase.co.uk';label=hireLabel(id);
-    subjBase='Booking - '+(h.customer||'')+' ['+(h.job_ref||('CVB:'+id))+']';
+    jobRef=h.job_ref||('CVB:'+id);
+    subjBase='Booking - '+(h.customer||'')+' ['+jobRef+']';
   }
   if(!to){toast('No booking email on the supplier account — add one in CRM → Accounts','error');return;}
   const msgs=(window._threadMsgs||[]);
   const lastOut=[...msgs].reverse().find(x=>x.direction==='outbound'&&x.subject);
-  const subject=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
+  const inherited=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
+  const subject=withJobRef(inherited,jobRef);
   replyCtx={mode:'new',to:to,from:from,subject:subject,hireId:kind==='hire'?id:null,movementId:kind==='mv'?id:null,messageId:null,sourceReplyId:null};
   document.getElementById('reply-context').textContent='New message · '+label+' · from '+from;
   document.getElementById('reply-to').value=to;
@@ -4297,7 +4401,7 @@ async function doManualReply(){
   const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
   const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,to:toValue,replyText:text})});
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,to:toValue,replyText:text,subject:replyCtx.subject||''})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     if(replyCtx.sourceReplyId){try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(replyCtx.sourceReplyId),{method:'PATCH',body:{status:'replied'},prefer:'return=minimal'});}catch(e){}}
     toast('Reply sent from '+(replyCtx.from||'rentals@covase.co.uk'),'success');
@@ -4354,7 +4458,7 @@ async function saveReplacement(){
     driver:old.driver,driver_contact_id:old.driver_contact_id,driver_mobile:old.driver_mobile,
     reference:old.reference,
     delivery_address_line1:old.delivery_address_line1,delivery_address_line2:old.delivery_address_line2,
-    delivery_town:old.delivery_town,delivery_postcode:old.delivery_postcode,
+    delivery_town:old.delivery_town,delivery_county:old.delivery_county,delivery_postcode:old.delivery_postcode,
     supplier:old.supplier,
     preferred_start_time:old.preferred_start_time,
     upsell_per_day:old.upsell_per_day,rft_per_day:old.rft_per_day,
@@ -4496,7 +4600,8 @@ function renderMovementKanban(){
 function mvKanCard(m){
   const next=MV_NEXT[m.movement_status];
   const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();mvAdvance('${esc(m.id)}')" title="Move to ${esc(mvStatusLabel(next))}">→ ${esc(mvStatusLabel(next))}</button>`:'';
-  return `<div class="mv-kan-wrap" draggable="true" ondragstart="mvKanDragStart(event,'${esc(m.id)}')" ondragend="mvKanDragEnd(event)">${movementCard(m)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+  const mvMoveBtn=IS_TOUCH?`<button type="button" class="kan-move" onclick="openTapMove(event,'mv','${esc(m.id)}')" title="Move to another lane">⇄ Move</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="mvKanDragStart(event,'${esc(m.id)}')" ondragend="mvKanDragEnd(event)">${movementCard(m)}${(advBtn||mvMoveBtn)?`<div class="mv-kan-actions">${mvMoveBtn}${advBtn}</div>`:''}</div>`;
 }
 function mvKanDragStart(e,id){mvKanDragId=id;try{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';}catch(_){}}
 function mvKanDragEnd(e){mvKanDragId=null;document.querySelectorAll('.kan-col.mvkan-over').forEach(el=>el.classList.remove('mvkan-over'));}
@@ -6778,7 +6883,8 @@ let fineKanDragId=null;
 function fineKanCard(f){
   const next=FINE_NEXT[f.status];
   const advBtn=next?`<button class="kan-advance" onclick="event.stopPropagation();fineSetStatus('${esc(f.id)}','${next}')" title="Move to ${esc(FINE_STATUS_LABEL[next])}">→ ${esc(FINE_STATUS_LABEL[next])}</button>`:'';
-  return `<div class="mv-kan-wrap" draggable="true" ondragstart="fineKanDragStart(event,'${esc(f.id)}')" ondragend="fineKanDragEnd(event)">${fineCardHtml(f)}${advBtn?`<div class="mv-kan-actions">${advBtn}</div>`:''}</div>`;
+  const fnMoveBtn=IS_TOUCH?`<button type="button" class="kan-move" onclick="openTapMove(event,'fine','${esc(f.id)}')" title="Move to another lane">⇄ Move</button>`:'';
+  return `<div class="mv-kan-wrap" draggable="true" ondragstart="fineKanDragStart(event,'${esc(f.id)}')" ondragend="fineKanDragEnd(event)">${fineCardHtml(f)}${(advBtn||fnMoveBtn)?`<div class="mv-kan-actions">${fnMoveBtn}${advBtn}</div>`:''}</div>`;
 }
 function renderFinesKanban(){
   const wrap=document.getElementById('fines-kanban');if(!wrap)return;
@@ -7780,6 +7886,108 @@ loadTheme();
 // Element-level style overrides (Edit mode) + listeners
 loadFontOverrides();
 initEditMode();
+
+// ═══════════════════════════════════════════════════════════════════
+// RESPONSIVE / TOUCH  (iPhone / iPad)
+// Desktop behaviour is untouched: every branch below is gated on
+// IS_TOUCH or on the ≤1024px breakpoint.
+// ═══════════════════════════════════════════════════════════════════
+
+// Coarse pointer with no hover = phone/tablet. iOS Safari never fires
+// HTML5 drag events, so these devices get the tap-to-move sheet instead.
+// matchMedia is authoritative where present: a touchscreen laptop reports
+// hover:hover and keeps the desktop drag behaviour.
+const IS_TOUCH = window.matchMedia
+  ? window.matchMedia('(hover:none) and (pointer:coarse)').matches
+  : ('ontouchstart' in window && (navigator.maxTouchPoints||0) > 0);
+
+// ── Off-canvas sidebar ──────────────────────────────────────────────
+function setNav(open){
+  document.body.classList.toggle('nav-open', !!open);
+  document.querySelectorAll('.nav-toggle').forEach(b=>b.setAttribute('aria-expanded', open?'true':'false'));
+}
+function toggleNav(){ setNav(!document.body.classList.contains('nav-open')); }
+
+function initResponsiveNav(){
+  // One hamburger per view topbar — views are static markup, so this runs once.
+  document.querySelectorAll('.topbar').forEach(tb=>{
+    if(tb.querySelector('.nav-toggle')) return;
+    const b=document.createElement('button');
+    b.type='button'; b.className='nav-toggle'; b.innerHTML='☰';
+    b.setAttribute('aria-label','Menu'); b.setAttribute('aria-expanded','false');
+    b.onclick=e=>{e.stopPropagation();toggleNav();};
+    tb.insertBefore(b, tb.firstChild);
+  });
+  // Scrim closes the drawer
+  if(!document.querySelector('.nav-scrim')){
+    const sc=document.createElement('div');
+    sc.className='nav-scrim';
+    sc.onclick=()=>setNav(false);
+    document.body.appendChild(sc);
+  }
+  // Picking a destination closes the drawer. Delegated, because the sidebar
+  // is re-rendered by the organiser (loadSidebarLayout).
+  const sb=document.querySelector('.sidebar');
+  if(sb && !sb.dataset.navBound){
+    sb.dataset.navBound='1';
+    sb.addEventListener('click', e=>{
+      if(e.target.closest('.sb-item') && !e.target.closest('.sb-item').classList.contains('disabled')) setNav(false);
+    });
+  }
+  // Escape closes it; widening past the breakpoint resets state
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') setNav(false); });
+  if(window.matchMedia) window.matchMedia('(max-width:1024px)').addEventListener('change', ev=>{ if(!ev.matches) setNav(false); });
+}
+
+// ── Tap-to-move sheet (replaces drag on touch) ──────────────────────
+let tapMoveCtx=null;
+
+function openTapMove(e,kind,id){
+  if(e){e.stopPropagation();e.preventDefault();}
+  let title,lanes,current,apply;
+  if(kind==='mv'){
+    const m=(allMovements||[]).find(x=>x.id===id); if(!m) return;
+    current=m.movement_status;
+    // 'in_progress' is retired — only offer it if the card is already sitting there
+    lanes=MV_KANBAN_COLS.filter(c=>c.key!=='in_progress'||current==='in_progress')
+                        .map(c=>({key:c.key,label:c.label}));
+    title='Move movement to'; apply=mvSetStatus;
+  }else{
+    const f=(allFines||[]).find(x=>x.id===id); if(!f) return;
+    current=f.status;
+    lanes=FINE_KAN_MAIN.concat(FINE_KAN_PARKED).map(k=>({key:k,label:FINE_STATUS_LABEL[k]||k}));
+    title='Move fine to'; apply=fineSetStatus;
+  }
+  tapMoveCtx={id,apply};
+  let sheet=document.getElementById('tapmove-sheet');
+  if(!sheet){
+    sheet=document.createElement('div');
+    sheet.id='tapmove-sheet'; sheet.className='tapmove-sheet';
+    sheet.addEventListener('click',ev=>{ if(ev.target===sheet) closeTapMove(); });
+    document.body.appendChild(sheet);
+  }
+  sheet.innerHTML='<div class="tapmove-panel">'
+    +'<div class="tapmove-title">'+esc(title)+'</div>'
+    + lanes.map(l=>l.key===current
+        ? '<div class="tapmove-opt current">'+esc(l.label)+'</div>'
+        : '<div class="tapmove-opt" onclick="tapMoveApply(\''+l.key+'\')">'+esc(l.label)+'</div>').join('')
+    +'<div class="tapmove-cancel" onclick="closeTapMove()">Cancel</div>'
+    +'</div>';
+  sheet.classList.add('open');
+}
+function closeTapMove(){
+  const sheet=document.getElementById('tapmove-sheet');
+  if(sheet) sheet.classList.remove('open');
+  tapMoveCtx=null;
+}
+async function tapMoveApply(status){
+  const ctx=tapMoveCtx; closeTapMove();
+  if(!ctx) return;
+  await ctx.apply(ctx.id,status);   // same code path drag-and-drop uses
+}
+
+// Mobile/tablet chrome: hamburger + off-canvas sidebar + tap-to-move
+initResponsiveNav();
 </script>
 </body>
 </html>
