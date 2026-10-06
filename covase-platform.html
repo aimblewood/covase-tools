@@ -7987,11 +7987,19 @@ function attChips(r){
 }
 // A chip can be clicked from the review queue or from inside a thread, so look
 // in both caches rather than assuming which view is open.
+// allSupplierReplies is a top-level `let`, which does NOT become a property of
+// window — reach it by identifier. _threadMsgs is explicitly set on window by
+// openThread, so that one is addressed differently on purpose.
 function openAttachment(replyId,i){
-  const r=((window.allSupplierReplies||[]).find(x=>x.id===replyId))
-        ||((window._threadMsgs||[]).find(x=>x.id===replyId));
+  const queue=(typeof allSupplierReplies!=='undefined'&&Array.isArray(allSupplierReplies))?allSupplierReplies:[];
+  const thread=Array.isArray(window._threadMsgs)?window._threadMsgs:[];
+  const r=queue.find(x=>x&&x.id===replyId)||thread.find(x=>x&&x.id===replyId);
   const f=r&&replyAttachments(r)[i];
-  if(!f||!f.url){toast('That attachment has no stored file','error');return;}
+  // Separate messages: a missing row is a bug here, a missing url means the
+  // upload into Storage did not land.
+  if(!r){toast('Could not find that reply — refresh and try again','error');return;}
+  if(!f){toast('That attachment is no longer on the reply','error');return;}
+  if(!f.url){toast('That attachment has no stored file','error');return;}
   if(String(f.type||'').indexOf('image/')===0)openAttLightbox(f);
   else window.open(f.url,'_blank','noopener');
 }
