@@ -512,6 +512,21 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .kan-cancel{background:transparent;color:var(--n400);border:1px solid var(--n200);font-size:10px;padding:2px 6px;border-radius:6px;cursor:pointer;}
 .kan-cancel:hover{color:var(--tl-red-t);border-color:var(--tl-red);}
 
+/* ─── Supplier-reply attachments ─── */
+.att-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.att-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:5px 9px;border:1px solid var(--n200);background:var(--n50);color:var(--n700);border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-body);}
+.att-chip:hover{border-color:var(--covase);color:var(--indigo)}
+.att-chip .att-name{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-chip .att-size{color:var(--n400);font-weight:500}
+/* Above the reply modal (260) so a chip opened from there is still visible */
+.att-lightbox{display:none;position:fixed;inset:0;z-index:300;background:rgba(36,34,84,.82);align-items:center;justify-content:center;flex-direction:column;padding:20px;}
+.att-lightbox.open{display:flex}
+.att-lightbox img{max-width:min(96vw,1400px);max-height:82dvh;object-fit:contain;border-radius:10px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.att-lb-bar{display:flex;align-items:center;gap:14px;width:100%;max-width:min(96vw,1400px);margin-bottom:10px;color:#fff;font-size:12px;font-weight:600}
+.att-lb-bar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-lb-bar a{color:var(--covase);text-decoration:none}
+.att-lb-close{background:rgba(255,255,255,.14);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px;flex-shrink:0}
+
 /* ═══════════════════════════════════════════════════════════════════
    RESPONSIVE — tablet & phone  (iPhone / iPad)
    ≤1024px : sidebar becomes an off-canvas drawer, kanban lanes swipe
@@ -584,6 +599,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
   .sb-item{padding:12px 20px;font-size:14px}
   .sb-new-btn{padding:11px 14px}
 
+  .att-chip{padding:8px 12px;font-size:12px}
+  .att-chip .att-name{max-width:150px}
   .mvcal-grid{gap:3px;font-size:10px}
   .kanban > .kan-col{flex-basis:min(84vw,290px);max-height:calc(100dvh - 168px)}
 }
@@ -4181,6 +4198,7 @@ function renderSupplierReplies(){
       +'<div style="font-size:12px;color:var(--n600);margin-top:4px">'+esc(r.summary||'')+'</div>'
       +(d.length?'<div style="font-size:12px;color:var(--n700);margin-top:6px">'+d.join(' · ')+'</div>':'')
       +q
+      +attChips(r)
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center">'+a+'</div>'
       +(!unmatched?'<div id="relink-'+r.id+'" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11px;color:var(--n500)">Wrong job? Link to:</span><select id="link-sel-'+r.id+'" style="font-size:12px;padding:5px 8px;border:1px solid var(--n200);border-radius:6px;max-width:300px"><option value="">— choose hire or movement —</option>'+linkOpts+'</select><button class="btn btn-secondary" style="font-size:12px;padding:5px 10px;background:var(--covase);color:#fff;border-color:var(--covase)" onclick="linkUnmatched(\''+r.id+'\')">Re-link</button></div>':'')
       +'</div>';
@@ -4298,6 +4316,7 @@ async function openThread(id,kind){
         +'<div id="thread-body-'+i+'" style="display:'+(open?'block':'none')+';padding:0 12px 12px 32px;border-top:1px solid var(--n100)">'
           +'<div style="font-size:11px;color:var(--n500);margin-top:8px">'+esc(m.subject||'')+'</div>'
           +'<div style="font-size:12px;color:var(--n700);margin-top:6px;white-space:pre-wrap">'+content+'</div>'
+          +attChips(m)
         +'</div></div>';
     }).join('');
   }catch(e){body.innerHTML='<div class="empty-state"><div class="empty-title">Load failed</div><div class="empty-sub">'+esc(e.message)+'</div></div>';}
@@ -7886,6 +7905,64 @@ loadTheme();
 // Element-level style overrides (Edit mode) + listeners
 loadFontOverrides();
 initEditMode();
+
+// ═══════════════════════════════════════════════════════════════════
+// SUPPLIER-REPLY ATTACHMENTS
+// Files live in the public reply-attachments Storage bucket; the row carries
+// only metadata. Signature logos are filtered out upstream by size, so
+// anything that reaches here is worth showing.
+// ═══════════════════════════════════════════════════════════════════
+function replyAttachments(r){
+  const a=r&&r.attachments;
+  if(Array.isArray(a))return a;
+  if(typeof a==='string'){try{const p=JSON.parse(a);return Array.isArray(p)?p:[];}catch(e){return [];}}
+  return [];
+}
+function attIcon(t){
+  t=String(t||'').toLowerCase();
+  if(t.indexOf('image/')===0)return '🖼';
+  if(t.indexOf('pdf')!==-1)return '📄';
+  if(/sheet|excel|csv/.test(t))return '📊';
+  if(/word|document/.test(t))return '📝';
+  return '📎';
+}
+function attSize(n){
+  n=Number(n)||0;
+  return n>=1048576?(n/1048576).toFixed(1)+' MB':(n>=1024?Math.round(n/1024)+' KB':n+' B');
+}
+function attChips(r){
+  const list=replyAttachments(r);
+  if(!list.length)return '';
+  return '<div class="att-row">'+list.map((f,i)=>
+    '<button type="button" class="att-chip" onclick="openAttachment(\''+esc(r.id)+'\','+i+')" title="'+esc((f.name||'attachment')+' · '+attSize(f.size))+'">'
+    +attIcon(f.type)+' <span class="att-name">'+esc(f.name||'attachment')+'</span>'
+    +'<span class="att-size">'+attSize(f.size)+'</span></button>').join('')+'</div>';
+}
+// A chip can be clicked from the review queue or from inside a thread, so look
+// in both caches rather than assuming which view is open.
+function openAttachment(replyId,i){
+  const r=((window.allSupplierReplies||[]).find(x=>x.id===replyId))
+        ||((window._threadMsgs||[]).find(x=>x.id===replyId));
+  const f=r&&replyAttachments(r)[i];
+  if(!f||!f.url){toast('That attachment has no stored file','error');return;}
+  if(String(f.type||'').indexOf('image/')===0)openAttLightbox(f);
+  else window.open(f.url,'_blank','noopener');
+}
+function openAttLightbox(f){
+  let el=document.getElementById('att-lightbox');
+  if(!el){
+    el=document.createElement('div');el.id='att-lightbox';el.className='att-lightbox';
+    el.addEventListener('click',ev=>{if(ev.target===el||ev.target.classList.contains('att-lb-close'))closeAttLightbox();});
+    document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeAttLightbox();});
+    document.body.appendChild(el);
+  }
+  el.innerHTML='<div class="att-lb-bar"><span>'+esc(f.name||'image')+'</span>'
+    +'<a href="'+esc(f.url)+'" target="_blank" rel="noopener">Open original ↗</a>'
+    +'<button type="button" class="att-lb-close" aria-label="Close">✕</button></div>'
+    +'<img src="'+esc(f.url)+'" alt="'+esc(f.name||'attachment')+'">';
+  el.classList.add('open');
+}
+function closeAttLightbox(){const el=document.getElementById('att-lightbox');if(el)el.classList.remove('open');}
 
 // ═══════════════════════════════════════════════════════════════════
 // RESPONSIVE / TOUCH  (iPhone / iPad)
