@@ -4334,10 +4334,53 @@ function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,t
   document.getElementById('reply-text').value='';
   document.getElementById('reply-modal').classList.add('open');
 }
+// Suppliers send automated confirmations from unattended addresses — Fourways
+// use noreply@fvsl.co.uk — and a reply there is silently binned. Resolve a real
+// inbox instead, and refuse to send to one of these at all.
+const NOREPLY_RE=/^(no[-._]?reply|do[-._]?not[-._]?reply|mailer[-._]?daemon|postmaster|bounce[sd]?)@/i;
+function isNoReplyAddress(e){return NOREPLY_RE.test(String(e||'').trim());}
+// The supplier's real booking inbox, from CRM rather than hardcoded: for
+// Fourways that is fvs@fvsl.co.uk, the same address composeToSupplier uses.
+function supplierAccountForReply(r){
+  if(!r)return null;
+  if(r.movement_id){
+    const m=(allMovements||[]).find(x=>x.id===r.movement_id);
+    if(m&&m.supplier_account_id){const a=(allAccounts||[]).find(x=>x.id===m.supplier_account_id);if(a)return a;}
+  }
+  if(r.hire_id){
+    const h=(allHires||[]).find(x=>x.id===r.hire_id);
+    if(h&&h.supplier){const a=findSupplierAccount(h.supplier);if(a)return a;}
+  }
+  // Unmatched rows have no linked job, so fall back to the sender's domain —
+  // noreply@fvsl.co.uk still resolves to the Fourways account that way.
+  const dom=String((r.from_email||'').split('@')[1]||'').toLowerCase();
+  if(dom){
+    const a=(allAccounts||[]).find(x=>x.type==='supplier'&&String(x.booking_email||'').toLowerCase().endsWith('@'+dom));
+    if(a)return a;
+  }
+  return null;
+}
+function replyToFor(r){
+  const from=String((r&&r.from_email)||'').trim();
+  if(from&&!isNoReplyAddress(from))return from;
+  const acc=supplierAccountForReply(r);
+  return (acc&&acc.booking_email)||'';
+}
+// Shared by both reply entry points so the warning wording stays in one place.
+function replyTarget(r){
+  const to=replyToFor(r);
+  let note='';
+  if(isNoReplyAddress(r&&r.from_email)){
+    note=to?(' \u00b7 \u26a0 sender is no-reply, using '+to):' \u00b7 \u26a0 sender is no-reply and no booking inbox on the supplier account';
+  }
+  return {to:to,note:note};
+}
 function openReplyFromQueue(id){
   const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
-  const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id));
-  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email,r.subject);
+  const t=replyTarget(r);
+  const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id))+t.note;
+  if(isNoReplyAddress(r.from_email)&&!t.to)toast('That reply came from a no-reply address and the supplier account has no booking email — add one in CRM → Accounts','error');
+  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,t.to,r.subject);
 }
 function replyFromThread(){
   const msgs=window._threadMsgs||[];const kind=window._threadKind||'hire';
@@ -4345,7 +4388,8 @@ function replyFromThread(){
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
   const latest=inbound.length?inbound[inbound.length-1]:null;
   if(!latest){threadNewMessage();return;} // nothing to thread onto yet — send a fresh chase instead
-  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email,latest.subject);
+  const t=replyTarget({from_email:latest.from_email,hire_id:kind==='hire'?id:null,movement_id:kind==='mv'?id:null});
+  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier')+t.note,kind==='mv'?id:null,t.to,latest.subject);
 }
 function threadNewMessage(){
   const kind=window._threadKind||'hire';
@@ -4399,6 +4443,9 @@ async function doManualReply(){
   if(!toList.length){toast('Enter at least one recipient address','error');return;}
   const bad=toList.filter(e=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
   if(bad.length){toast('Invalid address: '+bad.join(', '),'error');return;}
+  // Last line of defence: an unattended address can still be typed in by hand.
+  const unattended=toList.filter(isNoReplyAddress);
+  if(unattended.length){toast('Cannot send to an unattended address: '+unattended.join(', ')+' — use the supplier booking inbox','error');return;}
   const toValue=toList.join(',');
   // Fresh outbound (chase/nudge) — goes via the send webhook, not the Graph reply
   if(replyCtx.mode==='new'){
