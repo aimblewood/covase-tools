@@ -4306,10 +4306,10 @@ function closeThread(){document.getElementById('thread-modal').classList.remove(
 
 // ─── Manual human reply to a supplier (rentals@ for hires, logistics@ for movements) ───
 let replyCtx=null;
-function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,toEmail){
+function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,toEmail,origSubject){
   if(!messageId){toast('That message has no email id to reply to','error');return;}
   const from=movementId?'logistics@covase.co.uk':'rentals@covase.co.uk';
-  replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null};
+  replyCtx={mode:'reply',messageId:messageId,hireId:hireId||null,movementId:movementId||null,from:from,sourceReplyId:sourceReplyId||null,subject:origSubject||''};
   document.getElementById('reply-context').textContent=(contextLabel||('Reply for '+hireLabel(hireId)))+' · from '+from+' · in-thread';
   document.getElementById('reply-to').value=toEmail||'';
   document.getElementById('reply-text').value='';
@@ -4318,7 +4318,7 @@ function openReplyModal(messageId,hireId,sourceReplyId,contextLabel,movementId,t
 function openReplyFromQueue(id){
   const r=allSupplierReplies.find(x=>x.id===id);if(!r)return;
   const label='Reply to '+(r.from_email||'supplier')+' · '+(r.movement_id?mvJobLabel(r.movement_id):hireLabel(r.hire_id));
-  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email);
+  openReplyModal(r.message_id,r.hire_id,r.id,label,r.movement_id,r.from_email,r.subject);
 }
 function replyFromThread(){
   const msgs=window._threadMsgs||[];const kind=window._threadKind||'hire';
@@ -4326,7 +4326,7 @@ function replyFromThread(){
   const inbound=msgs.filter(m=>m.direction!=='outbound'&&m.message_id&&String(m.message_id).indexOf('manual-')!==0&&String(m.message_id).indexOf('ack-')!==0);
   const latest=inbound.length?inbound[inbound.length-1]:null;
   if(!latest){threadNewMessage();return;} // nothing to thread onto yet — send a fresh chase instead
-  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email);
+  openReplyModal(latest.message_id,kind==='hire'?id:null,null,'Reply to '+(latest.from_email||'supplier'),kind==='mv'?id:null,latest.from_email,latest.subject);
 }
 function threadNewMessage(){
   const kind=window._threadKind||'hire';
@@ -4335,24 +4335,35 @@ function threadNewMessage(){
 // Fresh email to the supplier (chase/nudge) — no inbound message required.
 // Threads on the supplier's side via 'Re:' + the original subject, and always
 // carries the job ref so the reply agents can match the answer.
+// The job ref is the reply agents' primary match key. A thread subject can be
+// inherited from a manual-reply or auto-ack row, which carry no ref, so every
+// outbound subject gets checked and re-stamped before it leaves.
+function withJobRef(subject,ref){
+  if(!ref)return subject;
+  const bare=String(ref).replace(/^\[|\]$/g,'');
+  return String(subject).indexOf(bare)!==-1?subject:subject+' ['+bare+']';
+}
 function composeToSupplier(id,kind){
   if(!id){toast('Nothing linked','error');return;}
-  let to='',from='',label='',subjBase='';
+  let to='',from='',label='',subjBase='',jobRef='';
   if(kind==='mv'){
     const m=(allMovements||[]).find(x=>x.id===id);if(!m){toast('Movement not loaded — open Movements and retry','error');return;}
     const sup=(allAccounts||[]).find(a=>a.id===m.supplier_account_id);
     to=(sup&&sup.booking_email)||'';from='logistics@covase.co.uk';label=mvJobLabel(id);
-    subjBase='Vehicle movement - '+(m.customer||'')+' ['+(m.job_ref||('CVM:'+id))+']';
+    jobRef=m.job_ref||('CVM:'+id);
+    subjBase='Vehicle movement - '+(m.customer||'')+' ['+jobRef+']';
   }else{
     const h=(allHires||[]).find(x=>x.id===id);if(!h){toast('Booking not loaded — open Bookings and retry','error');return;}
     const acc=findSupplierAccount(h.supplier);
     to=(acc&&acc.booking_email)||'';from='rentals@covase.co.uk';label=hireLabel(id);
-    subjBase='Booking - '+(h.customer||'')+' ['+(h.job_ref||('CVB:'+id))+']';
+    jobRef=h.job_ref||('CVB:'+id);
+    subjBase='Booking - '+(h.customer||'')+' ['+jobRef+']';
   }
   if(!to){toast('No booking email on the supplier account — add one in CRM → Accounts','error');return;}
   const msgs=(window._threadMsgs||[]);
   const lastOut=[...msgs].reverse().find(x=>x.direction==='outbound'&&x.subject);
-  const subject=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
+  const inherited=lastOut?(/^re:/i.test(lastOut.subject)?lastOut.subject:'Re: '+lastOut.subject):subjBase;
+  const subject=withJobRef(inherited,jobRef);
   replyCtx={mode:'new',to:to,from:from,subject:subject,hireId:kind==='hire'?id:null,movementId:kind==='mv'?id:null,messageId:null,sourceReplyId:null};
   document.getElementById('reply-context').textContent='New message · '+label+' · from '+from;
   document.getElementById('reply-to').value=to;
@@ -4390,7 +4401,7 @@ async function doManualReply(){
   const url=getConfig().n8nManualReply;if(!url){toast('Set the manual reply webhook in Settings','error');return;}
   const btn=document.getElementById('reply-send-btn');btn.disabled=true;btn.textContent='Sending…';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,to:toValue,replyText:text})});
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messageId:replyCtx.messageId,hireId:replyCtx.hireId,movementId:replyCtx.movementId,from:replyCtx.from,to:toValue,replyText:text,subject:replyCtx.subject||''})});
     if(!r.ok)throw new Error('Webhook returned '+r.status);
     if(replyCtx.sourceReplyId){try{await sbReq('covase_supplier_replies?id=eq.'+encodeURIComponent(replyCtx.sourceReplyId),{method:'PATCH',body:{status:'replied'},prefer:'return=minimal'});}catch(e){}}
     toast('Reply sent from '+(replyCtx.from||'rentals@covase.co.uk'),'success');
