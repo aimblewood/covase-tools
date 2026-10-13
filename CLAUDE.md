@@ -61,7 +61,7 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 
 `covase_config` keys: `supplier_booking_template`, `movement_booking_template`, `offhire_booking_template`, `supplier_agent_instructions`, `movement_agent_instructions`, `fines_templates`, `fines_dashboard`, `fines_reports`, `movement_card_layout`, `hire_card_layout`, `fine_card_layout`, `sidebar_layout`, `app_theme`, `font_overrides`.
 
-**SQL migrations** = `phase-*.sql` files in this folder, run manually in the Supabase SQL editor, all idempotent with rollback comments. Everything through `phase-delivery-county.sql` (Oct 2026) has been applied. Pattern for new work: ship SQL first, wait for Simon to run it, then platform code.
+**SQL migrations** = `phase-*.sql` files in this folder, run manually in the Supabase SQL editor, all idempotent with rollback comments. Applied up to and including `phase-reply-attachments.sql` + `phase-reply-attachments-storage.sql` (Oct 2026). **Not yet run: `phase-audit-trail.sql`** (change history for `covase_hires`). Pattern for new work: ship SQL first, wait for Simon to run it, then platform code.
 
 ## 5. Platform feature map (covase-platform.html)
 
