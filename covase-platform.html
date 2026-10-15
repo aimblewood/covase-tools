@@ -735,6 +735,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Journey map basemap</div>
+    <label>Tile URL template (blank = OpenStreetMap, no key needed)</label>
+    <input type="text" id="tile-url" placeholder="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?api_key=...">
+    <label>Attribution (required by most providers)</label>
+    <input type="text" id="tile-attr" placeholder="&copy; OpenStreetMap contributors">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Ideal Postcodes (PAF address lookup)</div>
     <label>API key (postcode → full address list)</label>
     <input type="password" id="idealpc-key" placeholder="ak_...">
@@ -1108,7 +1113,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="form-row trio">
         <div class="form-field"><label>Town / city</label><input id="hf-town" placeholder=""></div>
         <div class="form-field"><label>County</label><input id="hf-county" placeholder=""></div>
-        <div class="form-field"><label>Postcode</label><input id="hf-postcode" placeholder="" style="text-transform:uppercase"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('hire')">📮 Find addresses</span></div>
+          <input id="hf-postcode" placeholder="" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('hire');}">
+          <div id="hf-postcode-results" class="lookup-results"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Driver mobile</label><input id="hf-mobile" type="tel" placeholder="07XXX XXX XXX" autocomplete="off"></div>
@@ -1128,10 +1137,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         </div>
         <div class="form-field"><label>Date of registration</label><input type="date" id="hf-reg-date"></div>
       </div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>P11d value (£)</label><input type="number" step="0.01" id="hf-p11d" placeholder="0.00"></div>
         <div class="form-field"><label>CO₂ (g/km)</label><input type="number" step="1" id="hf-co2" placeholder="0"></div>
         <div class="form-field"><label>Engine (cc)</label><input type="number" step="1" id="hf-engine-cc" placeholder="0"></div>
+        <div class="form-field"><label>EV range (miles)</label><input type="number" step="1" min="0" id="hf-ev-range" placeholder="0"></div>
       </div>
       <div class="form-section-label">Dates &amp; Rates</div>
       <div class="form-row">
@@ -1286,10 +1296,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
         </div>
         <div class="form-field"><label>Date of registration</label><input type="date" id="rv-reg-date"></div>
       </div>
-      <div class="form-row trio">
+      <div class="form-row quad">
         <div class="form-field"><label>P11d value (£)</label><input type="number" step="0.01" id="rv-p11d" placeholder="0.00"></div>
         <div class="form-field"><label>CO₂ (g/km)</label><input type="number" step="1" id="rv-co2" placeholder="0"></div>
         <div class="form-field"><label>Engine (cc)</label><input type="number" step="1" id="rv-engine-cc" placeholder="0"></div>
+        <div class="form-field"><label>EV range (miles)</label><input type="number" step="1" min="0" id="rv-ev-range" placeholder="0"></div>
       </div>
       <div class="form-section-label">Rate</div>
       <div class="form-row">
@@ -2396,6 +2407,10 @@ function saveConfig(){
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   const ipcKey=(document.getElementById('idealpc-key')?.value||'').trim();
   if(ipcKey)localStorage.setItem('covase_idealpc_key',ipcKey);else localStorage.removeItem('covase_idealpc_key');
+  const tileUrl=(document.getElementById('tile-url')?.value||'').trim();
+  if(tileUrl)localStorage.setItem('covase_tile_url',tileUrl);else localStorage.removeItem('covase_tile_url');
+  const tileAttr=(document.getElementById('tile-attr')?.value||'').trim();
+  if(tileAttr)localStorage.setItem('covase_tile_attribution',tileAttr);else localStorage.removeItem('covase_tile_attribution');
   document.getElementById('config-panel').classList.remove('open');
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
@@ -2413,6 +2428,8 @@ function toggleConfig(){
   document.getElementById('n8n-replycheck-url').value=c.n8nReplyCheck===DEFAULT_N8N_REPLY_CHECK?'':c.n8nReplyCheck;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
   const ipcField=document.getElementById('idealpc-key');if(ipcField)ipcField.value=localStorage.getItem('covase_idealpc_key')||'';
+  const tileField=document.getElementById('tile-url');if(tileField)tileField.value=localStorage.getItem('covase_tile_url')||'';
+  const tileAttrField=document.getElementById('tile-attr');if(tileAttrField)tileAttrField.value=localStorage.getItem('covase_tile_attribution')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
 
@@ -3414,6 +3431,7 @@ const HIRE_CARD_FIELDS=[
   {key:'client_rate_day',label:'Client rate/day (£)',money:true,get:h=>{const c=(parseFloat(h.cost_per_day)||0)+(parseFloat(h.upsell_per_day)||0)+(parseFloat(h.rft_per_day)||0);return c?fmtMoney(c):'';}},
   {key:'category',label:'Category',get:h=>h.category||''},
   {key:'fuel_type',label:'Fuel',get:h=>h.fuel_type||''},
+  {key:'ev_range',label:'EV range',get:h=>h.ev_range!=null?h.ev_range+' mi':''},
   {key:'tariff',label:'Tariff',get:h=>h.tariff||''},
   {key:'delivery_town',label:'Delivery town',get:h=>h.delivery_town||''},
   {key:'delivery_county',label:'Delivery county',get:h=>h.delivery_county||''},
@@ -3590,6 +3608,7 @@ function buildHireCard(h){
         <div class="detail-field"><div class="detail-label">P11d value</div><div class="detail-val">${h.p11d_value!=null?fmtMoney(h.p11d_value):'—'}</div></div>
         <div class="detail-field"><div class="detail-label">CO₂ (g/km)</div><div class="detail-val">${h.co2_emissions!=null?h.co2_emissions:'—'}</div></div>
         <div class="detail-field"><div class="detail-label">Engine (cc)</div><div class="detail-val">${h.engine_cc!=null?h.engine_cc:'—'}</div></div>
+        <div class="detail-field"><div class="detail-label">EV range (miles)</div><div class="detail-val">${h.ev_range!=null?h.ev_range:'—'}</div></div>
       </div>
       <div class="financials-row">
         <div><span>Days</span><strong>${days??'—'}</strong></div>
@@ -3670,7 +3689,7 @@ function openEditHire(id){
   clearHireForm();
   populateHireAccountDropdown();
   const f=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
-  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-county',h.delivery_county);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
+  f('hf-account',h.client_account_id||'');f('hf-driver',h.driver);f('hf-mobile',h.driver_mobile);f('hf-reference',h.reference);f('hf-hire-status',h.hire_status||'booked');f('hf-billing',h.billing_status||'pending');f('hf-reg',h.vehicle_reg);f('hf-makemodel',h.make_model);f('hf-category',h.category);f('hf-fuel',h.fuel_type);f('hf-reg-date',h.date_of_registration);f('hf-p11d',h.p11d_value);f('hf-co2',h.co2_emissions);f('hf-engine-cc',h.engine_cc);f('hf-ev-range',h.ev_range);f('hf-addr1',h.delivery_address_line1);f('hf-addr2',h.delivery_address_line2);f('hf-town',h.delivery_town);f('hf-county',h.delivery_county);f('hf-postcode',h.delivery_postcode);f('hf-supplier',h.supplier);f('hf-supplier-ref',h.supplier_ref);f('hf-start',h.start_date);f('hf-end',h.end_date);f('hf-tariff',h.tariff);f('hf-start-time',h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'');f('hf-cost',h.cost_per_day);f('hf-upsell',h.upsell_per_day);f('hf-rft',h.rft_per_day);f('hf-in-inv',h.incoming_invoice_id);f('hf-out-inv',h.outgoing_invoice_id);f('hf-notes',h.notes);
   // Driver FK + Dynamics id (if contact exists with dynamics_id)
   f('hf-driver-contact-id',h.driver_contact_id||'');
   const driverContact=h.driver_contact_id?(allContacts||[]).find(c=>c.id===h.driver_contact_id):null;
@@ -3695,7 +3714,7 @@ function populateHireAccountDropdown(){
   if(cur)sel.value=cur;
 }
 function closeHireModal(){document.getElementById('hire-modal').classList.remove('open');}
-function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-addr1','hf-addr2','hf-town','hf-county','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
+function clearHireForm(){['hf-driver','hf-driver-contact-id','hf-driver-dynamics-id','hf-mobile','hf-reference','hf-reg','hf-makemodel','hf-reg-date','hf-p11d','hf-co2','hf-engine-cc','hf-ev-range','hf-addr1','hf-addr2','hf-town','hf-county','hf-postcode','hf-supplier-ref','hf-start','hf-end','hf-start-time','hf-cost','hf-upsell','hf-rft','hf-in-inv','hf-out-inv','hf-notes','hf-account-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['hf-category','hf-fuel','hf-supplier','hf-account','hf-tariff'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('hf-hire-status').value='pending';document.getElementById('hf-billing').value='pending';const tag=document.getElementById('hf-delivery-source');if(tag)tag.textContent='Auto-fills from driver Dynamics record';supps=[];renderSupps();updateHireRatePreview();
   // reset Dynamics UI bits
   const s=document.getElementById('hf-account-search');if(s)s.style.display='none';
   document.querySelectorAll('#hire-modal .lookup-results').forEach(r=>r.classList.remove('open'));
@@ -3785,7 +3804,7 @@ async function saveHire(){
     .map(s=>({type:s.type||'Other',cost_amount:suppCost(s),upsell_amount:suppUpsell(s),vat_status:s.vat_status||'full',notes:(s.notes||'').trim()||null}));
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
-  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_county:document.getElementById('hf-county').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_county:document.getElementById('hf-county').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,ev_range:parseInt(document.getElementById('hf-ev-range').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
@@ -3841,7 +3860,7 @@ function openSendSupplier(){
 }
 function hireEmailTokens(h,acc,notes){
   const addr=[h.delivery_address_line1,h.delivery_address_line2,h.delivery_town,h.delivery_county,h.delivery_postcode].filter(Boolean).join(', ');
-  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
+  return {customer:h.customer||'',reference:h.reference||'',hireStatus:h.hire_status||'',driver:h.driver||'',driverMobile:h.driver_mobile||'',startDate:fmtUK(h.start_date),endDate:h.end_date?fmtUK(h.end_date):'TBC',tariff:h.tariff||'',preferredStartTime:h.preferred_start_time?String(h.preferred_start_time).slice(0,5):'',vehicleReg:h.vehicle_reg||'',vehicleMakeModel:h.make_model||'',category:h.category||'',fuelType:h.fuel_type||'',dateOfRegistration:fmtUK(h.date_of_registration),engineCc:h.engine_cc!=null?String(h.engine_cc):'',evRange:h.ev_range!=null?String(h.ev_range):'',co2:h.co2_emissions!=null?String(h.co2_emissions):'',p11d:h.p11d_value!=null?String(h.p11d_value):'',address:addr,addressLine1:h.delivery_address_line1||'',addressLine2:h.delivery_address_line2||'',town:h.delivery_town||'',county:h.delivery_county||'',postcode:h.delivery_postcode||'',supplierName:acc?(acc.company_name||''):'',supplierRef:h.supplier_ref||'',costPerDay:h.cost_per_day!=null?String(h.cost_per_day):'',rftPerDay:h.rft_per_day!=null?String(h.rft_per_day):'',hireNotes:h.notes||'',notes:notes||''};
 }
 // Render the template into the editable subject/body. Typing in the body sets
 // ssDirty so note edits stop clobbering manual work; ↻ link forces a rebuild.
@@ -4000,7 +4019,7 @@ const ET_FIELD_GROUPS=[
   {g:'Customer & job',f:[['customer','Customer'],['reference','Booking reference'],['hireStatus','Hire status']]},
   {g:'Driver',f:[['driver','Driver name'],['driverMobile','Driver mobile']]},
   {g:'Dates',f:[['startDate','Start date'],['endDate','End date (blank shows TBC)'],['tariff','Tariff (duration band)'],['preferredStartTime','Preferred delivery time']]},
-  {g:'Vehicle',f:[['vehicleReg','Registration'],['vehicleMakeModel','Make / model'],['category','Category'],['fuelType','Fuel type'],['dateOfRegistration','Date of registration'],['engineCc','Engine (cc)'],['co2','CO2 (g/km)'],['p11d','P11D value']]},
+  {g:'Vehicle',f:[['vehicleReg','Registration'],['vehicleMakeModel','Make / model'],['category','Category'],['fuelType','Fuel type'],['dateOfRegistration','Date of registration'],['engineCc','Engine (cc)'],['evRange','EV range (miles)'],['co2','CO2 (g/km)'],['p11d','P11D value']]},
   {g:'Delivery address',f:[['address','Full address (one line)'],['addressLine1','Address line 1'],['addressLine2','Address line 2'],['town','Town'],['county','County'],['postcode','Postcode']]},
   {g:'Supplier',f:[['supplierName','Supplier name'],['supplierRef','Supplier invoice ref']]},
   {g:'Rates',f:[['costPerDay','Cost/day (supplier)'],['rftPerDay','RFT/day']]},
@@ -4037,7 +4056,7 @@ function etColor(c){etRestore();document.execCommand('foreColor',false,c);etSave
 function etLink(){const u=prompt('Link URL (include https://)');if(!u)return;etRestore();document.execCommand('createLink',false,u);etSaveRange();}
 function etField(token){if(!token)return;etRestore();document.execCommand('insertText',false,'{{'+token+'}}');etSaveRange();}
 function etResetDefault(){document.getElementById('et-subject').value=DEFAULT_BOOKING_SUBJECT;document.getElementById('et-body').innerHTML=DEFAULT_BOOKING_BODY;document.getElementById('et-preview').style.display='none';}
-function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',co2:'165',p11d:'32450',address:'1 High Street, Brighton, East Sussex, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',county:'East Sussex',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
+function sampleTokens(){return{customer:'Woodland Trust',reference:'CV-1042',hireStatus:'booked',driver:'Jane Doe',driverMobile:'07700 900123',startDate:'03/08/2026',endDate:'10/08/2026',tariff:'7-27 days',preferredStartTime:'09:00',vehicleReg:'AB12 CDE',vehicleMakeModel:'Ford Transit Custom',category:'Panel van',fuelType:'Diesel',dateOfRegistration:'01/03/2023',engineCc:'1995',evRange:'248',co2:'165',p11d:'32450',address:'1 High Street, Brighton, East Sussex, BN1 1AA',addressLine1:'1 High Street',addressLine2:'',town:'Brighton',county:'East Sussex',postcode:'BN1 1AA',supplierName:'Fourways',supplierRef:'FVSL048267',costPerDay:'62.50',rftPerDay:'',hireNotes:'Customer prefers morning delivery.',notes:'Tail lift preferred if available.'};}
 // Email clients add margins around block elements, so the editor's <div>/<p>
 // per-line output comes out double-spaced. Zero the block margins and turn
 // empty blocks into a single <br> so the email renders like the editor.
@@ -4158,6 +4177,7 @@ function renderSupplierReplies(){
     if(r.fuel_type)d.push(esc(r.fuel_type));
     if(r.co2_emissions!=null)d.push('CO2 '+esc(r.co2_emissions));
     if(r.engine_cc!=null)d.push(esc(r.engine_cc)+'cc');
+    if(r.ev_range!=null)d.push('Range '+esc(r.ev_range)+' mi');
     if(r.p11d_value!=null)d.push('P11D £'+esc(r.p11d_value));
     if(r.date_of_registration)d.push('Reg date '+esc(fmtUK(r.date_of_registration)));
     if(r.agreed_start_date||r.agreed_end_date)d.push('Dates '+esc(fmtUK(r.agreed_start_date)||'?')+' → '+esc(fmtUK(r.agreed_end_date)||'?'));
@@ -4230,6 +4250,7 @@ async function applyReply(id){
   if(r.fuel_type)patch.fuel_type=r.fuel_type;
   if(r.co2_emissions!=null)patch.co2_emissions=r.co2_emissions;
   if(r.engine_cc!=null)patch.engine_cc=r.engine_cc;
+  if(r.ev_range!=null)patch.ev_range=r.ev_range;
   if(r.date_of_registration)patch.date_of_registration=r.date_of_registration;
   if(r.agreed_start_date)patch.start_date=r.agreed_start_date;
   if(r.agreed_end_date)patch.end_date=r.agreed_end_date;
@@ -4493,7 +4514,7 @@ function openReplaceVehicle(){
   set('rv-changeover-date',today);
   set('rv-end-date',h.end_date||'');
   set('rv-reg','');set('rv-makemodel','');set('rv-category','');set('rv-fuel','');set('rv-reg-date','');
-  set('rv-p11d','');set('rv-co2','');set('rv-engine-cc','');
+  set('rv-p11d','');set('rv-co2','');set('rv-engine-cc','');set('rv-ev-range','');
   set('rv-cost',h.cost_per_day||'');
   document.getElementById('hire-modal').classList.remove('open');
   document.getElementById('replace-modal').classList.add('open');
@@ -4538,6 +4559,7 @@ async function saveReplacement(){
     p11d_value:parseFloat(document.getElementById('rv-p11d').value)||null,
     co2_emissions:parseInt(document.getElementById('rv-co2').value,10)||null,
     engine_cc:parseInt(document.getElementById('rv-engine-cc').value,10)||null,
+    ev_range:parseInt(document.getElementById('rv-ev-range').value,10)||null,
     // Allocation-level (new)
     start_date:changeoverDate,
     end_date:newEndDate,
@@ -5059,6 +5081,18 @@ function ensureLeaflet(){
   return window._leafletLoading;
 }
 function closeJourney(){jvToken++;document.getElementById('journey-modal').classList.remove('open');}
+// CARTO withdrew its keyless basemaps: the tiles still return 200, but every
+// one is stamped "API KEY REQUIRED", so the route drew over a watermark and
+// nothing errored. The default is now OpenStreetMap, which needs no key.
+// Settings takes a provider's own URL template to use anything else -- CARTO
+// included, with whatever key parameter they hand you.
+const JV_TILE_URL_DEFAULT='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const JV_TILE_ATTR_DEFAULT='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+function jvTileSource(){
+  const url=(localStorage.getItem('covase_tile_url')||'').trim();
+  const attr=(localStorage.getItem('covase_tile_attribution')||'').trim();
+  return {url:url||JV_TILE_URL_DEFAULT, attribution:attr||JV_TILE_ATTR_DEFAULT};
+}
 function jvBrand(){return (getComputedStyle(document.documentElement).getPropertyValue('--covase')||'#0a7a72').trim()||'#0a7a72';}
 // Count-up animation for a stat value
 function jvCount(el,target,fmt,dur){
@@ -5138,8 +5172,9 @@ async function openJourney(id){
     if(tok!==jvToken)return;
     mapEl.innerHTML='';
     if(jvMap){try{jvMap.remove();}catch(e){}jvMap=null;}
-    jvMap=L.map('jv-map',{zoomControl:false,attributionControl:false,scrollWheelZoom:true});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(jvMap);
+    jvMap=L.map('jv-map',{zoomControl:false,attributionControl:true,scrollWheelZoom:true});
+    const tiles=jvTileSource();
+    L.tileLayer(tiles.url,{maxZoom:19,attribution:tiles.attribution}).addTo(jvMap);
     const brand=jvBrand();
     const dot=(cls,bg)=>L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]});
     L.marker([A.lat,A.lng],{icon:dot('a',brand)}).addTo(jvMap).bindTooltip(esc(m.pickup_town||pc1),{direction:'top',offset:[0,-8]});
@@ -5438,11 +5473,14 @@ async function lookupMovementMileage(){
 // ── PAF postcode lookup (Ideal Postcodes): postcode → full address list.
 // Royal Mail data, ~3p/lookup — the residential-grade option. ORS autocomplete
 // below remains the free fallback when no key is set.
+// Movements name their fields mv-<prefix>-*, the hire delivery address names
+// them hf-*. Same lookup either way -- only the ids differ.
+function pafField(prefix,name){return prefix==='hire'?'hf-'+name:'mv-'+prefix+'-'+name;}
 async function lookupPafAddresses(prefix){
   const key=localStorage.getItem('covase_idealpc_key');
-  const res=document.getElementById('mv-'+prefix+'-postcode-results');if(!res)return;
+  const res=document.getElementById(pafField(prefix,'postcode-results'));if(!res)return;
   if(!key){toast('Add your Ideal Postcodes API key in Settings (⚙) for PAF address lookup','error');return;}
-  const pc=(document.getElementById('mv-'+prefix+'-postcode')?.value||'').trim();
+  const pc=(document.getElementById(pafField(prefix,'postcode'))?.value||'').trim();
   if(!pc){toast('Enter a postcode first','error');return;}
   res.innerHTML='<div class="lookup-status">Looking up addresses…</div>';res.classList.add('open');
   try{
@@ -5465,17 +5503,20 @@ function pickPafAddress(prefix,i){
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   const addr1=a.line_1||'';
   const addr2=[a.line_2,a.line_3].filter(Boolean).join(', ');
-  set('mv-'+prefix+'-addr1',addr1);
-  set('mv-'+prefix+'-addr2',addr2);
-  set('mv-'+prefix+'-town',a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
-  if(a.county)set('mv-'+prefix+'-county',a.county);
-  if(a.postcode)set('mv-'+prefix+'-postcode',a.postcode.toUpperCase());
+  set(pafField(prefix,'addr1'),addr1);
+  set(pafField(prefix,'addr2'),addr2);
+  set(pafField(prefix,'town'),a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
+  if(a.county)set(pafField(prefix,'county'),a.county);
+  if(a.postcode)set(pafField(prefix,'postcode'),a.postcode.toUpperCase());
   // PAF gives the property's exact coordinates — stash them for the mileage
   // route (signature guards against the address being edited afterwards)
-  window._mvCoords=window._mvCoords||{};
-  if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
-  else delete window._mvCoords[prefix];
-  document.getElementById('mv-'+prefix+'-postcode-results').classList.remove('open');
+  // Only the movement mileage route uses these; a hire has no routing.
+  if(prefix!=='hire'){
+    window._mvCoords=window._mvCoords||{};
+    if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
+    else delete window._mvCoords[prefix];
+  }
+  document.getElementById(pafField(prefix,'postcode-results')).classList.remove('open');
   if(prefix==='offhire')ohFieldChanged();
   toast('Address filled from Royal Mail PAF','success');
 }
