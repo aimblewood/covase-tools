@@ -26,7 +26,7 @@
 
 **n8n credentials:** Outlook OAuth `b7m5qszXbptDsLfk` ("Microsoft Outlook account" = Simon's account; Full Access + Send As on rentals@ and logistics@ — shared mailboxes have no login, hence `/users/<mailbox>/...` Graph paths, never `/me` for sends). Dynamics OAuth `UJJCexfFbCVEDskT` ("Unnamed credential") **works**; `kyMHkwTl7hZdAB2v` ("365 credential") **fails auth — never use**. Excel/SharePoint credential `NOhaxGlt7URuTtcI` exists (unused; earmarked for WT sheet write).
 
-Browser-side keys (localStorage, per machine, set in Settings ⚙): Supabase URL+anon key, OpenRouteService key (mileage), Ideal Postcodes key (PAF address lookup, `ak_…`).
+Browser-side keys (localStorage, per machine, set in Settings ⚙): Supabase URL+anon key, OpenRouteService key (mileage), Ideal Postcodes key (PAF address lookup, `ak_…`), and an optional journey-map tile URL + attribution (`covase_tile_url` / `covase_tile_attribution`, blank = OpenStreetMap).
 
 ## 3. n8n workflows (all active)
 
@@ -66,7 +66,7 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 ## 5. Platform feature map (covase-platform.html)
 
 - **Bookings (short hires):** pipeline kanban (Pending/Requested/Booked/Active/Off-hired lanes, drag + advance), designed cards (🎨 designer), send-to-supplier with editable email, delivery address incl. **county** (auto-filled from the driver's Dynamics contact, `address1_stateorprovince`), **📦 Offhire** flow (collect-from-delivery confirm, Dynamics/PAF/manual address, auto-advance at collection time, card badge), replace-vehicle chain, recharge flow.
-- **Logistics (movements):** list/kanban/calendar; card + calendar-chip designer with 🏷 labels and per-chip formatting; pricing £80 first 100mi + 80p/mi + markup, `price_override` = base only; **mileage is postcode-centroid → ORS routing, deliberately** (address fields are for emails/records, NOT routing); PAF postcode→address (Ideal Postcodes), Dynamics contact fill (incl. county), ORS autocomplete; supplier request email from logistics@; **🧭 Journey view** (Leaflet map, animated route, 5s, 🚗, stats).
+- **Logistics (movements):** list/kanban/calendar; card + calendar-chip designer with 🏷 labels and per-chip formatting; pricing £80 first 100mi + 80p/mi + markup, `price_override` = base only; **mileage is postcode-centroid → ORS routing, deliberately** (address fields are for emails/records, NOT routing); PAF postcode→address (Ideal Postcodes), Dynamics contact fill (incl. county), ORS autocomplete; supplier request email from logistics@; **🧭 Journey view** (Leaflet map, animated route, 5s, 🚗, stats). Basemap is **OpenStreetMap, keyless**, with attribution on; paste any provider's URL template in Settings to change it.
 - **Action Inbox → Review queue:** hire + movement replies together (🚚-prefixed), Apply/Reply/thread/re-link/dismiss; unmatched cards link to hire OR movement; ⚡ checks both webhooks. Reply modal: editable **To** (comma list ok), sends from correct mailbox; **New message / chase** works with zero inbound (Re: original subject + job ref).
 - **Correspondence threads** for hires AND movements (movement modal ✉ button; queue View thread).
 - **Accident management (FMG claims):** import DataSummary xlsx, type-aware kanban, full-field modal, dashboard, alerts, Dynamics fallback matching + match report. FMG is system of record.
@@ -95,6 +95,7 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 - The reply modal z-index is raised (260) so it stacks over other modals.
 - Card designer machinery is shared (`cdCtx` contexts mv/hire/fine) — new card types plug into `CD_CONTEXTS`.
 - `covase_supplier_replies.message_id` is unique — dedupe backbone for all agents.
+- CARTO withdrew its keyless basemaps (Oct 2026): tiles still returned **200**, each stamped "API KEY REQUIRED", so the Journey view drew its route over a watermark and nothing errored. Any tile provider can do this — a blank or branded map is a licensing change, not a code bug.
 
 ## 8. Open threads (Sep 2026)
 

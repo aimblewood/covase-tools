@@ -735,6 +735,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">OpenRouteService</div>
     <label>API key (for mileage lookup)</label>
     <input type="password" id="ors-key" placeholder="eyJ...">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Journey map basemap</div>
+    <label>Tile URL template (blank = OpenStreetMap, no key needed)</label>
+    <input type="text" id="tile-url" placeholder="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?api_key=...">
+    <label>Attribution (required by most providers)</label>
+    <input type="text" id="tile-attr" placeholder="&copy; OpenStreetMap contributors">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4);font-weight:700;margin:16px 0 2px">Ideal Postcodes (PAF address lookup)</div>
     <label>API key (postcode → full address list)</label>
     <input type="password" id="idealpc-key" placeholder="ak_...">
@@ -2398,6 +2403,10 @@ function saveConfig(){
   if(orsKey)localStorage.setItem('covase_ors_api_key',orsKey);else localStorage.removeItem('covase_ors_api_key');
   const ipcKey=(document.getElementById('idealpc-key')?.value||'').trim();
   if(ipcKey)localStorage.setItem('covase_idealpc_key',ipcKey);else localStorage.removeItem('covase_idealpc_key');
+  const tileUrl=(document.getElementById('tile-url')?.value||'').trim();
+  if(tileUrl)localStorage.setItem('covase_tile_url',tileUrl);else localStorage.removeItem('covase_tile_url');
+  const tileAttr=(document.getElementById('tile-attr')?.value||'').trim();
+  if(tileAttr)localStorage.setItem('covase_tile_attribution',tileAttr);else localStorage.removeItem('covase_tile_attribution');
   document.getElementById('config-panel').classList.remove('open');
   toast('Saved — reloading…','success');setTimeout(()=>location.reload(),400);
 }
@@ -2415,6 +2424,8 @@ function toggleConfig(){
   document.getElementById('n8n-replycheck-url').value=c.n8nReplyCheck===DEFAULT_N8N_REPLY_CHECK?'':c.n8nReplyCheck;
   const orsField=document.getElementById('ors-key');if(orsField)orsField.value=localStorage.getItem('covase_ors_api_key')||'';
   const ipcField=document.getElementById('idealpc-key');if(ipcField)ipcField.value=localStorage.getItem('covase_idealpc_key')||'';
+  const tileField=document.getElementById('tile-url');if(tileField)tileField.value=localStorage.getItem('covase_tile_url')||'';
+  const tileAttrField=document.getElementById('tile-attr');if(tileAttrField)tileAttrField.value=localStorage.getItem('covase_tile_attribution')||'';
   if(opening)setTimeout(()=>p.scrollIntoView({block:'end',behavior:'smooth'}),0);
 }
 
@@ -5066,6 +5077,18 @@ function ensureLeaflet(){
   return window._leafletLoading;
 }
 function closeJourney(){jvToken++;document.getElementById('journey-modal').classList.remove('open');}
+// CARTO withdrew its keyless basemaps: the tiles still return 200, but every
+// one is stamped "API KEY REQUIRED", so the route drew over a watermark and
+// nothing errored. The default is now OpenStreetMap, which needs no key.
+// Settings takes a provider's own URL template to use anything else -- CARTO
+// included, with whatever key parameter they hand you.
+const JV_TILE_URL_DEFAULT='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const JV_TILE_ATTR_DEFAULT='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+function jvTileSource(){
+  const url=(localStorage.getItem('covase_tile_url')||'').trim();
+  const attr=(localStorage.getItem('covase_tile_attribution')||'').trim();
+  return {url:url||JV_TILE_URL_DEFAULT, attribution:attr||JV_TILE_ATTR_DEFAULT};
+}
 function jvBrand(){return (getComputedStyle(document.documentElement).getPropertyValue('--covase')||'#0a7a72').trim()||'#0a7a72';}
 // Count-up animation for a stat value
 function jvCount(el,target,fmt,dur){
@@ -5145,8 +5168,9 @@ async function openJourney(id){
     if(tok!==jvToken)return;
     mapEl.innerHTML='';
     if(jvMap){try{jvMap.remove();}catch(e){}jvMap=null;}
-    jvMap=L.map('jv-map',{zoomControl:false,attributionControl:false,scrollWheelZoom:true});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(jvMap);
+    jvMap=L.map('jv-map',{zoomControl:false,attributionControl:true,scrollWheelZoom:true});
+    const tiles=jvTileSource();
+    L.tileLayer(tiles.url,{maxZoom:19,attribution:tiles.attribution}).addTo(jvMap);
     const brand=jvBrand();
     const dot=(cls,bg)=>L.divIcon({className:'',html:'<div style="width:14px;height:14px;border-radius:50%;background:'+bg+';border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]});
     L.marker([A.lat,A.lng],{icon:dot('a',brand)}).addTo(jvMap).bindTooltip(esc(m.pickup_town||pc1),{direction:'top',offset:[0,-8]});
