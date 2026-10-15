@@ -82,7 +82,8 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 - `str_replace`-style incremental edits, never wholesale rewrites. `node --check` the extracted script block after edits.
 - SQL first → Simon runs it → then app code. Confirm before anything destructive; flag irreversible actions.
 - Dates: DB ISO, UI `fmtUK()` DD/MM/YYYY. Regs uppercased, whitespace-stripped.
-- Simon pushes all deploys. Claude never activates new n8n workflows.
+- **Claude commits and pushes once Simon says the work is OK** (agreed 15 Oct 2026) — don't ask again for the push itself. Getting it onto `main` (= deploy) additionally needs `Bash(git merge *)` and `Bash(git push *)` allowed in a **committed** `.claude/settings.json`: without it the harness denies the merge as a production deploy, and Claude cannot add the rule itself (denied as self-modification). Put it in the committed project settings, not the gitignored local one — cloud containers are re-cloned, which silently loses a local grant.
+- Claude never activates new n8n workflows.
 - Matching philosophy everywhere: **unique-match-or-refuse** — an unmatched queue item beats a wrong match.
 - Don't touch: RLS/security silently, M365 settings, live client data (see PROJECT.md §10).
 - When uncertain about a fact, say so — don't pattern-match.
