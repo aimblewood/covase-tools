@@ -1113,7 +1113,11 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
       <div class="form-row trio">
         <div class="form-field"><label>Town / city</label><input id="hf-town" placeholder=""></div>
         <div class="form-field"><label>County</label><input id="hf-county" placeholder=""></div>
-        <div class="form-field"><label>Postcode</label><input id="hf-postcode" placeholder="" style="text-transform:uppercase"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('hire')">📮 Find addresses</span></div>
+          <input id="hf-postcode" placeholder="" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('hire');}">
+          <div id="hf-postcode-results" class="lookup-results"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Driver mobile</label><input id="hf-mobile" type="tel" placeholder="07XXX XXX XXX" autocomplete="off"></div>
@@ -5469,11 +5473,14 @@ async function lookupMovementMileage(){
 // ── PAF postcode lookup (Ideal Postcodes): postcode → full address list.
 // Royal Mail data, ~3p/lookup — the residential-grade option. ORS autocomplete
 // below remains the free fallback when no key is set.
+// Movements name their fields mv-<prefix>-*, the hire delivery address names
+// them hf-*. Same lookup either way -- only the ids differ.
+function pafField(prefix,name){return prefix==='hire'?'hf-'+name:'mv-'+prefix+'-'+name;}
 async function lookupPafAddresses(prefix){
   const key=localStorage.getItem('covase_idealpc_key');
-  const res=document.getElementById('mv-'+prefix+'-postcode-results');if(!res)return;
+  const res=document.getElementById(pafField(prefix,'postcode-results'));if(!res)return;
   if(!key){toast('Add your Ideal Postcodes API key in Settings (⚙) for PAF address lookup','error');return;}
-  const pc=(document.getElementById('mv-'+prefix+'-postcode')?.value||'').trim();
+  const pc=(document.getElementById(pafField(prefix,'postcode'))?.value||'').trim();
   if(!pc){toast('Enter a postcode first','error');return;}
   res.innerHTML='<div class="lookup-status">Looking up addresses…</div>';res.classList.add('open');
   try{
@@ -5496,17 +5503,20 @@ function pickPafAddress(prefix,i){
   const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
   const addr1=a.line_1||'';
   const addr2=[a.line_2,a.line_3].filter(Boolean).join(', ');
-  set('mv-'+prefix+'-addr1',addr1);
-  set('mv-'+prefix+'-addr2',addr2);
-  set('mv-'+prefix+'-town',a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
-  if(a.county)set('mv-'+prefix+'-county',a.county);
-  if(a.postcode)set('mv-'+prefix+'-postcode',a.postcode.toUpperCase());
+  set(pafField(prefix,'addr1'),addr1);
+  set(pafField(prefix,'addr2'),addr2);
+  set(pafField(prefix,'town'),a.post_town?String(a.post_town).replace(/\b\w+/g,w=>w[0]+w.slice(1).toLowerCase()):'');
+  if(a.county)set(pafField(prefix,'county'),a.county);
+  if(a.postcode)set(pafField(prefix,'postcode'),a.postcode.toUpperCase());
   // PAF gives the property's exact coordinates — stash them for the mileage
   // route (signature guards against the address being edited afterwards)
-  window._mvCoords=window._mvCoords||{};
-  if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
-  else delete window._mvCoords[prefix];
-  document.getElementById('mv-'+prefix+'-postcode-results').classList.remove('open');
+  // Only the movement mileage route uses these; a hire has no routing.
+  if(prefix!=='hire'){
+    window._mvCoords=window._mvCoords||{};
+    if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
+    else delete window._mvCoords[prefix];
+  }
+  document.getElementById(pafField(prefix,'postcode-results')).classList.remove('open');
   if(prefix==='offhire')ohFieldChanged();
   toast('Address filled from Royal Mail PAF','success');
 }
