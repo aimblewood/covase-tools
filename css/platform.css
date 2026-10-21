@@ -607,3 +607,13 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .tapmove-opt.current{color:var(--n400);font-weight:500}
 .tapmove-opt.current::after{content:'current';margin-left:auto;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--n300)}
 .tapmove-cancel{padding:14px 20px;text-align:center;font-size:13px;font-weight:700;color:var(--n500);cursor:pointer;border-top:1px solid var(--n200);}
+/* ── Document library (js/09-documents.js) ── */
+.docs-drop{border:1.5px dashed var(--n200);border-radius:10px;padding:12px 14px 8px;margin-bottom:14px;transition:background .15s,border-color .15s}
+.docs-drop.over{background:var(--n50);border-color:var(--covase)}
+.docs-drop-hint{font-size:11px;color:var(--n400);margin-top:-4px}
+.docs-list{display:flex;flex-direction:column;gap:8px}
+.doc-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--n100);border-radius:10px;background:#fff}
+.doc-main{flex:1;min-width:0}
+.doc-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-meta{font-size:11px;color:var(--n400);margin-top:2px}
+@media (max-width:700px){.doc-row{flex-wrap:wrap}.doc-main{flex-basis:100%}}
