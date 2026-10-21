@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORBIS-SON — Covase</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/platform.css?v=fd98e9b2ab">
+<link rel="stylesheet" href="css/platform.css?v=53849ed568">
 </head>
 <body>
 
@@ -1407,6 +1407,29 @@
 </div>
 
 <!-- ─── ACCOUNT MODAL ─── -->
+<div class="modal-overlay" id="docs-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="docs-modal-title">Documents</div>
+      <button class="modal-close" onclick="closeDocsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="docs-drop" class="docs-drop" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="docsDrop(event)">
+        <div class="form-row">
+          <div class="form-field"><label>Document type</label>
+            <select id="docs-type"><option value="quotation">Quotation</option><option value="funder_quote">Funder quote / worksheet</option><option value="purchase_order">Purchase order</option><option value="order_confirmation">Order confirmation</option><option value="contract">Contract</option><option value="signed_contract">Signed contract</option><option value="v5">V5 / registration</option><option value="driving_licence">Driving licence</option><option value="delivery_note">Delivery note</option><option value="invoice">Invoice</option><option value="photo">Photo</option><option value="correspondence">Correspondence</option><option value="other">Other</option></select>
+          </div>
+          <div class="form-field"><label>Add files</label><input type="file" id="docs-file" multiple onchange="uploadDocs(this.files)"></div>
+        </div>
+        <div class="docs-drop-hint">…or drop files anywhere in this box. Up to 25MB each.</div>
+      </div>
+      <div id="docs-list" class="docs-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary-modal" onclick="closeDocsModal()">Close</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="account-modal">
   <div class="modal">
     <div class="modal-header">
@@ -1802,9 +1825,10 @@
 <script src="js/02-invoices.js?v=69553f6e76"></script>
 <script src="js/03-hires.js?v=e2c0ed031c"></script>
 <script src="js/04-movements.js?v=23fcbd05be"></script>
-<script src="js/05-crm.js?v=91b0afea76"></script>
+<script src="js/05-crm.js?v=645a44f4fe"></script>
 <script src="js/06-claims.js?v=810fa584ed"></script>
 <script src="js/07-fines.js?v=d84bafd6f1"></script>
 <script src="js/08-chrome.js?v=40de86e684"></script>
+<script src="js/09-documents.js?v=1b67cd4d30"></script>
 </body>
 </html>

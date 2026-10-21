@@ -76,6 +76,7 @@ function buildAccountCard(a){
       ${a.notes?`<div class="notes-box">${esc(a.notes)}</div>`:''}
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditAccount('${a.id}')">✎ Edit</button>
+        <button class="btn btn-edit" onclick="openDocs('account','${a.id}',allAccounts.find(x=>x.id==='${a.id}')?.company_name)">📎 Documents</button>
         <button class="btn btn-recharge" onclick="openGenerator();localStorage.setItem('prefill_client','${esc(a.company_name)}')">+ Invoice this account</button>
         <button class="btn btn-danger" onclick="deleteAccount('${a.id}')">✗</button>
       </div>
@@ -171,6 +172,7 @@ function buildContactCard(c){
       ${c.notes?`<div class="notes-box">${esc(c.notes)}</div>`:''}
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditContact('${c.id}')">✎ Edit</button>
+        <button class="btn btn-edit" onclick="openDocs('contact','${c.id}',contactDisplayName(allContacts.find(x=>x.id==='${c.id}')||{}))">📎 Documents</button>
         <button class="btn btn-danger" onclick="deleteContact('${c.id}')">✗</button>
       </div>
     </div>
@@ -308,6 +310,7 @@ function buildVehicleCard(v){
       ${v.notes?`<div class="notes-box">${esc(v.notes)}</div>`:''}
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditVehicle('${v.id}')">✎ Edit</button>
+        <button class="btn btn-edit" onclick="openDocs('vehicle','${v.id}',(allVehicles.find(x=>x.id==='${v.id}')||{}).registration)">📎 Documents</button>
         <button class="btn btn-danger" onclick="deleteVehicle('${v.id}')">✗</button>
       </div>
     </div>
