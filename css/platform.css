@@ -617,3 +617,25 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .doc-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .doc-meta{font-size:11px;color:var(--n400);margin-top:2px}
 @media (max-width:700px){.doc-row{flex-wrap:wrap}.doc-main{flex-basis:100%}}
+/* ── Lease CRM (js/10-orders.js, 11-fleet.js, 12-overview.js) ── */
+.modal.ls-wide{max-width:min(1100px,96vw);width:100%}
+.ls-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 12px}
+.ls-quote{border:1px solid var(--n100);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff}
+.ls-quote.chosen{border-color:var(--covase);box-shadow:0 0 0 1px var(--covase) inset}
+.ls-quote-head{font-size:13px;margin-bottom:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ls-stagebar{display:flex;gap:4px;flex-wrap:wrap}
+.ls-step{flex:1 1 90px;font:600 11px var(--font-body,inherit);padding:7px 6px;border-radius:6px;border:1px solid var(--n200);background:var(--n50);color:var(--n500);cursor:pointer}
+.ls-step.done{background:#e6faf8;border-color:var(--covase);color:var(--n700)}
+.ls-step.cur{background:var(--covase);border-color:var(--covase);color:#08303a}
+.ls-check{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.ls-check label{font-size:13px;display:flex;gap:8px;align-items:center;cursor:pointer}
+.ls-check label span{font-size:11px;color:var(--n400)}
+.ls-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+.ls-table th{text-align:left;font-weight:600;color:var(--n500);border-bottom:1px solid var(--n100);padding:5px 6px}
+.ls-table td{border-bottom:1px solid var(--n100);padding:5px 6px;vertical-align:top}
+.kan-card.ls-stuck{border-left-color:#e5484d}
+.ls-dash{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
+.ls-dash-card{background:var(--card);border:1px solid var(--n100);border-radius:var(--radius);padding:14px 16px}
+.ls-bar{background:var(--n50);border-radius:4px;height:8px;overflow:hidden}.ls-bar span{display:block;height:100%;background:var(--covase)}
+@media (max-width:1024px){.ls-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.ls-grid{grid-template-columns:1fr}.ls-dash{grid-template-columns:1fr}.ls-step{flex-basis:44%}.ls-table{font-size:11px}}

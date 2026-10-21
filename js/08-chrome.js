@@ -232,6 +232,9 @@ const SB_ITEMS={
   'accounts':{icon:'◉',label:'Accounts',view:'accounts',badge:'badge-accounts'},
   'contacts':{icon:'👤',label:'Contacts',view:'contacts',badge:'badge-contacts'},
   'vehicles':{icon:'🚙',label:'Vehicles',view:'vehicles',badge:'badge-vehicles'},
+  'orders':{icon:'📝',label:'Orders',view:'orders',badge:'badge-orders',home:'accounts'},
+  'fleet':{icon:'🛣',label:'Lease fleet',view:'fleet',badge:'badge-fleet',home:'vehicles'},
+  'crm-dashboard':{icon:'📊',label:'CRM dashboard',view:'crm-dashboard',home:'accounts'},
   'reconciliation':{icon:'⟷',label:'Reconciliation',disabled:true},
   'sage':{icon:'◎',label:'Sage',disabled:true},
   'gocardless':{icon:'◉',label:'GoCardless',disabled:true}
@@ -243,8 +246,8 @@ const DEFAULT_SB_LAYOUT={sections:[
   {label:'Accident management',items:['claims']},
   {label:'Fines & penalties',items:['fines']},
   {label:'Supplier replies',items:['supplier-replies']},
-  {label:'CRM',items:['accounts','contacts']},
-  {label:'Fleet',items:['vehicles']},
+  {label:'CRM',items:['crm-dashboard','orders','accounts','contacts']},
+  {label:'Fleet',items:['fleet','vehicles']},
   {label:'Reports',items:['reconciliation']},
   {label:'Integrations',items:['sage','gocardless']}
 ],hidden:[]};
@@ -260,6 +263,12 @@ function sbCloneLayout(src){
   const used=new Set();
   sections.forEach(x=>{x.items=x.items.filter(k=>{if(used.has(k))return false;used.add(k);return true;});});
   hidden=hidden.filter(k=>{if(used.has(k))return false;used.add(k);return true;});
+  // new modules with a `home` join the section that holds their home item
+  // (a saved layout otherwise drops them into "Other")
+  Object.keys(SB_ITEMS).filter(k=>!used.has(k)&&SB_ITEMS[k].home).forEach(k=>{
+    const sec=sections.find(x=>x.items.includes(SB_ITEMS[k].home));
+    if(sec){sec.items.splice(sec.items.indexOf(SB_ITEMS[k].home),0,k);used.add(k);}
+  });
   const missing=Object.keys(SB_ITEMS).filter(k=>!used.has(k));
   if(missing.length){
     let other=sections.find(x=>x.label==='Other');
@@ -505,7 +514,11 @@ let tapMoveCtx=null;
 function openTapMove(e,kind,id){
   if(e){e.stopPropagation();e.preventDefault();}
   let title,lanes,current,apply;
-  if(kind==='mv'){
+  const reg=(window.TAPMOVE_KINDS||{})[kind]; // later section files register their boards here
+  if(reg){
+    const c=reg(id); if(!c) return;
+    title=c.title; lanes=c.lanes; current=c.current; apply=c.apply;
+  }else if(kind==='mv'){
     const m=(allMovements||[]).find(x=>x.id===id); if(!m) return;
     current=m.movement_status;
     // 'in_progress' is retired — only offer it if the card is already sitting there

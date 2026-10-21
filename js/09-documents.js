@@ -46,24 +46,30 @@ async function loadDocs(){
 
 async function uploadDocs(files){
   if(!docCtx||!files||!files.length)return;
-  const type=document.getElementById('docs-type').value||'other';
-  let ok=0;
-  for(const f of files){
-    if(f.size>DOC_MAX_BYTES){toast(`${f.name} is over 25MB — not uploaded`,'error');continue;}
-    const safe=f.name.replace(/[^\w.\-]+/g,'_').slice(-120);
-    const path=`documents/${docCtx.type}/${docCtx.id}/${Date.now()}-${safe}`;
-    try{
-      const r=await fetch(docStorageUrl(path),{method:'POST',headers:docHeaders({'Content-Type':f.type||'application/octet-stream','x-upsert':'false'}),body:f});
-      if(!r.ok)throw new Error(await r.text());
-      const ins=await sbReq('covase_documents',{method:'POST',body:{storage_path:path.replace(/^documents\//,''),file_name:f.name,mime_type:f.type||null,size_bytes:f.size,doc_type:type,source:'upload'}});
-      const doc=Array.isArray(ins)?ins[0]:ins;
-      await sbReq('covase_document_links',{method:'POST',body:{document_id:doc.id,record_type:docCtx.type,record_id:docCtx.id},prefer:'return=minimal'});
-      ok++;
-    }catch(e){toast(`${f.name}: upload failed — ${e.message}`,'error');}
-  }
+  const ok=await uploadDocsTo(docCtx.type,docCtx.id,files,document.getElementById('docs-type').value||'other');
   document.getElementById('docs-file').value='';
   if(ok)toast(ok===1?'Document added':ok+' documents added','success');
   loadDocs();
+}
+// Store files against any record. Also used by other modules (e.g. the funder
+// worksheet reader files the worksheet it read on the order). The new
+// covase_documents ids are left in window._lastDocIds.
+async function uploadDocsTo(recordType,recordId,files,docType){
+  let ok=0;window._lastDocIds=[];
+  for(const f of files){
+    if(f.size>DOC_MAX_BYTES){toast(`${f.name} is over 25MB — not uploaded`,'error');continue;}
+    const safe=f.name.replace(/[^\w.\-]+/g,'_').slice(-120);
+    const path=`documents/${recordType}/${recordId}/${Date.now()}-${safe}`;
+    try{
+      const r=await fetch(docStorageUrl(path),{method:'POST',headers:docHeaders({'Content-Type':f.type||'application/octet-stream','x-upsert':'false'}),body:f});
+      if(!r.ok)throw new Error(await r.text());
+      const ins=await sbReq('covase_documents',{method:'POST',body:{storage_path:path.replace(/^documents\//,''),file_name:f.name,mime_type:f.type||null,size_bytes:f.size,doc_type:docType||'other',source:'upload'}});
+      const doc=Array.isArray(ins)?ins[0]:ins;
+      await sbReq('covase_document_links',{method:'POST',body:{document_id:doc.id,record_type:recordType,record_id:recordId},prefer:'return=minimal'});
+      window._lastDocIds.push(doc.id);ok++;
+    }catch(e){toast(`${f.name}: upload failed — ${e.message}`,'error');}
+  }
+  return ok;
 }
 
 async function openDoc(docId){
