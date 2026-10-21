@@ -1,4 +1,24 @@
 // ─── ACCOUNTS ───
+// Structured address (address_line1..postcode, added 21 Oct 2026) as display
+// lines; falls back to the legacy free-text `address`, which is never parsed
+// or overwritten.
+function fmtAddressLines(o){
+  const lines=[o.address_line1,o.address_line2,o.address_line3,o.town,o.county,o.postcode].map(v=>(v||'').trim()).filter(Boolean);
+  return lines.length?lines.join('\n'):(o.address||'').trim();
+}
+// Address fields shared by the account (acf) and contact (ctf) forms.
+const ADDR_FIELDS=[['addr1','address_line1'],['addr2','address_line2'],['town','town'],['county','county'],['postcode','postcode']];
+function fillAddressFields(px,o){
+  ADDR_FIELDS.forEach(([f,col])=>{const e=document.getElementById(px+'-'+f);if(e)e.value=o?.[col]||'';});
+  const leg=document.getElementById(px+'-address');if(leg)leg.value=o?.address||'';
+  const w=document.getElementById(px+'-legacy-wrap');if(w)w.style.display=o?.address?'':'none';
+  const r=document.getElementById(px+'-postcode-results');if(r)r.classList.remove('open');
+}
+function readAddressFields(px){
+  const out={};
+  ADDR_FIELDS.forEach(([f,col])=>{const v=(document.getElementById(px+'-'+f)?.value||'').trim();out[col]=v?(f==='postcode'?v.toUpperCase():v):null;});
+  return out;
+}
 let allAccounts=[],accountFilter='all';
 async function loadAccounts(){
   const el=document.getElementById('account-list');if(needsSetup(el))return;
@@ -52,7 +72,7 @@ function buildAccountCard(a){
         <div class="detail-field"><div class="detail-label">Payment method</div><div class="detail-val">${pmLabel}</div></div>
         <div class="detail-field"><div class="detail-label">Dynamics ID</div><div class="detail-val">${a.dynamics_id?`<a href="${d365Url('account',a.dynamics_id)}" target="_blank" rel="noopener" class="d365-chip small" title="${esc(a.dynamics_id)}">↗ Open in Dynamics</a>`:'—'}</div></div>
       </div>
-      ${a.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(a.address)}</div>`:''}
+      ${fmtAddressLines(a)?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(fmtAddressLines(a))}</div>`:''}
       ${a.notes?`<div class="notes-box">${esc(a.notes)}</div>`:''}
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditAccount('${a.id}')">✎ Edit</button>
@@ -74,16 +94,17 @@ function openEditAccount(id){
   const a=allAccounts.find(x=>x.id===id);if(!a)return;editAccountId=id;
   document.getElementById('account-modal-title').textContent='Edit account';
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);f('acf-address',a.address);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);f('acf-booking-email',a.booking_email);
-  updateAccountDynamicsLink();toggleAcfBookingEmail();
+  f('acf-company',a.company_name);f('acf-type',a.type||'client');f('acf-status',a.status);f('acf-mha',a.mha);f('acf-contact',a.contact_name);f('acf-email',a.contact_email);f('acf-phone',a.contact_phone);f('acf-manager',a.account_manager);fillAddressFields('acf',a);f('acf-website',a.website);f('acf-company-number',a.company_number);f('acf-vat',a.vat_number);f('acf-ordering',a.ordering_route);f('acf-pm',a.payment_method);f('acf-terms',a.payment_terms);f('acf-dynamics',a.dynamics_id);f('acf-notes',a.notes);f('acf-booking-email',a.booking_email);
+  updateAccountDynamicsLink();toggleAcfBookingEmail();toggleAcfOrdering();
   document.getElementById('account-modal').classList.add('open');
 }
 function closeAccountModal(){document.getElementById('account-modal').classList.remove('open');}
+function toggleAcfOrdering(){const w=document.getElementById('acf-ordering-wrap');if(w)w.style.display=['dealer','funder','supplier'].includes(document.getElementById('acf-type').value)?'':'none';}
 function toggleAcfBookingEmail(){const w=document.getElementById('acf-booking-email-wrap');if(w)w.style.display=document.getElementById('acf-type').value==='supplier'?'':'none';}
-function clearAccountForm(){['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-address','acf-dynamics','acf-notes','acf-booking-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';updateAccountDynamicsLink();toggleAcfBookingEmail();}
+function clearAccountForm(){fillAddressFields('acf',null);['acf-company','acf-mha','acf-contact','acf-email','acf-phone','acf-dynamics','acf-notes','acf-booking-email','acf-website','acf-company-number','acf-vat','acf-ordering'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('acf-type').value='client';document.getElementById('acf-status').value='active';document.getElementById('acf-pm').value='BACS';document.getElementById('acf-terms').value='28 days';document.getElementById('acf-manager').value='Simon Homer';updateAccountDynamicsLink();toggleAcfBookingEmail();toggleAcfOrdering();}
 async function saveAccount(){
   const company=document.getElementById('acf-company').value.trim();if(!company){toast('Company name required','error');return;}
-  const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,booking_email:document.getElementById('acf-booking-email').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={company_name:company,type:document.getElementById('acf-type').value,status:document.getElementById('acf-status').value,mha:document.getElementById('acf-mha').value.trim()||null,contact_name:document.getElementById('acf-contact').value.trim()||null,contact_email:document.getElementById('acf-email').value.trim()||null,contact_phone:document.getElementById('acf-phone').value.trim()||null,account_manager:document.getElementById('acf-manager').value,address:document.getElementById('acf-address').value.trim()||null,...readAddressFields('acf'),website:document.getElementById('acf-website').value.trim()||null,company_number:document.getElementById('acf-company-number').value.trim()||null,vat_number:document.getElementById('acf-vat').value.trim()||null,ordering_route:document.getElementById('acf-ordering').value||null,payment_method:document.getElementById('acf-pm').value,payment_terms:document.getElementById('acf-terms').value,dynamics_id:document.getElementById('acf-dynamics').value.trim()||null,notes:document.getElementById('acf-notes').value.trim()||null,booking_email:document.getElementById('acf-booking-email').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editAccountId){await sbReq(`covase_accounts?id=eq.${encodeURIComponent(editAccountId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allAccounts.findIndex(x=>x.id===editAccountId);if(idx>=0)allAccounts[idx]={...allAccounts[idx],...payload};toast('Account updated','success');}
     else{const res=await sbReq('covase_accounts',{method:'POST',body:{...payload,id:'acc-'+Date.now()}});allAccounts.push(Array.isArray(res)?res[0]:res||{...payload,id:'acc-'+Date.now()});allAccounts.sort((a,b)=>a.company_name.localeCompare(b.company_name));toast('Account saved','success');}
@@ -146,7 +167,7 @@ function buildContactCard(c){
         <div class="detail-field"><div class="detail-label">Driver grade</div><div class="detail-val">${esc(c.driver_grade||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Account</div><div class="detail-val">${esc(acctName)}</div></div>
       </div>
-      ${c.address?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(c.address)} <span style="color:var(--n400);font-size:11px">(${esc(c.address_type||'home')})</span></div>`:''}
+      ${fmtAddressLines(c)?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(fmtAddressLines(c))} <span style="color:var(--n400);font-size:11px">(${esc(c.address_type||'home')})</span></div>`:''}
       ${c.notes?`<div class="notes-box">${esc(c.notes)}</div>`:''}
       <div class="action-row">
         <button class="btn btn-edit" onclick="openEditContact('${c.id}')">✎ Edit</button>
@@ -163,12 +184,12 @@ function openEditContact(id){
   document.getElementById('contact-modal-title').textContent='Edit contact';
   populateContactAccountSelect(c.account_id);
   const f=(fid,v)=>{const e=document.getElementById(fid);if(e)e.value=v??''};
-  f('ctf-first',c.first_name);f('ctf-surname',c.last_name);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);f('ctf-address',c.address);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);f('ctf-dynamics',c.dynamics_id);
+  f('ctf-first',c.first_name);f('ctf-surname',c.last_name);f('ctf-preferred',c.preferred_name);f('ctf-empno',c.employee_number);f('ctf-email',c.email);f('ctf-mobile',c.mobile);fillAddressFields('ctf',c);f('ctf-addr-type',c.address_type||'home');f('ctf-type',c.contact_type||'driver');f('ctf-status',c.employee_status||'employed');f('ctf-job',c.job_description);f('ctf-grade',c.driver_grade);f('ctf-notes',c.notes);f('ctf-dynamics',c.dynamics_id);
   updateContactDynamicsLink();
   document.getElementById('contact-modal').classList.add('open');
 }
 function closeContactModal(){document.getElementById('contact-modal').classList.remove('open');}
-function clearContactForm(){['ctf-first','ctf-surname','ctf-preferred','ctf-empno','ctf-email','ctf-mobile','ctf-address','ctf-job','ctf-grade','ctf-notes','ctf-dynamics'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('ctf-addr-type').value='home';document.getElementById('ctf-type').value='driver';document.getElementById('ctf-status').value='employed';updateContactDynamicsLink();}
+function clearContactForm(){fillAddressFields('ctf',null);['ctf-first','ctf-surname','ctf-preferred','ctf-empno','ctf-email','ctf-mobile','ctf-job','ctf-grade','ctf-notes','ctf-dynamics'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('ctf-addr-type').value='home';document.getElementById('ctf-type').value='driver';document.getElementById('ctf-status').value='employed';updateContactDynamicsLink();}
 function updateContactDynamicsLink(){
   const id=(document.getElementById('ctf-dynamics')?.value||'').trim();
   const link=document.getElementById('ctf-dynamics-link');if(!link)return;
@@ -190,7 +211,7 @@ function populateContactAccountSelect(selectedId=''){
 async function saveContact(){
   const first=document.getElementById('ctf-first').value.trim(),surname=document.getElementById('ctf-surname').value.trim();
   if(!first||!surname){toast('First name and surname required','error');return;}
-  const payload={first_name:first,last_name:surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,dynamics_id:document.getElementById('ctf-dynamics').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  const payload={first_name:first,last_name:surname,preferred_name:document.getElementById('ctf-preferred').value.trim()||null,account_id:document.getElementById('ctf-account').value||null,employee_number:document.getElementById('ctf-empno').value.trim()||null,email:document.getElementById('ctf-email').value.trim()||null,mobile:document.getElementById('ctf-mobile').value.trim()||null,address:document.getElementById('ctf-address').value.trim()||null,...readAddressFields('ctf'),address_type:document.getElementById('ctf-addr-type').value||'home',contact_type:document.getElementById('ctf-type').value||'driver',employee_status:document.getElementById('ctf-status').value||'employed',job_description:document.getElementById('ctf-job').value.trim()||null,driver_grade:document.getElementById('ctf-grade').value.trim()||null,dynamics_id:document.getElementById('ctf-dynamics').value.trim()||null,notes:document.getElementById('ctf-notes').value.trim()||null,updated_at:new Date().toISOString()};
   try{
     if(editContactId){await sbReq(`covase_contacts?id=eq.${encodeURIComponent(editContactId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allContacts.findIndex(x=>x.id===editContactId);if(idx>=0)allContacts[idx]={...allContacts[idx],...payload};toast('Contact updated','success');}
     else{const res=await sbReq('covase_contacts',{method:'POST',body:{...payload,id:'ct-'+Date.now()}});allContacts.push(Array.isArray(res)?res[0]:res||{...payload,id:'ct-'+Date.now()});allContacts.sort((a,b)=>a.last_name.localeCompare(b.last_name));toast('Contact saved','success');}
