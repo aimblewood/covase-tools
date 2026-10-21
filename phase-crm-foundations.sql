@@ -192,31 +192,25 @@ DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE covase_document_links;
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE covase_assignments;       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
--- 7. Change history: the existing covase_audit trigger (phase-audit-trail.sql)
---    on the CRM tables. It fails open, so it can never block a save.
+-- 7. Change history: the covase_audit trigger (phase-audit-trail.sql) on the
+--    CRM tables -- only if that phase has been run. On 2026-10-21 it had not
+--    (covase_audit_capture() did not exist), so this step skips itself;
+--    re-run this file after phase-audit-trail.sql and the triggers appear.
 -- ---------------------------------------------------------------------------
 
-DROP TRIGGER IF EXISTS covase_accounts_audit ON covase_accounts;
-CREATE TRIGGER covase_accounts_audit AFTER INSERT OR UPDATE OR DELETE ON covase_accounts
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_contacts_audit ON covase_contacts;
-CREATE TRIGGER covase_contacts_audit AFTER INSERT OR UPDATE OR DELETE ON covase_contacts
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_vehicles_audit ON covase_vehicles;
-CREATE TRIGGER covase_vehicles_audit AFTER INSERT OR UPDATE OR DELETE ON covase_vehicles
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_assignments_audit ON covase_assignments;
-CREATE TRIGGER covase_assignments_audit AFTER INSERT OR UPDATE OR DELETE ON covase_assignments
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_account_addresses_audit ON covase_account_addresses;
-CREATE TRIGGER covase_account_addresses_audit AFTER INSERT OR UPDATE OR DELETE ON covase_account_addresses
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_documents_audit ON covase_documents;
-CREATE TRIGGER covase_documents_audit AFTER INSERT OR UPDATE OR DELETE ON covase_documents
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
-DROP TRIGGER IF EXISTS covase_document_links_audit ON covase_document_links;
-CREATE TRIGGER covase_document_links_audit AFTER INSERT OR UPDATE OR DELETE ON covase_document_links
-  FOR EACH ROW EXECUTE FUNCTION covase_audit_capture();
+DO $$
+DECLARE t TEXT;
+BEGIN
+  IF to_regprocedure('public.covase_audit_capture()') IS NULL THEN
+    RAISE NOTICE 'covase_audit_capture() not installed: audit triggers skipped (run phase-audit-trail.sql, then re-run this file)';
+    RETURN;
+  END IF;
+  FOREACH t IN ARRAY ARRAY['covase_accounts','covase_contacts','covase_vehicles','covase_assignments',
+                           'covase_account_addresses','covase_documents','covase_document_links'] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_audit', t);
+    EXECUTE format('CREATE TRIGGER %I AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION covase_audit_capture()', t || '_audit', t);
+  END LOOP;
+END $$;
 
 COMMIT;
 
