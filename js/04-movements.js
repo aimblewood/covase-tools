@@ -882,8 +882,9 @@ async function lookupMovementMileage(){
 // Royal Mail data, ~3p/lookup — the residential-grade option. ORS autocomplete
 // below remains the free fallback when no key is set.
 // Movements name their fields mv-<prefix>-*, the hire delivery address names
-// them hf-*. Same lookup either way -- only the ids differ.
-function pafField(prefix,name){return prefix==='hire'?'hf-'+name:'mv-'+prefix+'-'+name;}
+// them hf-*; the account and contact forms use acf-* / ctf-*. Same lookup
+// either way -- only the ids differ.
+function pafField(prefix,name){return prefix==='hire'?'hf-'+name:(prefix==='acf'||prefix==='ctf')?prefix+'-'+name:'mv-'+prefix+'-'+name;}
 async function lookupPafAddresses(prefix){
   const key=localStorage.getItem('covase_idealpc_key');
   const res=document.getElementById(pafField(prefix,'postcode-results'));if(!res)return;
@@ -919,7 +920,7 @@ function pickPafAddress(prefix,i){
   // PAF gives the property's exact coordinates — stash them for the mileage
   // route (signature guards against the address being edited afterwards)
   // Only the movement mileage route uses these; a hire has no routing.
-  if(prefix!=='hire'){
+  if(!['hire','acf','ctf'].includes(prefix)){
     window._mvCoords=window._mvCoords||{};
     if(a.longitude!=null&&a.latitude!=null)window._mvCoords[prefix]={longitude:a.longitude,latitude:a.latitude,sig:addr1+'|'+(a.postcode||'').toUpperCase()};
     else delete window._mvCoords[prefix];

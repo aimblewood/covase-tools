@@ -1418,7 +1418,7 @@
       <div class="form-row trio">
         <div class="form-field" style="grid-column:1/3"><label>Company name *</label><input id="acf-company" placeholder="e.g. Woodland Trust"></div>
         <div class="form-field"><label>Account type *</label>
-          <select id="acf-type" onchange="toggleAcfBookingEmail()"><option value="client">Client</option><option value="funder">Funder</option><option value="supplier">Supplier</option><option value="dealer">Dealer</option></select>
+          <select id="acf-type" onchange="toggleAcfBookingEmail();toggleAcfOrdering()"><option value="client">Client</option><option value="funder">Funder</option><option value="supplier">Supplier</option><option value="dealer">Dealer</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -1442,7 +1442,33 @@
           <select id="acf-manager"><option>Simon Homer</option><option>Andy Jackson</option></select>
         </div>
       </div>
-      <div class="form-field"><label>Address</label><textarea id="acf-address" placeholder="115 New London Road&#10;Chelmsford&#10;Essex&#10;CM2 0QT"></textarea></div>
+      <div class="form-section-label">Address</div>
+      <div class="form-row">
+        <div class="form-field"><label>Address line 1</label><input id="acf-addr1" placeholder="Street / building"></div>
+        <div class="form-field"><label>Address line 2</label><input id="acf-addr2" placeholder="(optional)"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Town / city</label><input id="acf-town"></div>
+        <div class="form-field"><label>County</label><input id="acf-county"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('acf')">📮 Find addresses</span></div>
+          <input id="acf-postcode" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('acf');}">
+          <div id="acf-postcode-results" class="lookup-results"></div>
+        </div>
+      </div>
+      <div class="form-field" id="acf-legacy-wrap" style="display:none"><label>Old address <span style="font-size:10px;color:var(--n400);font-weight:400">(free-text, from before addresses were split into fields; kept for reference, not changed)</span></label><textarea id="acf-address" readonly style="background:var(--n50);color:var(--n500)"></textarea></div>
+      <div class="form-section-label">Company details</div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Website</label><input id="acf-website" placeholder="www.company.co.uk"></div>
+        <div class="form-field"><label>Company number</label><input id="acf-company-number" placeholder="e.g. 05569777"></div>
+        <div class="form-field"><label>VAT number</label><input id="acf-vat" placeholder="e.g. GB 866 3107 19"></div>
+      </div>
+      <div class="form-row" id="acf-ordering-wrap" style="display:none">
+        <div class="form-field"><label>How they take vehicle orders</label>
+          <select id="acf-ordering"><option value="">— not set —</option><option value="email_po">Emailed purchase order</option><option value="online_platform">Their online platform</option><option value="funder_placed">Ordered by the funder</option></select>
+        </div>
+        <div></div>
+      </div>
       <div class="form-section-label">Billing preferences</div>
       <div class="form-row trio">
         <div class="form-field"><label>Payment method</label>
@@ -1491,11 +1517,26 @@
         <div class="form-field"><label>Email</label><input type="email" id="ctf-email" placeholder="name@company.com"></div>
         <div class="form-field"><label>Mobile</label><input id="ctf-mobile" placeholder="07700 900000"></div>
       </div>
+      <div class="form-section-label">Address</div>
       <div class="form-row">
-        <div class="form-field" style="grid-column:1/2"><label>Address</label><textarea id="ctf-address" placeholder="Home address"></textarea></div>
+        <div class="form-field"><label>Address line 1</label><input id="ctf-addr1" placeholder="Street / building"></div>
+        <div class="form-field"><label>Address line 2</label><input id="ctf-addr2" placeholder="(optional)"></div>
+      </div>
+      <div class="form-row trio">
+        <div class="form-field"><label>Town / city</label><input id="ctf-town"></div>
+        <div class="form-field"><label>County</label><input id="ctf-county"></div>
+        <div class="form-field lookup-wrap">
+          <div class="label-row"><label>Postcode</label><span class="dynamics-link" onclick="lookupPafAddresses('ctf')">📮 Find addresses</span></div>
+          <input id="ctf-postcode" style="text-transform:uppercase" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupPafAddresses('ctf');}">
+          <div id="ctf-postcode-results" class="lookup-results"></div>
+        </div>
+      </div>
+      <div class="form-field" id="ctf-legacy-wrap" style="display:none"><label>Old address <span style="font-size:10px;color:var(--n400);font-weight:400">(free-text, from before addresses were split into fields; kept for reference, not changed)</span></label><textarea id="ctf-address" readonly style="background:var(--n50);color:var(--n500)"></textarea></div>
+      <div class="form-row">
         <div class="form-field"><label>Address type</label>
           <select id="ctf-addr-type"><option value="home">Home</option><option value="work">Work</option><option value="correspondence">Correspondence</option><option value="other">Other</option></select>
         </div>
+        <div></div>
       </div>
       <div class="form-section-label">Role &amp; status</div>
       <div class="form-row">
@@ -1760,8 +1801,8 @@
 <script src="js/01-core.js?v=b259cfbcbd"></script>
 <script src="js/02-invoices.js?v=69553f6e76"></script>
 <script src="js/03-hires.js?v=e2c0ed031c"></script>
-<script src="js/04-movements.js?v=284d0a348c"></script>
-<script src="js/05-crm.js?v=727554fb7d"></script>
+<script src="js/04-movements.js?v=23fcbd05be"></script>
+<script src="js/05-crm.js?v=91b0afea76"></script>
 <script src="js/06-claims.js?v=810fa584ed"></script>
 <script src="js/07-fines.js?v=d84bafd6f1"></script>
 <script src="js/08-chrome.js?v=40de86e684"></script>
