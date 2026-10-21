@@ -2369,6 +2369,10 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 
 <script>
 // ─── CONFIG ───
+// Every n8n webhook call carries the Supabase anon key as ?ck=. The workflows refuse calls without it,
+// so the webhook URLs in this (public) file can't be used on their own to send mail or read Dynamics.
+// Interim lock until ORBIS logins + a server-side layer replace it.
+(function(){const _f=window.fetch.bind(window);window.fetch=function(input,init){try{const u=typeof input==='string'?input:(input&&input.url);if(u&&u.indexOf('covase.app.n8n.cloud/webhook')>-1){const k=localStorage.getItem('covase_sb_key')||'';if(k){const nu=u+(u.indexOf('?')>-1?'&':'?')+'ck='+encodeURIComponent(k);input=typeof input==='string'?nu:new Request(nu,input);}}}catch(e){}return _f(input,init);};})();
 const DEFAULT_N8N_CLIENT='https://covase.app.n8n.cloud/webhook/covase-client-lookup';
 const DEFAULT_N8N_CONTACT='https://covase.app.n8n.cloud/webhook/covase-contact-lookup';
 const DEFAULT_N8N_VEHICLE='https://covase.app.n8n.cloud/webhook/covase-vehicle-lookup';
