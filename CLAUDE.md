@@ -55,6 +55,11 @@ Tables (TEXT ids, prefixed): `covase_hires` (hire-…), `covase_invoices` (inv-�
 
 Key columns added since PROJECT.md: hires — `tariff`, `delivery_county`, `ev_range` (electric range in **miles**, whole number; sits with `fuel_type`/`p11d_value`/`co2_emissions`/`engine_cc` and mirrored on `covase_supplier_replies`), `supplier_email_sent_at`, `job_ref` (**CVB-0001**, DB default from sequence), offhire set (`collection_address_line1/2`, `collection_town/county/postcode`, `collection_date`, `collection_time`, `offhire_notes`, `offhire_requested_at`); movements — endpoints incl. `*_address_line2`, contacts/phones, `supplier`, `supplier_account_id`, `price_override` (**replaces BASE only, pre-markup**), `supplier_email_sent_at`, `job_ref` (**CVM-0001**); supplier_replies — `movement_id`; fines — `pdf_url`, `pin` (speeding/NoIP nomination code; `'NONE'` = checked, nothing printed).
 
+**CRM columns as the platform writes them today** (from `saveAccount` / `saveContact` — the CRM screens are thinner than the hire/movement ones and are the next area to flesh out):
+- `covase_accounts`: `company_name`, `type`, `status`, `mha`, `contact_name`, `contact_email`, `contact_phone`, `account_manager`, `address` (**single free-text field**), `payment_method`, `payment_terms`, `booking_email` (the supplier-request address), `dynamics_id`, `notes`.
+- `covase_contacts`: `first_name`, `last_name`, `preferred_name`, `account_id` (FK), `employee_number`, `email`, `mobile`, `address` (**single free-text field**), `address_type` (home/work), `contact_type` (driver/…), `employee_status`, `job_description`, `driver_grade`, `dynamics_id`, `notes`.
+- Both addresses are unstructured blobs — no line1/line2/town/**county**/postcode. That is why a hire's `delivery_county` cannot be backfilled from a contact, and it is the obvious first thing to fix if CRM gets structured properly (PAF lookup already exists and would drop straight in via `pafField()`).
+
 Statuses: hires `pending→requested→booked→active→offhired` (+cancelled) × billing `pending→invoiced-in→recharged→paid`; movements `quoted→booked→(in_progress retired, kept)→completed_pending_fuel("Awaiting invoice")→invoiced→paid` (+cancelled); fines `new→driver_notified→address_requested→nominated→on_coin→to_be_charged→charged` (+query/appeal_upheld/refunded/cancelled).
 
 Auto-advance (client-side on load): booked→active at start date; active→offhired day after end date; **offhire-tagged bookings → offhired when collection date/time reached** (end_date=collection date). `daysOn()` = elapsed only (0 before start).
@@ -107,7 +112,7 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 - Edit Mode phase 2: drag-drop screen elements.
 - Sage push, GoCardless, bank rec (PROJECT.md roadmap).
 - Andreas Stihl/FVSL050339 reply re-link (may already be done — check queue).
-- Existing hires have `delivery_county` NULL. **A SQL backfill is impossible**: `covase_contacts` holds no address at all (only `dynamics_id`), so there is nothing in Supabase to copy from — county has only ever come from the Dynamics webhook at booking time. `query-delivery-county-gap.sql` (read-only) sizes the gap and lists the fillable hires with their `dynamics_id`. Filling it means a Dynamics call per hire, so it is platform or n8n work, not SQL — not commissioned.
+- Existing hires have `delivery_county` NULL. **A SQL backfill is not viable**: `covase_contacts` stores `address` as a single free-text blob plus `address_type` — there is no structured county to copy, and parsing one out of free text would guess. (An earlier note here claimed contacts hold no address at all; that was wrong — see §4 for the real column set.) A reliable county still has to come from the Dynamics webhook, as it does at booking time. `query-delivery-county-gap.sql` (read-only) sizes the gap and lists the fillable hires with their `dynamics_id`. Filling it means a Dynamics call per hire, so it is platform or n8n work, not SQL — not commissioned.
 
 ## 9. Session bootstrap
 
