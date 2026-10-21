@@ -8,7 +8,7 @@
 -- supplier, all active; contacts 199, all driver / home; vehicles 55;
 -- assignments 0.)
 -- The editor caps results at 100 rows: if the grid stops at exactly 100,
--- change the ORDER BY line to add  OFFSET 99  and run again for the rest.
+-- change the ORDER BY line to add  OFFSET 100  and run again for the rest.
 
 SELECT table_name, 'column' AS kind, lpad(ordinal_position::text, 3, '0') AS pos,
        column_name AS name,
