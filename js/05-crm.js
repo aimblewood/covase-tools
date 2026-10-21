@@ -75,7 +75,9 @@ function buildAccountCard(a){
       ${fmtAddressLines(a)?`<div class="notes-box" style="white-space:pre-line">📍 ${esc(fmtAddressLines(a))}</div>`:''}
       ${a.notes?`<div class="notes-box">${esc(a.notes)}</div>`:''}
       <div class="action-row">
+        <button class="btn btn-recharge" onclick="openClientOverview('${a.id}')">🔎 Overview</button>
         <button class="btn btn-edit" onclick="openEditAccount('${a.id}')">✎ Edit</button>
+        <button class="btn btn-edit" onclick="openAccountAddresses('${a.id}')">📍 Other addresses</button>
         <button class="btn btn-edit" onclick="openDocs('account','${a.id}',allAccounts.find(x=>x.id==='${a.id}')?.company_name)">📎 Documents</button>
         <button class="btn btn-recharge" onclick="openGenerator();localStorage.setItem('prefill_client','${esc(a.company_name)}')">+ Invoice this account</button>
         <button class="btn btn-danger" onclick="deleteAccount('${a.id}')">✗</button>
@@ -309,6 +311,7 @@ function buildVehicleCard(v){
       </div>
       ${v.notes?`<div class="notes-box">${esc(v.notes)}</div>`:''}
       <div class="action-row">
+        <button class="btn btn-recharge" onclick="openVehicleRecord('${v.id}')">Open record</button>
         <button class="btn btn-edit" onclick="openEditVehicle('${v.id}')">✎ Edit</button>
         <button class="btn btn-edit" onclick="openDocs('vehicle','${v.id}',(allVehicles.find(x=>x.id==='${v.id}')||{}).registration)">📎 Documents</button>
         <button class="btn btn-danger" onclick="deleteVehicle('${v.id}')">✗</button>

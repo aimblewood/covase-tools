@@ -341,7 +341,7 @@ function showView(id,el){
   currentViewId=id;loadCurrentView();
 }
 function loadCurrentView(){
-  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'claims':loadClaims,'fines':loadFines,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles};
+  const loaders={'received':loadInvoices,'outgoing':loadOutgoing,'hires-pipeline':loadHires,'hires-active':loadHires,'hires-all':loadHires,'hires-recharge':loadHires,'movements':loadMovements,'claims':loadClaims,'fines':loadFines,'supplier-replies':loadSupplierReplies,'accounts':loadAccounts,'contacts':loadContacts,'vehicles':loadVehicles,...(window.EXTRA_VIEW_LOADERS||{})}; // later section files register theirs
   if(loaders[currentViewId])loaders[currentViewId]();
 }
 
