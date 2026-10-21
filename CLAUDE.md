@@ -84,6 +84,8 @@ Auto-advance (client-side on load): booked→active at start date; active→offh
 
 ## 6. Conventions & guardrails (unchanged, still law)
 
+- **Write replies in plain English** (Simon's instruction, 21 Oct 2026). He is the owner/operator, not an engineer, and does not want the internals. Lead with what he needs to know or do. Keep it short. No file paths, function names, commit hashes, SQL, config snippets or test counts in chat unless he asks for them or they are something he must type. Put the technical detail in the commit message and the brief, where it belongs — not in his inbox. If something went wrong, say what it means for him and what happens next, not how it works.
+
 - `str_replace`-style incremental edits, never wholesale rewrites. `node --check` the extracted script block after edits.
 - SQL first → Simon runs it → then app code. Confirm before anything destructive; flag irreversible actions.
 - Dates: DB ISO, UI `fmtUK()` DD/MM/YYYY. Regs uppercased, whitespace-stripped.
