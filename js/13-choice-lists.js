@@ -247,8 +247,8 @@ lsInjectView('view-choice-lists',`
         <button class="btn" onclick="clEditPolicy(clPolicyId)">✎ Edit</button> <button class="btn" onclick="clEditPolicy(null)">+ New policy</button></div>
       <div><span>Term</span> <select id="cl-term" onchange="clRender()"></select></div>
       <div><span>Mileage</span> <select id="cl-miles" onchange="clRender()"></select></div>
-      <div><span>Show</span> <select id="cl-show" onchange="clRender()"><option value="ok">On the list</option><option value="out">Left off</option><option value="all">Everything</option></select></div>
-      <div><input id="cl-q" placeholder="Search make / model…" oninput="clRender()" style="min-width:180px"></div>
+      <div><span>Show</span> <select id="cl-show" onchange="clRenderTable()"><option value="ok">On the list</option><option value="out">Left off</option><option value="all">Everything</option></select></div>
+      <div><input id="cl-q" type="search" placeholder="Search — any words, any order…" oninput="clRenderTable()" style="min-width:240px"></div>
     </div>
     <div id="cl-status" class="notes-box"></div>
     <div id="cl-table"></div>
@@ -288,13 +288,73 @@ function clRender(){
     +(p&&(p.profile_type!=='ratebook'||p.commission>0)?`<br>Rentals shown on a <strong>${esc(clProfileLabel(p,want[0]))}</strong> profile`+(p.commission>0?` including ${lsMoney(p.commission)} commission (${lsMoney(p.commission/(clProfileCount(p,want[0])||clResults.map(r=>r.payments).find(Boolean)||1))} a month on the finance rental)`:''):'')
     +(clResults.some(r=>r.niAssumed)?'<br><span style="color:var(--n400)">The term runs past the last tax year in the tables, so employer\'s NI for the later years uses that year\'s rates.</span>':'')
     +(clImportNotes.length?'<br><span style="color:var(--n400)">'+clImportNotes.map(esc).join('<br>')+'</span>':'');
-  let rows=clResults.filter(r=>show==='all'||(show==='ok'?r.ok:!r.ok));
-  if(q)rows=rows.filter(r=>clKey(r.v.make+r.v.desc).includes(q));
-  const yrs=(rows[0]||clResults[0]||{years:[]}).years.map(y=>y.year);
-  const m=x=>x==null?'—':lsMoney(x);
-  el.innerHTML=rows.length?`<div style="overflow-x:auto"><table class="ls-table" style="white-space:nowrap"><tr><th>Vehicle</th><th>Fuel</th><th>CO₂</th><th>Range</th><th>P11D</th><th>Finance</th><th>Service</th><th>VAT lost</th><th>LRR</th><th>Er NI</th><th>Fuel</th><th>WLC / month</th><th>Over term</th>${yrs.map(y=>`<th>BIK ${esc(y)}</th>`).join('')}<th>Grade</th><th>Notes</th></tr>
-    ${rows.slice(0,600).map(r=>{const v=r.v;return `<tr><td style="white-space:normal;min-width:260px"><strong>${esc(v.make)}</strong> ${esc(v.desc)}</td><td>${esc(v.fuel_raw)}</td><td>${v.co2??'—'}</td><td>${v.ev_range??''}</td><td>${m(v.p11d)}</td><td>${m(r.finance)}</td><td>${m(r.service)}</td><td>${m(r.vatLost)}</td><td>${r.lrr?m(r.lrr):''}</td><td>${m(r.ni)}</td><td>${m(r.fuelPm)}</td><td><strong>${m(pp.budget_includes_fuel===false?r.wlcNoFuel:r.wlc)}</strong></td><td>${m(r.wlcTerm)}</td>${r.years.map(y=>`<td>${clPct(y.rate)}</td>`).join('')}<td>${r.grade?esc(r.grade.name):''}</td><td style="white-space:normal;color:${r.ok?'var(--n400)':'#c0392b'}">${esc([...r.why,...r.flags].join('; '))}</td></tr>`;}).join('')}</table></div>${rows.length>600?`<div class="empty-sub">Showing the first 600 of ${rows.length} — narrow with the search box, or use ⬇ Working sheet for everything.</div>`:''}`
-    :`<div class="empty-state"><div class="empty-title">Nothing to show</div><div class="empty-sub">${clResults.length?'Try “Show: Everything” to see why cars were left off.':'The ratebook has no rows at this term and mileage.'}</div></div>`;
+  clRenderTable();
+}
+// ── Results table: sort by any column, filter under each heading, word search ──
+// Re-draws without re-running the sums, and puts the cursor back in the box being typed in.
+let clSort={key:'wlc',dir:1},clFilters={};
+function clCols(){
+  const p=clPolicy(),noFuel=p&&p.budget_includes_fuel===false;
+  const yrs=(clResults[0]||{years:[]}).years.map(y=>y.year);
+  const money=x=>x==null?'—':lsMoney(x);
+  return [
+    {key:'vehicle',label:'Vehicle',get:r=>r.v.make+' '+r.v.desc,html:r=>`<strong>${esc(r.v.make)}</strong> ${esc(r.v.desc)}`,wide:1},
+    {key:'fuel',label:'Fuel',get:r=>r.v.fuel_raw},
+    {key:'co2',label:'CO₂',num:1,get:r=>r.v.co2},
+    {key:'range',label:'Range',num:1,get:r=>r.v.ev_range},
+    {key:'p11d',label:'P11D',num:1,get:r=>r.v.p11d,fmt:money},
+    {key:'finance',label:'Finance',num:1,get:r=>r.finance,fmt:money},
+    {key:'service',label:'Service',num:1,get:r=>r.service,fmt:money},
+    {key:'vat',label:'VAT lost',num:1,get:r=>r.vatLost,fmt:money},
+    {key:'lrr',label:'LRR',num:1,get:r=>r.lrr,fmt:x=>x?money(x):''},
+    {key:'ni',label:'Er NI',num:1,get:r=>r.ni,fmt:money},
+    {key:'fuelpm',label:'Fuel',num:1,get:r=>r.fuelPm,fmt:money},
+    {key:'wlc',label:'WLC / month',num:1,get:r=>noFuel?r.wlcNoFuel:r.wlc,fmt:x=>`<strong>${money(x)}</strong>`},
+    {key:'term',label:'Over term',num:1,get:r=>r.wlcTerm,fmt:money},
+    ...yrs.map((y,i)=>({key:'bik'+i,label:'BIK '+y,num:1,pct:1,get:r=>r.years[i]&&r.years[i].rate,fmt:clPct})),
+    {key:'grade',label:'Grade',get:r=>r.grade?r.grade.name:''},
+    {key:'notes',label:'Notes',get:r=>[...r.why,...r.flags].join('; '),wide:1,notes:1}];
+}
+// A filter box takes words (all must appear), or for number columns >300, <500, 300-400 or an exact figure.
+function clFilterTest(col,text){
+  const t=String(text||'').trim();if(!t)return null;
+  if(col.num){
+    const n=s=>{const x=clN(s);return x==null?null:col.pct?x/100:x;};
+    let m=t.match(/^(>=|<=|>|<)\s*(.+)$/);
+    if(m){const lim=n(m[2]);if(lim==null)return null;return v=>v!=null&&(m[1]==='>'?v>lim:m[1]==='<'?v<lim:m[1]==='>='?v>=lim:v<=lim);}
+    m=t.match(/^([\d.,£%]+)\s*(?:-|to)\s*([\d.,£%]+)$/);
+    if(m){const a=n(m[1]),b=n(m[2]);if(a==null||b==null)return null;return v=>v!=null&&v>=a&&v<=b;}
+    const eq=n(t);if(eq!=null)return v=>v!=null&&Math.abs(v-eq)<(col.pct?0.0005:0.5);
+  }
+  const words=t.toLowerCase().split(/\s+/).filter(Boolean);
+  return v=>{const s=String(v??'').toLowerCase();return words.every(w=>s.includes(w));};
+}
+function clSortBy(key){clSort=clSort.key===key?{key,dir:-clSort.dir}:{key,dir:1};clRenderTable();}
+function clSetFilter(key,val){if(val)clFilters[key]=val;else delete clFilters[key];clRenderTable();}
+function clClearFilters(){clFilters={};const q=document.getElementById('cl-q');if(q)q.value='';clRenderTable();}
+function clRenderTable(){
+  const el=document.getElementById('cl-table');if(!el||!clRows.length)return;
+  const act=document.activeElement,focusKey=act&&act.dataset?act.dataset.clf:null,caret=focusKey!=null?act.selectionStart:null;
+  const cols=clCols(),show=clVal('cl-show');
+  const words=clVal('cl-q').toLowerCase().split(/\s+/).filter(Boolean);
+  const hay=r=>(r.v.make+' '+r.v.model+' '+r.v.desc+' '+r.v.fuel_raw+' '+r.v.body+' '+r.v.cap+' '+(r.grade?r.grade.name:'')+' '+[...r.why,...r.flags].join(' ')).toLowerCase();
+  const tests=cols.map(c=>[c,clFilterTest(c,clFilters[c.key])]).filter(x=>x[1]);
+  const match=r=>words.every(w=>hay(r).includes(w))&&tests.every(([c,t])=>t(c.get(r)));
+  const all=clResults.filter(match);
+  let rows=all.filter(r=>show==='all'||(show==='ok'?r.ok:!r.ok));
+  const sc=cols.find(c=>c.key===clSort.key)||cols.find(c=>c.key==='wlc');
+  rows=rows.slice().sort((a,b)=>{const x=sc.get(a),y=sc.get(b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+    return (sc.num?x-y:String(x).localeCompare(String(y),'en-GB',{numeric:true}))*clSort.dir;});
+  const filtering=words.length||tests.length,hidden=all.length-rows.length;
+  const head=cols.map(c=>`<th style="cursor:pointer;user-select:none" title="Sort" onclick="clSortBy('${c.key}')">${esc(c.label)}${clSort.key===c.key?(clSort.dir>0?' ▲':' ▼'):''}</th>`).join('');
+  const filt=cols.map(c=>`<td style="padding:3px 4px"><input data-clf="${c.key}" value="${esc(clFilters[c.key]||'')}" placeholder="${c.num?'e.g. <500':'filter'}" oninput="clSetFilter('${c.key}',this.value)" style="width:100%;min-width:${c.wide?'120':'56'}px;font-size:11px;padding:3px 5px;box-sizing:border-box"></td>`).join('');
+  const body=rows.slice(0,600).map(r=>`<tr>${cols.map(c=>{const v=c.get(r);const h=c.html?c.html(r):c.fmt?c.fmt(v):esc(v==null?'':String(v));
+    return `<td${c.wide?` style="white-space:normal;min-width:${c.notes?200:260}px${c.notes?';color:'+(r.ok?'var(--n400)':'#c0392b'):''}"`:''}>${h}</td>`;}).join('')}</tr>`).join('');
+  el.innerHTML=`<div style="font-size:12px;color:var(--n500);margin:0 0 6px">${rows.length.toLocaleString('en-GB')} shown${filtering?' matching your search / filters':''}${hidden&&filtering?` · ${hidden} more match but are ${show==='ok'?'left off':'on the list'} — change “Show” to see them`:''}${filtering?' · <a href="#" onclick="clClearFilters();return false">clear all</a>':''} · click a heading to sort</div>
+    <div style="overflow-x:auto"><table class="ls-table" style="white-space:nowrap"><tr>${head}</tr><tr>${filt}</tr>${body}</table></div>
+    ${rows.length>600?`<div class="empty-sub">Showing the first 600 of ${rows.length} — narrow with the search or filters, or use ⬇ Working sheet for everything.</div>`:''}
+    ${rows.length?'':`<div class="empty-state"><div class="empty-title">Nothing to show</div><div class="empty-sub">${filtering?'Nothing matches — try fewer words or clear the filters.':clResults.length?'Try “Show: Everything” to see why cars were left off.':'The ratebook has no rows at this term and mileage.'}</div></div>`}`;
+  if(focusKey){const i=el.querySelector(`[data-clf="${focusKey}"]`);if(i){i.focus();try{i.setSelectionRange(caret,caret);}catch(e){}}}
 }
 
 // ── Exports ──
