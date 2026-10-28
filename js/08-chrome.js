@@ -235,6 +235,7 @@ const SB_ITEMS={
   'orders':{icon:'📝',label:'Orders',view:'orders',badge:'badge-orders',home:'accounts'},
   'fleet':{icon:'🛣',label:'Lease fleet',view:'fleet',badge:'badge-fleet',home:'vehicles'},
   'crm-dashboard':{icon:'📊',label:'CRM dashboard',view:'crm-dashboard',home:'accounts'},
+  'choice-lists':{icon:'📋',label:'Choice lists',view:'choice-lists',home:'orders'},
   'reconciliation':{icon:'⟷',label:'Reconciliation',disabled:true},
   'sage':{icon:'◎',label:'Sage',disabled:true},
   'gocardless':{icon:'◉',label:'GoCardless',disabled:true}
@@ -246,7 +247,7 @@ const DEFAULT_SB_LAYOUT={sections:[
   {label:'Accident management',items:['claims']},
   {label:'Fines & penalties',items:['fines']},
   {label:'Supplier replies',items:['supplier-replies']},
-  {label:'CRM',items:['crm-dashboard','orders','accounts','contacts']},
+  {label:'CRM',items:['crm-dashboard','choice-lists','orders','accounts','contacts']},
   {label:'Fleet',items:['fleet','vehicles']},
   {label:'Reports',items:['reconciliation']},
   {label:'Integrations',items:['sage','gocardless']}
