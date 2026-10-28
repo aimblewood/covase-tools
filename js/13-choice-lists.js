@@ -29,7 +29,7 @@ const CL_DEFAULT_SETTINGS={
   }
 };
 const CL_FUELS=[['electric','Electric'],['phev','Plug-in hybrid'],['hybrid','Hybrid'],['petrol','Petrol'],['diesel','Diesel']];
-const CL_BLANK_POLICY={name:'',account_id:'',term:48,mileage:20000,delivery_date:'',budget_basis:'monthly',budget_includes_fuel:true,insurance_pm:0,ni_basis:'term',corp_tax:0.25,
+const CL_BLANK_POLICY={name:'',account_id:'',term:48,mileage:20000,delivery_date:'',budget_basis:'monthly',budget_includes_fuel:true,insurance_pm:0,ni_basis:'term',corp_tax:0.25,profile_type:'ratebook',profile_upfront:3,commission:0,
   phev_mpg_factor:1,ev_range_factor:1,fuels:['electric','phev','hybrid','petrol','diesel'],min_ev_range:null,min_phev_range:null,max_co2:null,max_p11d:null,
   makes:[],exclude_words:[],grade_mode:'cumulative',grades:[],tax_years_shown:3,show_45:false,driver_note:''};
 // The Stihl WLC workbook (Aug 2026) as a starting point for a new policy.
@@ -69,7 +69,7 @@ const CL_COLS={make:['manufacturer','make'],model:['modelname','model'],variant:
   ev_range:['evrange','electricmilerange','electricrange','wltpelectricrange'],battery:['batterysize','batterykwh','batterycapacity'],
   mpg:['truempg','fuelecocombined','mpg','combinedmpg','mpgcombined'],body:['bodystyle','body'],model_year:['modelyear'],commercial:['commercial'],
   rde:['rdecertificationlevel','rde'],transmission:['transmission'],otr:['otrp','otr','otrprice'],insurance_group:['insurancegroup'],
-  excess_ppm:['excessmileage'],reg_date:['delivery','registrationdate','regdate','dateofregistration']};
+  excess_ppm:['excessmileage'],plan:['paymentplan','paymentprofile','profile'],reg_date:['delivery','registrationdate','regdate','dateofregistration']};
 const CL_REQUIRED={make:'Manufacturer',fuel:'Fuel type',co2:'CO2',p11d:'P11D',term:'Term',mileage:'Mileage',finance:'Finance (lease) rental',service:'Service rental'};
 function clParseCsv(text){
   const rows=[];let row=[],cell='',q=false;
@@ -111,11 +111,12 @@ async function clReadFile(file){
     const v={make,model,variant,desc,cap:str('cap'),fuel_raw:str('fuel'),fuel:clFuelCat(g('fuel')),diesel:/diesel/i.test(str('fuel')),co2:clN(g('co2')),p11d:clN(g('p11d')),
       term:clN(g('term')),mileage:clN(g('mileage')),finance:clN(g('finance')),service:clN(g('service')),ev_range:clN(g('ev_range')),battery:kwh,
       mpg:clN(g('mpg')),body:str('body'),model_year:str('model_year'),commercial:/^(y|yes|true|1)$/i.test(str('commercial')),rde2:/2/.test(str('rde')),
-      transmission:str('transmission'),otr:clN(g('otr')),insurance_group:str('insurance_group'),excess_ppm:clN(g('excess_ppm')),reg_date:(d=>d?clIso(d):null)(clDate(g('reg_date')))};
+      transmission:str('transmission'),otr:clN(g('otr')),insurance_group:str('insurance_group'),excess_ppm:clN(g('excess_ppm')),plan:str('plan'),reg_date:(d=>d?clIso(d):null)(clDate(g('reg_date')))};
     const k=[v.cap||v.make+'|'+v.desc,v.term,v.mileage].join('|');
     if(seen.has(k)){dupes++;return;}seen.set(k,1);rows.push(v);
   });
   if(dupes)notes.push(dupes+' duplicate row'+(dupes>1?'s':'')+' (same vehicle, term and mileage) ignored — the first one in the file was kept');
+  if(map.plan==null)notes.push('This file doesn\'t say what payment profile its rentals are based on, so a policy can\'t convert them to the client\'s profile or spread commission');
   const unk=rows.filter(v=>!v.fuel).length;if(unk)notes.push(unk+' row'+(unk>1?'s have a fuel type':' has a fuel type')+' ORBIS doesn\'t recognise — shown as needing data');
   return {rows,notes};
 }
@@ -145,16 +146,33 @@ function clYearRate(v,year,preTable){
   if(v.diesel&&!v.rde2){const cap=Math.max(...t.co2.map(b=>b[i+1]));rate=Math.min(cap,rate+clSettings.diesel_supplement);}
   return {rate};
 }
+// Payment profiles. A rental is one of (payments in advance + the monthly ones),
+// so the sum of a contract is rental × payment count. 'Spread, 6 down' over 48
+// months = 6+47 = 53 payments; 'terminal pause, 3 down' = 3+45 = 48 (= the term).
+// Converting keeps the contract total and re-divides it by the client's count.
+function clPlanCount(plan,term){
+  const s=String(plan||'').toLowerCase();if(!s||!term)return null;
+  const pm=s.match(/(\d+)\s*\+\s*(\d+)/);if(pm)return +pm[1]+ +pm[2];
+  const d=s.match(/(\d+)\s*(?:down|up\s*front|upfront|in advance|advance)/);if(!d)return null;
+  return /terminal|pause/.test(s)?term:+d[1]+term-1;
+}
+function clProfileCount(p,term){if(!p||p.profile_type==='ratebook'||!term)return null;const n=Math.max(1,parseInt(p.profile_upfront)||1);return p.profile_type==='terminal'?term:n+term-1;}
+function clProfileLabel(p,term){if(!p||p.profile_type==='ratebook')return 'as the ratebook';const n=Math.max(1,parseInt(p.profile_upfront)||1);return p.profile_type==='terminal'?`${n}+${term-n} terminal pause`:`${n}+${term-1} spread`;}
 function clCalc(v,p){
   const S=clSettings,out={v,flags:[],data:[]};
+  // Re-profile the rentals, then spread commission over the client's payments (finance only)
+  const src=clPlanCount(v.plan,v.term),dst=clProfileCount(p,v.term);
+  out.finance=v.finance;out.service=v.service;out.commissionPm=0;out.payments=dst||src;
+  if(dst){if(src){out.finance=v.finance*src/dst;out.service=v.service*src/dst;}else out.data.push(v.plan?'payment plan "'+v.plan+'" not understood':'ratebook gives no payment plan');}
+  if(p.commission>0){if(out.payments){out.commissionPm=p.commission/out.payments;out.finance+=out.commissionPm;}else if(!out.data.length)out.data.push(v.plan?'payment plan "'+v.plan+'" not understood':'ratebook gives no payment plan');}
   const reg=clDate(v.reg_date)||clDate(p.delivery_date)||new Date();
   const pre=reg<new Date(2020,3,6);
   const term=p.term||v.term||0;
-  out.vatLost=v.finance*S.vat_rate*S.vat_unrecoverable_share;
+  out.vatLost=out.finance*S.vat_rate*S.vat_unrecoverable_share;
   // Lease rental restriction: 15% of the finance rental (incl. the VAT that can't be reclaimed)
   // is disallowed for corporation tax above the CO2 threshold for the car's registration date.
   const lrrLimit=reg>=new Date(2021,3,1)?50:reg>=new Date(2018,3,1)?110:130;
-  out.lrr=v.co2!=null&&v.co2>lrrLimit?(v.finance+out.vatLost)*S.lrr_share*(p.corp_tax??0.25):0;
+  out.lrr=v.co2!=null&&v.co2>lrrLimit?(out.finance+out.vatLost)*S.lrr_share*(p.corp_tax??0.25):0;
   // Company car tax by tax year, from the delivery date for as many years as the policy shows
   out.years=[];const startY=clTaxYear(reg);const y0=parseInt(startY);
   for(let k=0;k<Math.max(1,p.tax_years_shown||3);k++){const yl=(y0+k)+'/'+String(y0+k+1).slice(2);const r=clYearRate(v,yl,pre);out.years.push({year:yl,rate:r.rate,why:r.why});}
@@ -177,9 +195,10 @@ function clCalc(v,p){
     if(mpg){out.fuelPm=miles/mpg*(v.diesel?S.diesel_litre:S.petrol_litre)*4.54609/12;}else{out.fuelPm=null;out.flags.push('no MPG — fuel cost unknown');}
   }
   out.insurance=p.insurance_pm||0;
-  out.wlcNoFuel=out.ni==null?null:v.finance+v.service+out.vatLost+out.lrr+out.ni+out.insurance;
+  out.wlcNoFuel=out.ni==null?null:out.finance+out.service+out.vatLost+out.lrr+out.ni+out.insurance;
   out.wlc=out.wlcNoFuel==null||out.fuelPm==null?null:out.wlcNoFuel+out.fuelPm;
-  out.wlcTerm=out.wlc==null?null:out.wlc*term;
+  const rentals=out.finance+out.service+out.vatLost+out.lrr;
+  out.wlcTerm=out.wlc==null?null:rentals*(out.payments||term)+(out.wlc-rentals)*term;
   return out;
 }
 // Policy rules, then grade by budget. Returns reasons a car is out (empty = in).
@@ -266,6 +285,7 @@ function clRender(){
   st.innerHTML=`<strong>${esc(clFile?clFile.name:'Ratebook')}</strong> · ${clRows.length.toLocaleString('en-GB')} rows · ${clResults.length.toLocaleString('en-GB')} at ${want[0]} months / ${(want[1]||0).toLocaleString('en-GB')} miles · <strong>${clResults.filter(r=>r.ok).length}</strong> on the list, ${out.length} left off`
     +(counts.length?'<br>'+counts.map(([n,c])=>`${esc(n)}: <strong>${c}</strong>`).join(' · ')+(p.grade_mode==='banded'?' (each car in one grade)':' (each grade also sees the cheaper grades\' cars)'):'')
     +(Object.keys(reasons).length?'<br><span style="color:var(--n400)">Left off: '+Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>esc(k)+' ('+n+')').join(' · ')+'</span>':'')
+    +(p&&(p.profile_type!=='ratebook'||p.commission>0)?`<br>Rentals shown on a <strong>${esc(clProfileLabel(p,want[0]))}</strong> profile`+(p.commission>0?` including ${lsMoney(p.commission)} commission (${lsMoney(p.commission/(clProfileCount(p,want[0])||clResults.map(r=>r.payments).find(Boolean)||1))} a month on the finance rental)`:''):'')
     +(clResults.some(r=>r.niAssumed)?'<br><span style="color:var(--n400)">The term runs past the last tax year in the tables, so employer\'s NI for the later years uses that year\'s rates.</span>':'')
     +(clImportNotes.length?'<br><span style="color:var(--n400)">'+clImportNotes.map(esc).join('<br>')+'</span>':'');
   let rows=clResults.filter(r=>show==='all'||(show==='ok'?r.ok:!r.ok));
@@ -273,7 +293,7 @@ function clRender(){
   const yrs=(rows[0]||clResults[0]||{years:[]}).years.map(y=>y.year);
   const m=x=>x==null?'—':lsMoney(x);
   el.innerHTML=rows.length?`<div style="overflow-x:auto"><table class="ls-table" style="white-space:nowrap"><tr><th>Vehicle</th><th>Fuel</th><th>CO₂</th><th>Range</th><th>P11D</th><th>Finance</th><th>Service</th><th>VAT lost</th><th>LRR</th><th>Er NI</th><th>Fuel</th><th>WLC / month</th><th>Over term</th>${yrs.map(y=>`<th>BIK ${esc(y)}</th>`).join('')}<th>Grade</th><th>Notes</th></tr>
-    ${rows.slice(0,600).map(r=>{const v=r.v;return `<tr><td style="white-space:normal;min-width:260px"><strong>${esc(v.make)}</strong> ${esc(v.desc)}</td><td>${esc(v.fuel_raw)}</td><td>${v.co2??'—'}</td><td>${v.ev_range??''}</td><td>${m(v.p11d)}</td><td>${m(v.finance)}</td><td>${m(v.service)}</td><td>${m(r.vatLost)}</td><td>${r.lrr?m(r.lrr):''}</td><td>${m(r.ni)}</td><td>${m(r.fuelPm)}</td><td><strong>${m(pp.budget_includes_fuel===false?r.wlcNoFuel:r.wlc)}</strong></td><td>${m(r.wlcTerm)}</td>${r.years.map(y=>`<td>${clPct(y.rate)}</td>`).join('')}<td>${r.grade?esc(r.grade.name):''}</td><td style="white-space:normal;color:${r.ok?'var(--n400)':'#c0392b'}">${esc([...r.why,...r.flags].join('; '))}</td></tr>`;}).join('')}</table></div>${rows.length>600?`<div class="empty-sub">Showing the first 600 of ${rows.length} — narrow with the search box, or use ⬇ Working sheet for everything.</div>`:''}`
+    ${rows.slice(0,600).map(r=>{const v=r.v;return `<tr><td style="white-space:normal;min-width:260px"><strong>${esc(v.make)}</strong> ${esc(v.desc)}</td><td>${esc(v.fuel_raw)}</td><td>${v.co2??'—'}</td><td>${v.ev_range??''}</td><td>${m(v.p11d)}</td><td>${m(r.finance)}</td><td>${m(r.service)}</td><td>${m(r.vatLost)}</td><td>${r.lrr?m(r.lrr):''}</td><td>${m(r.ni)}</td><td>${m(r.fuelPm)}</td><td><strong>${m(pp.budget_includes_fuel===false?r.wlcNoFuel:r.wlc)}</strong></td><td>${m(r.wlcTerm)}</td>${r.years.map(y=>`<td>${clPct(y.rate)}</td>`).join('')}<td>${r.grade?esc(r.grade.name):''}</td><td style="white-space:normal;color:${r.ok?'var(--n400)':'#c0392b'}">${esc([...r.why,...r.flags].join('; '))}</td></tr>`;}).join('')}</table></div>${rows.length>600?`<div class="empty-sub">Showing the first 600 of ${rows.length} — narrow with the search box, or use ⬇ Working sheet for everything.</div>`:''}`
     :`<div class="empty-state"><div class="empty-title">Nothing to show</div><div class="empty-sub">${clResults.length?'Try “Show: Everything” to see why cars were left off.':'The ratebook has no rows at this term and mileage.'}</div></div>`;
 }
 
@@ -282,8 +302,8 @@ function clNeedRows(){if(!clRows.length){toast('Import a ratebook first','error'
 async function clExportWorking(){
   if(!clNeedRows())return;await loadSheetJS();
   const yrs=clResults[0].years.map(y=>y.year);const r2=x=>x==null?null:Math.round(x*100)/100;
-  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','P11D','Term','Mileage','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Reasons / notes']];
-  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,v.battery,v.p11d,v.term,v.mileage,v.finance,v.service,r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',[...r.why,...r.flags].join('; ')]);});
+  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','P11D','Term','Mileage','Ratebook payment plan','Ratebook finance','Ratebook service','Payments','Commission / month','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Reasons / notes']];
+  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,v.battery,v.p11d,v.term,v.mileage,v.plan,v.finance,v.service,r.payments,r2(r.commissionPm),r2(r.finance),r2(r.service),r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',[...r.why,...r.flags].join('; ')]);});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'WLC');
   const p=clPolicy();XLSX.writeFile(wb,'WLC-'+((p&&p.name)||'ratebook').replace(/[^\w-]+/g,'_')+'-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
@@ -338,6 +358,10 @@ function clRenderPolicy(){
     <div class="form-section-label">Who and what</div>
     <div class="form-row trio">${f('clp-name','Policy name',p.name)}<div class="form-field"><label>Client account</label><select id="clp-acc">${lsAccountOptions(null,p.account_id,'— none —')}</select></div>${f('clp-date','Expected delivery (sets the tax years)',p.delivery_date,'type="date"')}</div>
     <div class="form-row quad">${f('clp-term','Term (months)',p.term,'type="number"')}${f('clp-miles','Annual mileage',p.mileage,'type="number"')}${f('clp-ct','Client corporation tax %',pc(p.corp_tax),'type="number" step="0.1"')}${f('clp-ins','Insurance £ per month (0 = leave out)',p.insurance_pm,'type="number" step="0.01"')}</div>
+    <div class="form-section-label">Payment profile and commission</div>
+    <div class="form-row trio"><div class="form-field"><label>Client's payment profile</label><select id="clp-prof">${lsOptions([['ratebook','As the ratebook (no change)'],['spread','Spread — payments in advance, then term − 1'],['terminal','Terminal pause — total payments = term']],p.profile_type)}</select></div>
+      ${f('clp-up','Payments in advance',p.profile_upfront,'type="number" min="1"')}${f('clp-comm','Commission £ (whole contract, added to finance rental)',p.commission||'','type="number" step="0.01"')}</div>
+    <div style="font-size:12px;color:var(--n500);margin:-4px 0 8px">e.g. 4 years: spread 3 down = 3+47, terminal pause 3 down = 3+45. Rentals are converted from the ratebook's own plan; commission is divided by the client's number of payments.</div>
     <div class="form-section-label">Budget and grades</div>
     <div class="form-row trio"><div class="form-field"><label>Budgets are</label><select id="clp-basis">${lsOptions([['monthly','Whole life cost per month'],['term','Whole life cost over the term']],p.budget_basis)}</select></div>
       <div class="form-field"><label>Whole life cost includes fuel</label><select id="clp-fuelin">${lsOptions([['1','Yes'],['0','No']],p.budget_includes_fuel?'1':'0')}</select></div>
@@ -360,7 +384,7 @@ function clReadPolicyForm(){
   const g=id=>(document.getElementById(id).value||'').trim(),n=id=>clN(g(id)),lines=id=>g(id).split(/\n|,/).map(s=>s.trim()).filter(Boolean),pc=id=>{const x=n(id);return x==null?null:x/100;};
   const p=clEditing;
   p.grades=[...document.querySelectorAll('#clp-grades [data-gn]')].map(i=>({name:i.value.trim(),budget:clN(document.querySelector(`#clp-grades [data-gb="${i.dataset.gn}"]`).value)}));
-  Object.assign(p,{name:g('clp-name'),account_id:g('clp-acc')||'',delivery_date:g('clp-date'),term:n('clp-term'),mileage:n('clp-miles'),corp_tax:pc('clp-ct')??0.25,insurance_pm:n('clp-ins')||0,
+  Object.assign(p,{name:g('clp-name'),account_id:g('clp-acc')||'',delivery_date:g('clp-date'),term:n('clp-term'),mileage:n('clp-miles'),corp_tax:pc('clp-ct')??0.25,insurance_pm:n('clp-ins')||0,profile_type:g('clp-prof'),profile_upfront:Math.max(1,n('clp-up')||1),commission:n('clp-comm')||0,
     budget_basis:g('clp-basis'),budget_includes_fuel:g('clp-fuelin')==='1',grade_mode:g('clp-mode'),fuels:[...document.querySelectorAll('#clp-body [data-fuel]:checked')].map(i=>i.dataset.fuel),
     min_ev_range:n('clp-evr'),min_phev_range:n('clp-phr'),max_co2:n('clp-co2'),max_p11d:n('clp-p11d'),makes:lines('clp-makes'),exclude_words:lines('clp-excl'),
     phev_mpg_factor:pc('clp-phf')||1,ev_range_factor:pc('clp-evf')||1,ni_basis:g('clp-ni'),tax_years_shown:Math.min(6,Math.max(1,n('clp-yrs')||3)),show_45:document.getElementById('clp-45').checked,driver_note:g('clp-note')});
