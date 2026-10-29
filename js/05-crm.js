@@ -273,7 +273,7 @@ function buildVehicleCard(v){
     <div class="vehicle-header" onclick="toggleCard('vhc-${v.id}')">
       <div>
         <div class="vh-reg">${esc(v.reg||'—')}</div>
-        <div class="vh-model">${[v.manufacturer,v.model,v.derivative].filter(Boolean).map(esc).join(' ')||esc(v.name||'—')}</div>
+        <div class="vh-model">${[typeof lsMake==='function'?lsMake(v.manufacturer):v.manufacturer,v.model,v.derivative].filter(Boolean).map(esc).join(' ')||esc(v.name||'—')}</div>
       </div>
       <div class="inv-col"><div class="inv-col-label">Account</div><div class="inv-col-val">${esc(accountName)}</div></div>
       <div class="inv-col"><div class="inv-col-label">Driver</div><div class="inv-col-val">${esc(driverName)}</div></div>
@@ -286,7 +286,7 @@ function buildVehicleCard(v){
       <div class="detail-section-head">Vehicle</div>
       <div class="detail-grid-4">
         <div class="detail-field"><div class="detail-label">Reg</div><div class="detail-val">${esc(v.reg||'—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Make</div><div class="detail-val">${esc(v.manufacturer||'—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Make</div><div class="detail-val">${esc((typeof lsMake==='function'?lsMake(v.manufacturer):v.manufacturer)||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Model</div><div class="detail-val">${esc(v.model||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Derivative</div><div class="detail-val">${esc(v.derivative||'—')}</div></div>
         <div class="detail-field"><div class="detail-label">Fuel</div><div class="detail-val">${esc(v.fuel_type||'—')}</div></div>
@@ -366,7 +366,7 @@ function openEditVehicle(id){
   // Overview
   f('vf-reg',v.reg);f('vf-name',v.name);f('vf-desc',v.description);f('vf-fqno',v.funders_quote_no);f('vf-cpo',v.covase_po_number);f('vf-lpo',v.legacy_po_number);f('vf-lex',v.lex_900_number);f('vf-source',v.source);f('vf-status',v.status||'active');f('vf-notes',v.notes);f('vf-dynamics',v.dynamics_id);
   // Spec
-  f('vf-vtype',v.vehicle_type);f('vf-body',v.body_style);f('vf-doors',v.num_doors);f('vf-make',v.manufacturer);f('vf-model',v.model);f('vf-deriv',v.derivative);f('vf-engsize',v.engine_size);f('vf-engcc',v.engine_cc);f('vf-fuel',v.fuel_type);f('vf-trans',v.transmission);f('vf-evrange',v.ev_range);f('vf-extcol',v.exterior_colour);f('vf-intrim',v.interior_trim);f('vf-chassis',v.chassis_number);f('vf-key',v.key_number);f('vf-p11d',v.p11d_value);f('vf-co2',v.co2_emissions);f('vf-mpg',v.fuel_consumption);f('vf-motheld',String(v.mot_held||false));f('vf-std',v.standard_items);f('vf-opts',v.optional_extras);vfEngineLabel();
+  f('vf-vtype',v.vehicle_type);f('vf-body',v.body_style);f('vf-doors',v.num_doors);f('vf-make',typeof lsMake==='function'?lsMake(v.manufacturer):v.manufacturer);f('vf-model',v.model);f('vf-deriv',v.derivative);f('vf-engsize',v.engine_size);f('vf-engcc',v.engine_cc);f('vf-fuel',v.fuel_type);f('vf-trans',v.transmission);f('vf-evrange',v.ev_range);f('vf-extcol',v.exterior_colour);f('vf-intrim',v.interior_trim);f('vf-chassis',v.chassis_number);f('vf-key',v.key_number);f('vf-p11d',v.p11d_value);f('vf-co2',v.co2_emissions);f('vf-mpg',v.fuel_consumption);f('vf-motheld',String(v.mot_held||false));f('vf-std',v.standard_items);f('vf-opts',v.optional_extras);vfEngineLabel();
   // Contract
   f('vf-term',v.term_months);f('vf-miles',v.annual_mileage);f('vf-profile',v.payment_profile);f('vf-vattype',v.vat_type);f('vf-fundmethod',v.funding_method);f('vf-conttype',v.contract_type);f('vf-finrent',v.finance_rental);f('vf-svcrent',v.service_rental);f('vf-xsmile',v.excess_mileage_ppm);f('vf-otr',v.otr);f('vf-initpay',v.initial_payment);f('vf-finalpay',v.final_payment);f('vf-drivercon',v.driver_contribution);
   // Financials
@@ -404,7 +404,7 @@ function getVehiclePayload(){
   return{
     account_id:nd('vf-account'),driver_id:nd('vf-driver'),funder_id:nd('vf-funder'),dealer_id:nd('vf-dealer'),
     reg:(document.getElementById('vf-reg')?.value||'').trim().toUpperCase()||null,name:nd('vf-name'),description:nd('vf-desc'),source:nd('vf-source'),funders_quote_no:nd('vf-fqno'),covase_po_number:nd('vf-cpo'),legacy_po_number:nd('vf-lpo'),lex_900_number:nd('vf-lex'),status:nd('vf-status')||'active',notes:nd('vf-notes'),dynamics_id:nd('vf-dynamics'),
-    vehicle_type:nd('vf-vtype'),body_style:nd('vf-body'),num_doors:ni('vf-doors'),manufacturer:nd('vf-make'),model:nd('vf-model'),derivative:nd('vf-deriv'),engine_size:nd('vf-engsize'),engine_cc:ni('vf-engcc'),fuel_type:nd('vf-fuel'),transmission:nd('vf-trans'),ev_range:nf('vf-evrange'),exterior_colour:nd('vf-extcol'),interior_trim:nd('vf-intrim'),chassis_number:nd('vf-chassis'),key_number:nd('vf-key'),p11d_value:nf('vf-p11d'),co2_emissions:ni('vf-co2'),fuel_consumption:ni('vf-mpg'),mot_held:document.getElementById('vf-motheld')?.value==='true',standard_items:nd('vf-std'),optional_extras:nd('vf-opts'),
+    vehicle_type:nd('vf-vtype'),body_style:nd('vf-body'),num_doors:ni('vf-doors'),manufacturer:typeof lsMake==='function'&&nd('vf-make')?lsMake(nd('vf-make')):nd('vf-make'),model:nd('vf-model'),derivative:nd('vf-deriv'),engine_size:nd('vf-engsize'),engine_cc:ni('vf-engcc'),fuel_type:nd('vf-fuel'),transmission:nd('vf-trans'),ev_range:nf('vf-evrange'),exterior_colour:nd('vf-extcol'),interior_trim:nd('vf-intrim'),chassis_number:nd('vf-chassis'),key_number:nd('vf-key'),p11d_value:nf('vf-p11d'),co2_emissions:ni('vf-co2'),fuel_consumption:ni('vf-mpg'),mot_held:document.getElementById('vf-motheld')?.value==='true',standard_items:nd('vf-std'),optional_extras:nd('vf-opts'),
     term_months:ni('vf-term'),annual_mileage:ni('vf-miles'),payment_profile:nd('vf-profile'),vat_type:nd('vf-vattype'),funding_method:nd('vf-fundmethod'),contract_type:nd('vf-conttype'),finance_rental:nf('vf-finrent'),service_rental:nf('vf-svcrent'),excess_mileage_ppm:nf('vf-xsmile'),otr:nf('vf-otr'),initial_payment:nf('vf-initpay'),final_payment:nf('vf-finalpay'),driver_contribution:nf('vf-drivercon'),
     commissions:nf('vf-commissions'),setup_fee:nf('vf-setupfee'),management_fee:nf('vf-mgmtfee'),other_revenue:nf('vf-otherrev'),costs:nf('vf-costs'),
     order_received_date:nd('vf-d-ordered'),proposal_sent_date:nd('vf-d-proposal'),order_to_dealer_date:nd('vf-d-todealer'),order_confirmed_date:nd('vf-d-confirmed'),build_date_confirmed:nd('vf-d-build'),expected_delivery_date:nd('vf-d-expdeliv'),delivery_date:nd('vf-d-delivered'),registration_date:nd('vf-d-registered'),contracts_sent_date:nd('vf-d-ctsent'),contracts_signed_date:nd('vf-d-ctsigned'),sent_for_payment_date:nd('vf-d-sentpay'),paid_out_date:nd('vf-d-paidout'),renewal_date:nd('vf-d-renewal'),de_hire_date:nd('vf-d-dehire'),mot_1_due:nd('vf-d-mot1'),mot_2_due:nd('vf-d-mot2'),mot_expiry:nd('vf-d-motexp'),driver_card_sent_date:nd('vf-d-dcsent'),driver_card_received_date:nd('vf-d-dcrecd'),

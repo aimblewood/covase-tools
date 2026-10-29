@@ -24,10 +24,15 @@ function leaseSums(q){
   const profit=lsRound(lsNum(q.commissions)+lsNum(q.setup_fee)+mgmtProfit+lsNum(q.other_revenue)-lsNum(q.costs));
   return {total,unreclaimable,effective,mgmtProfit,profit};
 }
-function vehicleTitle(q){return [q.manufacturer,q.model,q.derivative].filter(Boolean).join(' ')||'Vehicle not set';}
+// Makes written in capitals (Simon, 29 Oct: "BMW should always be all caps").
+// Applied wherever a make is shown or saved, so quotes and vehicles stored as
+// "Bmw" before this rule still come out right.
+const LS_CAPS_MAKES=/^(BMW|MG|DS|BYD|GWM|KGM|LEVC|MINI)$/i;
+function lsMake(m){const t=String(m??'').trim();return LS_CAPS_MAKES.test(t)?t.toUpperCase():(m??'');}
+function vehicleTitle(q){return [lsMake(q.manufacturer),q.model,q.derivative].filter(Boolean).join(' ')||'Vehicle not set';}
 // Description on the Covase quotation (Simon, 29 Oct): make, model, engine
 // size, fuel type, derivative, body style, gearbox.
-function quotationVehicleTitle(q){return [q.manufacturer,q.model,q.engine_size,q.fuel_type,q.derivative,q.body_style,q.transmission].map(v=>String(v??'').trim()).filter(Boolean).join(' ')||'Vehicle not set';}
+function quotationVehicleTitle(q){return [lsMake(q.manufacturer),q.model,q.engine_size,q.fuel_type,q.derivative,q.body_style,q.transmission].map(v=>String(v??'').trim()).filter(Boolean).join(' ')||'Vehicle not set';}
 // Bullets under it: exterior colour + interior trim on one line, then each
 // optional extra (one per line), skipping extras that repeat the colour/trim.
 function quotationVehicleBullets(q){
@@ -301,7 +306,7 @@ lsInjectModal('quote-modal',`
   <div class="modal-footer"><button class="btn-secondary-modal" onclick="closeQuoteModal()">Cancel</button><button class="btn-primary-modal" onclick="saveQuote()">Save quote</button></div>`,true);
 function quoteFormHtml(q){
   const sec=QUOTE_FIELDS.map(([label,fields])=>`<div class="form-section-label">${esc(label)}</div><div class="ls-grid">`+fields.map(([k,l,t,opts])=>{
-    let v=q[k]??'';if(t==='num0'&&v!=='')v=Math.ceil(lsNum(v));
+    let v=q[k]??'';if(t==='num0'&&v!=='')v=Math.ceil(lsNum(v));if(k==='manufacturer')v=lsMake(v);
     let input;
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
@@ -318,6 +323,7 @@ function qfRead(){
   const out={};
   QUOTE_FIELDS.forEach(([,fields])=>fields.forEach(([k,,t])=>{const v=document.getElementById('qf-'+k)?.value;out[k]=(v===''||v==null)?null:(t==='int'?parseInt(v):t==='num0'?Math.ceil(parseFloat(v)):t&&t.startsWith('num')?parseFloat(v):v);}));
   ['standard_items','optional_extras','notes'].forEach(k=>{const v=document.getElementById('qf-'+k)?.value;out[k]=v?v:null;});
+  if(out.manufacturer)out.manufacturer=lsMake(out.manufacturer);
   return out;
 }
 // "Engine size" reads "Battery size" for electric cars (same field).
@@ -487,8 +493,6 @@ function funderPaymentProfile(text,term,rules){
   if(type==='spread'){const k=next||2;return {profile:init+'+'+(term-k+1),type};}
   return {why:'no rule says whether this is spread or terminal pause'};
 }
-// Makes written in capitals (Simon, 29 Oct: "BMW should always be all caps").
-const LS_CAPS_MAKES=/^(BMW|MG|DS|BYD|GWM|KGM|LEVC|MINI)$/i;
 function worksheetToQuote(parsed,rules){
   const g=parsed.got,q={},notes=[];
   if(g.funders_quote_no)q.funders_quote_no=g.funders_quote_no.replace(/\s+/g,' ').trim();
