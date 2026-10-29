@@ -185,13 +185,25 @@ function clPriceWarnings(){
   if(!ed)w.push('the electricity price has no “as of” date');else if(ed<q)w.push('the electricity price is from '+fmtUK(S.elec_as_of)+', before the current price-cap quarter began on '+fmtUK(clIso(q)));
   return w;
 }
-function clCalc(v,p){
-  const S=clSettings,out={v,flags:[],data:[]};
+// ── Adjusted cars: P11D, the funder's finance/service rentals and commission typed over the
+// ratebook for one car (e.g. a revised quote with options). Kept per machine with the ratebook,
+// applied everywhere (table, working sheet, driver lists) and marked ✎ so it's never mistaken
+// for the funder's own figure. Rentals are entered on the ratebook's payment plan, as the
+// funder quotes them; the policy's profile and commission are then applied as normal.
+let clOverrides={},clSelected=new Set(),clLastPP=null;
+function clRowKey(v){return [v.cap||v.make+'|'+v.desc,v.term,v.mileage].join('|');}
+try{clOverrides=JSON.parse(localStorage.getItem('covase_cl_overrides')||'{}')||{};}catch(e){clOverrides={};}
+function clSaveOverrides(){try{localStorage.setItem('covase_cl_overrides',JSON.stringify(clOverrides));}catch(e){}}
+function clCalc(v0,p,ovr){
+  const o=ovr!==undefined?ovr:clOverrides[clRowKey(v0)];
+  const v=o?Object.assign({},v0,{p11d:o.p11d??v0.p11d,finance:o.finance??v0.finance,service:o.service??v0.service}):v0;
+  const commission=o&&o.commission!=null?o.commission:p.commission;
+  const S=clSettings,out={v,orig:v0,edited:!!o,commission,flags:[],data:[]};
   // Re-profile the rentals, then spread commission over the client's payments (finance only)
   const src=clPlanCount(v.plan,v.term),dst=clProfileCount(p,v.term);
   out.finance=v.finance;out.service=v.service;out.commissionPm=0;out.payments=dst||src;
   if(dst){if(src){out.finance=v.finance*src/dst;out.service=v.service*src/dst;}else out.data.push(v.plan?'payment plan "'+v.plan+'" not understood':'ratebook gives no payment plan');}
-  if(p.commission>0){if(out.payments){out.commissionPm=p.commission/out.payments;out.finance+=out.commissionPm;}else if(!out.data.length)out.data.push(v.plan?'payment plan "'+v.plan+'" not understood':'ratebook gives no payment plan');}
+  if(commission>0){if(out.payments){out.commissionPm=commission/out.payments;out.finance+=out.commissionPm;}else if(!out.data.length)out.data.push(v.plan?'payment plan "'+v.plan+'" not understood':'ratebook gives no payment plan');}
   const reg=clDate(v.reg_date)||clDate(p.delivery_date)||new Date();
   const pre=reg<new Date(2020,3,6);
   const term=p.term||v.term||0;
@@ -257,7 +269,7 @@ function clRun(){
   const pp=Object.assign({},p,{term,mileage:miles});
   clResults=clRows.filter(v=>v.term===term&&v.mileage===miles).map(v=>clApplyPolicy(clCalc(v,pp),pp));
   clResults.sort((a,b)=>(a.budgetValue??Infinity)-(b.budgetValue??Infinity));
-  return pp;
+  clLastPP=pp;return pp;
 }
 function clVal(id){const e=document.getElementById(id);return e?e.value:'';}
 
@@ -276,7 +288,8 @@ lsInjectView('view-choice-lists',`
         <button class="btn" onclick="clEditPolicy(clPolicyId)">✎ Edit</button> <button class="btn" onclick="clEditPolicy(null)">+ New policy</button></div>
       <div><span>Term</span> <select id="cl-term" onchange="clRender()"></select></div>
       <div><span>Mileage</span> <select id="cl-miles" onchange="clRender()"></select></div>
-      <div><span>Show</span> <select id="cl-show" onchange="clRenderTable()"><option value="ok">On the list</option><option value="out">Left off</option><option value="all">Everything</option></select></div>
+      <div><span>Show</span> <select id="cl-show" onchange="clRenderTable()"><option value="ok">On the list</option><option value="out">Left off</option><option value="all">Everything</option><option value="sel">Selected</option></select></div>
+      <div><button class="btn" onclick="clOpenTinker()">✎ Adjust selected</button></div>
       <div><input id="cl-q" type="search" placeholder="Search — any words, any order…" oninput="clRenderTable()" style="min-width:240px"></div>
     </div>
     <div id="cl-status" class="notes-box"></div>
@@ -328,7 +341,8 @@ function clCols(){
   const yrs=(clResults[0]||{years:[]}).years.map(y=>y.year);
   const money=x=>x==null?'—':lsMoney(x);
   return [
-    {key:'vehicle',label:'Vehicle',get:r=>r.v.make+' '+r.v.desc,html:r=>`<strong>${esc(r.v.make)}</strong> ${esc(r.v.desc)}`,wide:1},
+    {key:'sel',label:'',fixed:1,get:r=>clSelected.has(clRowKey(r.orig))?1:0,html:r=>`<input type="checkbox" title="Select to adjust" ${clSelected.has(clRowKey(r.orig))?'checked':''} onclick="clToggleSel('${esc(clRowKey(r.orig)).replace(/'/g,'&#39;')}',this.checked)">`},
+    {key:'vehicle',label:'Vehicle',get:r=>r.v.make+' '+r.v.desc,html:r=>`${r.edited?'<span title="Adjusted by hand — ✎ Adjust selected to change or reset" style="color:#b7791f">✎ </span>':''}<strong>${esc(r.v.make)}</strong> ${esc(r.v.desc)}`,wide:1},
     {key:'fuel',label:'Fuel',get:r=>r.v.fuel_raw},
     {key:'co2',label:'CO₂',num:1,get:r=>r.v.co2},
     {key:'range',label:'Range',num:1,get:r=>r.v.ev_range},
@@ -369,16 +383,16 @@ function clRenderTable(){
   const cols=clCols(),show=clVal('cl-show');
   const words=clVal('cl-q').toLowerCase().split(/\s+/).filter(Boolean);
   const hay=r=>(r.v.make+' '+r.v.model+' '+r.v.desc+' '+r.v.fuel_raw+' '+r.v.body+' '+r.v.cap+' '+(r.grade?r.grade.name:'')+' '+[...r.why,...r.flags].join(' ')).toLowerCase();
-  const tests=cols.map(c=>[c,clFilterTest(c,clFilters[c.key])]).filter(x=>x[1]);
+  const tests=cols.filter(c=>!c.fixed).map(c=>[c,clFilterTest(c,clFilters[c.key])]).filter(x=>x[1]);
   const match=r=>words.every(w=>hay(r).includes(w))&&tests.every(([c,t])=>t(c.get(r)));
   const all=clResults.filter(match);
-  let rows=all.filter(r=>show==='all'||(show==='ok'?r.ok:!r.ok));
+  let rows=show==='sel'?clResults.filter(r=>clSelected.has(clRowKey(r.orig))):all.filter(r=>show==='all'||(show==='ok'?r.ok:!r.ok));
   const sc=cols.find(c=>c.key===clSort.key)||cols.find(c=>c.key==='wlc');
   rows=rows.slice().sort((a,b)=>{const x=sc.get(a),y=sc.get(b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
     return (sc.num?x-y:String(x).localeCompare(String(y),'en-GB',{numeric:true}))*clSort.dir;});
   const filtering=words.length||tests.length,hidden=all.length-rows.length;
-  const head=cols.map(c=>`<th style="cursor:pointer;user-select:none" title="Sort" onclick="clSortBy('${c.key}')">${esc(c.label)}${clSort.key===c.key?(clSort.dir>0?' ▲':' ▼'):''}</th>`).join('');
-  const filt=cols.map(c=>`<td style="padding:3px 4px"><input data-clf="${c.key}" value="${esc(clFilters[c.key]||'')}" placeholder="${c.num?'e.g. <500':'filter'}" oninput="clSetFilter('${c.key}',this.value)" style="width:100%;min-width:${c.wide?'120':'56'}px;font-size:11px;padding:3px 5px;box-sizing:border-box"></td>`).join('');
+  const head=cols.map(c=>c.fixed?`<th title="Tick cars, then ✎ Adjust selected">${clSelected.size?`<a href="#" onclick="clSelected.clear();clRenderTable();return false" title="Untick all">✕${clSelected.size}</a>`:''}</th>`:`<th style="cursor:pointer;user-select:none" title="Sort" onclick="clSortBy('${c.key}')">${esc(c.label)}${clSort.key===c.key?(clSort.dir>0?' ▲':' ▼'):''}</th>`).join('');
+  const filt=cols.map(c=>c.fixed?'<td></td>':`<td style="padding:3px 4px"><input data-clf="${c.key}" value="${esc(clFilters[c.key]||'')}" placeholder="${c.num?'e.g. <500':'filter'}" oninput="clSetFilter('${c.key}',this.value)" style="width:100%;min-width:${c.wide?'120':'56'}px;font-size:11px;padding:3px 5px;box-sizing:border-box"></td>`).join('');
   const body=rows.slice(0,600).map(r=>`<tr>${cols.map(c=>{const v=c.get(r);const h=c.html?c.html(r):c.fmt?c.fmt(v):esc(v==null?'':String(v));
     return `<td${c.wide?` style="white-space:normal;min-width:${c.notes?200:260}px${c.notes?';color:'+(r.ok?'var(--n400)':'#c0392b'):''}"`:''}>${h}</td>`;}).join('')}</tr>`).join('');
   el.innerHTML=`<div style="font-size:12px;color:var(--n500);margin:0 0 6px">${rows.length.toLocaleString('en-GB')} shown${filtering?' matching your search / filters':''}${hidden&&filtering?` · ${hidden} more match but are ${show==='ok'?'left off':'on the list'} — change “Show” to see them`:''}${filtering?' · <a href="#" onclick="clClearFilters();return false">clear all</a>':''} · click a heading to sort</div>
@@ -388,13 +402,61 @@ function clRenderTable(){
   if(focusKey){const i=el.querySelector(`[data-clf="${focusKey}"]`);if(i){i.focus();try{i.setSelectionRange(caret,caret);}catch(e){}}}
 }
 
+function clToggleSel(k,on){if(on)clSelected.add(k);else clSelected.delete(k);if(clVal('cl-show')==='sel'&&!on)clRenderTable();else{const th=document.querySelector('#cl-table th');if(th)th.innerHTML=clSelected.size?`<a href="#" onclick="clSelected.clear();clRenderTable();return false" title="Untick all">✕${clSelected.size}</a>`:'';}}
+
+// ── Adjust selected cars ──
+lsInjectModal('cl-tinker-modal',`
+  <div class="modal-header"><div class="modal-title">Adjust selected cars</div><button class="modal-close" onclick="clCloseTinker()">✕</button></div>
+  <div class="modal-body"><div style="font-size:12px;color:var(--n500);margin-bottom:10px">Type the funder's revised figures — rentals as they quote them, on the ratebook's payment plan. The client's payment profile and commission are applied on top, and the results update as you type. Leave commission blank to use the policy's. Nothing changes on the list until you press Save.</div><div id="clt-body"></div></div>
+  <div class="modal-footer"><button class="btn-secondary-modal" style="margin-right:auto" onclick="clTinkerResetAll()">Reset all to ratebook</button><button class="btn-secondary-modal" onclick="clCloseTinker()">Cancel</button><button class="btn-primary-modal" onclick="clSaveTinker()">Save</button></div>`,true);
+let clTinkerRows=[];
+function clOpenTinker(){
+  if(!clRows.length){toast('Import a ratebook first','error');return;}
+  clRun();const rows=clResults.filter(r=>clSelected.has(clRowKey(r.orig)));
+  if(!rows.length){toast('Tick one or more cars in the list first','error');return;}
+  if(rows.length>10){toast('Pick up to 10 cars to adjust at a time','error');return;}
+  clTinkerRows=rows.map(r=>{const k=clRowKey(r.orig),o=clOverrides[k]||{};return {k,v0:r.orig,o:{p11d:o.p11d??null,finance:o.finance??null,service:o.service??null,commission:o.commission??null}};});
+  clRenderTinker();document.getElementById('cl-tinker-modal').classList.add('open');
+}
+function clCloseTinker(){document.getElementById('cl-tinker-modal').classList.remove('open');}
+function clTinkerOverride(t){const o=t.o;return [o.p11d,o.finance,o.service,o.commission].some(x=>x!=null)?o:null;}
+function clRenderTinker(){
+  const pp=clLastPP;
+  document.getElementById('clt-body').innerHTML=clTinkerRows.map((t,i)=>{const v=t.v0,f=(fld,label,val,ph)=>`<div class="form-field"><label>${label}</label><input type="number" step="0.01" data-clt="${i}" data-f="${fld}" value="${val==null?'':val}" placeholder="${esc(ph)}" oninput="clTinkerInput(${i},'${fld}',this.value)"></div>`;
+    return `<div class="ls-quote"><div class="ls-quote-head"><strong>${esc(v.make)}</strong> ${esc(v.desc)} <span style="color:var(--n400)">· ${esc(String(v.term))} months · ${Number(v.mileage).toLocaleString('en-GB')} miles · ${esc(v.plan||'payment plan not given')}</span><button class="btn" style="margin-left:auto" onclick="clTinkerReset(${i})">Reset</button></div>
+      <div class="form-row quad">${f('p11d','P11D value £',t.o.p11d,'ratebook '+v.p11d)}${f('finance','Funder finance rental £',t.o.finance,'ratebook '+v.finance)}${f('service','Funder service rental £',t.o.service,'ratebook '+v.service)}${f('commission','Commission £ (whole contract)',t.o.commission,'policy '+((pp&&pp.commission)||0))}</div>
+      <div id="clt-res-${i}"></div></div>`;}).join('');
+  clTinkerRows.forEach((t,i)=>clTinkerResult(i));
+}
+function clTinkerInput(i,fld,val){clTinkerRows[i].o[fld]=clN(val);clTinkerResult(i);}
+function clTinkerReset(i){const t=clTinkerRows[i];t.o={p11d:null,finance:null,service:null,commission:null};document.querySelectorAll(`[data-clt="${i}"]`).forEach(x=>x.value='');clTinkerResult(i);}
+function clTinkerResetAll(){clTinkerRows.forEach((t,i)=>clTinkerReset(i));}
+function clTinkerResult(i){
+  const t=clTinkerRows[i],pp=clLastPP;if(!pp)return;
+  const before=clApplyPolicy(clCalc(t.v0,pp,null),pp),after=clApplyPolicy(clCalc(t.v0,pp,clTinkerOverride(t)),pp);
+  const m=x=>x==null?'—':lsMoney(x),row=(label,a,b,fmt)=>{const fa=(fmt||m)(a),fb=(fmt||m)(b);return `<tr><td>${label}</td><td>${fa}</td><td${fa!==fb?' style="font-weight:700"':''}>${fb}</td></tr>`;};
+  const tax=(r,i,b)=>r.years[i]&&r.years[i].rate!=null?r.v.p11d*r.years[i].rate*b/12:null;
+  const status=r=>r.ok?(r.grade?'On the list — '+esc(r.grade.name):'On the list'):'<span style="color:#c0392b">Left off: '+esc(r.why.join('; '))+'</span>';
+  document.getElementById('clt-res-'+i).innerHTML=`<table class="ls-table"><tr><th></th><th>Ratebook</th><th>Adjusted</th></tr>
+    ${row('Client finance rental (incl. commission)',before.finance,after.finance)}${row('Client service rental',before.service,after.service)}${row('Commission per payment',before.commissionPm,after.commissionPm)}
+    ${row('Irrecoverable VAT',before.vatLost,after.vatLost)}${row('Lease rental restriction',before.lrr,after.lrr)}${row("Employer's NI",before.ni,after.ni)}${row('Fuel / energy',before.fuelPm,after.fuelPm)}
+    ${row('<strong>WLC per month</strong>',pp.budget_includes_fuel===false?before.wlcNoFuel:before.wlc,pp.budget_includes_fuel===false?after.wlcNoFuel:after.wlc)}${row('WLC over term',before.wlcTerm,after.wlcTerm)}
+    ${after.years.map((y,k)=>row('BIK '+esc(y.year),before.years[k].rate,y.rate,clPct)
+      +`<tr><td>&nbsp;&nbsp;driver tax / month at 20% · 40%</td><td>${m(tax(before,k,0.2))} · ${m(tax(before,k,0.4))}</td><td>${m(tax(after,k,0.2))} · ${m(tax(after,k,0.4))}</td></tr>`).join('')}
+    <tr><td>Status</td><td>${status(before)}</td><td>${status(after)}</td></tr></table>`;
+}
+function clSaveTinker(){
+  clTinkerRows.forEach(t=>{const o=clTinkerOverride(t);if(o)clOverrides[t.k]=Object.fromEntries(Object.entries(o).filter(([,x])=>x!=null));else delete clOverrides[t.k];});
+  clSaveOverrides();clCloseTinker();clRender();toast('Saved — adjusted cars are marked ✎','success');
+}
+
 // ── Exports ──
 function clNeedRows(){if(!clRows.length){toast('Import a ratebook first','error');return false;}clRun();if(!clResults.length){toast('No ratebook rows at this term and mileage','error');return false;}return true;}
 async function clExportWorking(){
   if(!clNeedRows())return;await loadSheetJS();
   const yrs=clResults[0].years.map(y=>y.year);const r2=x=>x==null?null:Math.round(x*100)/100;
-  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','Battery size from','Miles per kWh','MPG used / MPGe (cost-equivalent)','P11D','Term','Mileage','Ratebook payment plan','Ratebook finance','Ratebook service','Payments','Commission / month','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Reasons / notes']];
-  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,r.battery??null,r.batterySrc||'',v.fuel==='electric'&&r.mpu?Math.round(r.mpu*100)/100:null,(v.fuel==='electric'?r.mpge:r.mpu)==null?null:Math.round((v.fuel==='electric'?r.mpge:r.mpu)*10)/10,v.p11d,v.term,v.mileage,v.plan,v.finance,v.service,r.payments,r2(r.commissionPm),r2(r.finance),r2(r.service),r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',[...r.why,...r.flags].join('; ')]);});
+  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','Battery size from','Miles per kWh','MPG used / MPGe (cost-equivalent)','P11D','Term','Mileage','Ratebook payment plan','Ratebook finance','Ratebook service','Payments','Commission / month','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Adjusted by hand','Reasons / notes']];
+  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,r.battery??null,r.batterySrc||'',v.fuel==='electric'&&r.mpu?Math.round(r.mpu*100)/100:null,(v.fuel==='electric'?r.mpge:r.mpu)==null?null:Math.round((v.fuel==='electric'?r.mpge:r.mpu)*10)/10,v.p11d,v.term,v.mileage,v.plan,v.finance,v.service,r.payments,r2(r.commissionPm),r2(r.finance),r2(r.service),r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',r.edited?'Yes (ratebook P11D '+r.orig.p11d+', finance '+r.orig.finance+', service '+r.orig.service+')':'',[...r.why,...r.flags].join('; ')]);});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'WLC');
   const p=clPolicy();XLSX.writeFile(wb,'WLC-'+((p&&p.name)||'ratebook').replace(/[^\w-]+/g,'_')+'-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
