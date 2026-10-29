@@ -361,7 +361,14 @@ const DEFAULT_FUNDER_RULES={lex:{name:'Lex Autolease',match:'Lex|Quote No\\s',fi
   num_doors:['Number of Doors'],fuel_consumption:['FC Weighted (Combined)','MPG (Combined)'],ev_range:['Pure EV Range (Combined)','EAER Miles (Combined)'],
   finance_rental:['Lease Rental'],service_rental:['Service Rental'],monthly_rental:['Monthly Rental'],effective_rental:['Effective Rental'],
   excess_mileage:['Excess Mileage Charge'],p11d_value:['Taxable List Price (P11D)']},
-  fuel:{'Electric':'Electric','Elec H':'Plugin Hybrid (Petrol)','Petrol':'Petrol','Diesel':'Diesel'}}};
+  fuel:{'Electric':'Electric','Elec H':'Plugin Hybrid (Petrol)','Petrol':'Petrol','Diesel':'Diesel'},
+  // Payment plan wording -> profile type. 'spread' = payments up front then
+  // one a month to the end (3+35 on 36m = 38 payments); 'terminal' = terminal
+  // pause, total payments = the term (3+45 on 48m). Lex's plain "X months
+  // initial rental, next payment month Y" sentence with none of these words
+  // is a spread.
+  plan_words:{'terminal pause':'terminal','spread':'spread'},
+  multiline:['payment_plan']}};
 let funderRules=JSON.parse(JSON.stringify(DEFAULT_FUNDER_RULES));
 async function loadFunderRules(){try{const r=await sbReq('covase_config?key=eq.funder_rules&select=value');if(r&&r[0]&&r[0].value)funderRules=r[0].value;}catch(e){}}
 async function saveFunderRules(){await sbReq('covase_config',{method:'POST',body:{key:'funder_rules',value:funderRules,updated_at:new Date().toISOString()},prefer:'resolution=merge-duplicates,return=minimal'});}
@@ -390,10 +397,21 @@ function lsAmount(s){const m=String(s||'').replace(/,/g,'').match(/-?\d+(\.\d+)?
 function parseFunderWorksheet(lines,rules){
   const labelOf={};Object.entries(rules.fields).forEach(([f,labels])=>labels.forEach(l=>labelOf[l.toLowerCase()]=f));
   const got={},seen=new Set(),unmapped=[];
-  lines.forEach(r=>r.cells.forEach((c,i)=>{
+  // A long value can wrap: Lex prints the Payment Plan sentence over two
+  // lines with the label beside the second. For fields in rules.multiline,
+  // a neighbouring line holding a single cell in the value column (and no
+  // label) is joined on.
+  const multi=new Set(rules.multiline||DEFAULT_FUNDER_RULES.lex.multiline);
+  const wrapOf=(r,vx)=>r&&r.cells.length===1&&Math.abs(r.cells[0].x-vx)<=8&&!labelOf[r.cells[0].s.toLowerCase()]?r.cells[0].s:null;
+  lines.forEach((r,ri)=>r.cells.forEach((c,i)=>{
     const f=labelOf[c.s.toLowerCase()];if(!f)return;seen.add(i+'@'+r.y);
     const nxt=r.cells[i+1];
-    if(nxt&&!labelOf[nxt.s.toLowerCase()]){if(got[f]===undefined)got[f]=nxt.s;seen.add((i+1)+'@'+r.y);}
+    if(nxt&&!labelOf[nxt.s.toLowerCase()]){if(got[f]===undefined){
+      let v=nxt.s;
+      if(multi.has(f)){const up=lines[ri-1],dn=lines[ri+1];
+        const a=up&&Math.abs(up.y-r.y)<=12?wrapOf(up,nxt.x):null,b=dn&&Math.abs(dn.y-r.y)<=12?wrapOf(dn,nxt.x):null;
+        v=[a,v,b].filter(Boolean).join(' ');}
+      got[f]=v;}seen.add((i+1)+'@'+r.y);}
   }));
   // extras: lines after "Selected Optional Extras" (right half) until "Financials"
   const extras=[];let inX=false,xStart=null;
@@ -405,6 +423,27 @@ function parseFunderWorksheet(lines,rules){
   // fuel type may be split over two lines ("Petrol/PlugIn" above "Elec H")
   const flat=lines.map(r=>r.cells.map(c=>c.s).join(' ')).join('\n');
   return {got,extras,flat};
+}
+// Funder payment plan wording -> ORBIS profile. Spread: 3 up front then
+// monthly from month Y to the end = 3+(term-Y+1). Terminal pause: total
+// payments = the term, so 3 up front leaves term-3 (3+45 on 48m), stored as
+// "3+45 terminal pause". The type comes from rules.plan_words; a sentence with
+// none of them is only taken as a spread when it is Lex's "next payment is
+// month Y" form. Anything else is refused, never guessed.
+function funderPaymentProfile(text,term,rules){
+  const s=String(text||'').toLowerCase().replace(/\s+/g,' '),num=w=>LS_WORDNUM[w]||parseInt(w)||null;
+  if(!term)return {why:'no term on the worksheet'};
+  const words=rules.plan_words||DEFAULT_FUNDER_RULES.lex.plan_words;
+  const hit=Object.keys(words).filter(w=>s.includes(w.toLowerCase())).sort((a,b)=>b.length-a.length)[0];
+  const pm=s.match(/(\d+)\s*\+\s*(\d+)/); // already written as a profile, e.g. "3+35"
+  if(pm)return words[hit]==='terminal'?{profile:pm[1]+'+'+pm[2]+' terminal pause',type:'terminal'}:{profile:pm[1]+'+'+pm[2],type:'spread'};
+  const im=s.match(/(\w+) months?'? (?:initial rental|in advance|advance rental|up ?front|down)/)||s.match(/with (\w+) down/);
+  const init=im&&num(im[1]);if(!init)return {why:'no number of payments up front'};
+  const nm=s.match(/next payment (?:is )?(?:at |in )?month (\w+)/),next=nm?num(nm[1]):null;
+  const type=hit?words[hit]:(next?'spread':null);
+  if(type==='terminal'){if(init>=term)return {why:'more payments up front than the term'};return {profile:init+'+'+(term-init)+' terminal pause',type};}
+  if(type==='spread'){const k=next||2;return {profile:init+'+'+(term-k+1),type};}
+  return {why:'no rule says whether this is spread or terminal pause'};
 }
 function worksheetToQuote(parsed,rules){
   const g=parsed.got,q={},notes=[];
@@ -420,11 +459,8 @@ function worksheetToQuote(parsed,rules){
     else{q.funding_method=ct;notes.push('contract type "'+ct+'" — no rule, please set full or non maintenance');}}
   q.term_months=lsAmount(g.term_months)||null;
   if(g.mileage){const pa=lsAmount(String(g.mileage).split('/')[0]);if(pa)q.annual_mileage=pa;}
-  if(g.payment_plan){
-    const m=String(g.payment_plan).toLowerCase().match(/based on (\w+) months? initial rental.*?month (\w+)/);
-    const init=m&&(LS_WORDNUM[m[1]]||parseInt(m[1])),k=m&&(LS_WORDNUM[m[2]]||parseInt(m[2]));
-    if(init&&k&&q.term_months){q.payment_profile=init+'+'+(q.term_months-k+1);}else notes.push('payment plan not recognised: "'+g.payment_plan+'"');
-  }
+  if(g.payment_plan){const pp=funderPaymentProfile(g.payment_plan,q.term_months,rules);
+    if(pp.profile)q.payment_profile=pp.profile;else notes.push('payment plan not recognised: "'+g.payment_plan+'" — '+pp.why);}
   ['otr','commissions','p11d_value','finance_rental','service_rental'].forEach(k=>{if(g[k]!==undefined)q[k]=lsAmount(g[k]);});
   ['co2_emissions','num_doors'].forEach(k=>{if(g[k]!==undefined)q[k]=parseInt(lsAmount(g[k]));});
   if(g.fuel_consumption)q.fuel_consumption=lsAmount(g.fuel_consumption);
@@ -576,7 +612,7 @@ function printQuotation(id){
   const html=`<div class="side">Quotation</div>${covaseHeader()}
   <table class="q-kv client"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
     <tr><td>Contract</td><td>${esc(String(q.term_months||'—'))} month${q.contract_type?'<br>'+esc(q.contract_type):''}${q.funding_method?'<br>'+esc(q.funding_method):''}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
-    <tr><td>Payments</td><td>${esc(q.payment_profile||'—')} monthly payments<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
+    <tr><td>Payments</td><td>${esc(String(q.payment_profile||'—').replace(/\s*terminal pause$/i,''))} monthly payments${/terminal pause$/i.test(q.payment_profile||'')?' (terminal pause)':''}<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
   <table class="q-kv prep"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
   <div class="q-box"><div>Quotation</div><div>${esc(q.quote_no)}</div><small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div>
   <div class="q-body">
