@@ -457,7 +457,7 @@ function lsPrint(html,title){
   .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'Covase Open Sans',Arial;padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
   @media print{.bar{display:none}}@media screen{body{background:#eee}.page{background:#fff;margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.15)}}
   .logo{position:absolute;left:18mm;top:9mm;width:55mm;height:auto}
-  .co{display:flex;gap:11mm;justify-content:flex-end;font-size:10pt;color:#8a8a8a;line-height:1.45;min-height:22mm}
+  .co{display:flex;gap:11mm;justify-content:flex-end;font-size:8pt;color:#8a8a8a;line-height:1.45;min-height:22mm}
   .teal{color:var(--teal)}
   .side{position:absolute;left:14mm;top:33mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:400}
   .grid{display:flex;justify-content:space-between;gap:8mm;margin:2mm 0 9mm;align-items:flex-start}
@@ -465,7 +465,7 @@ function lsPrint(html,title){
   .box{border:1px solid #222;padding:4mm 9mm;text-align:center;font-family:var(--netto);font-size:20pt;line-height:1.2;min-width:48mm;box-sizing:border-box}
   .box small{display:block;font-family:'Covase Open Sans','Open Sans',Arial,sans-serif;font-size:10pt;margin-top:1.5mm}
   table.v{width:100%;border-collapse:collapse;margin-bottom:6mm}
-  table.v th{font-family:var(--netto);font-size:12pt;font-weight:400;text-transform:uppercase;line-height:1.25;border-bottom:2px solid var(--teal);padding:0 2mm 1.5mm;text-align:center;vertical-align:bottom}
+  table.v th{font-family:var(--netto);font-size:12pt;font-weight:400;text-transform:uppercase;line-height:1.25;border-bottom:2px solid var(--teal);padding:0 2mm 1.5mm;text-align:center;vertical-align:top}
   table.v th:first-child{text-align:left;padding-left:0}
   table.v td{padding:1.5mm 2mm;vertical-align:top;font-size:10pt;text-align:center;white-space:nowrap}
   table.v td:first-child{text-align:left;padding-left:0;white-space:normal}
