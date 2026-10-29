@@ -269,23 +269,26 @@ const QUOTE_FIELDS=[
   ['Money (monthly, ex VAT)',[['finance_rental','Finance rental £','num'],['service_rental','Service rental £','num'],['commissions','Commission £','num'],['setup_fee','Set-up fee £','num'],['management_fee','Management fee £/month','num'],['other_revenue','Other revenue £','num'],['costs','Costs £','num']]]
 ];
 let editQuoteId=null,quoteDraftDoc=null;
-// Worksheet reader → quote (Simon, 29 Oct): every field the reader filled gets
-// a "use" tick. Unticking puts the field back to its default (or blank),
-// ticking brings the worksheet value back. Unticked fields are remembered on
-// this machine (localStorage covase_reader_skip) and start unticked on the
-// next worksheet, so a field he never wants filled stays out until re-ticked.
+// Worksheet reader → quote (Simon, 29 Oct): fields the reader filled are
+// marked (teal name, teal edge on the box). Clicking a marked field's name
+// leaves it out — the default (or blank) goes back and the name is struck
+// through; clicking again restores the worksheet value. Left-out fields are
+// remembered on this machine (localStorage covase_reader_skip) and start left
+// out on the next worksheet. (Tickboxes were tried first and were too busy.)
 let qfReader=null; // {read:{k:v}, base:{k:v}} while a worksheet quote is open
 const QF_SKIP_KEY='covase_reader_skip';
 const QF_KEYS=new Set([...QUOTE_FIELDS.flatMap(([,f])=>f.map(x=>x[0])),'standard_items','optional_extras']);
 function qfSkipList(){try{return JSON.parse(localStorage.getItem(QF_SKIP_KEY)||'[]');}catch(e){return [];}}
 function qfSaveSkipList(){if(!qfReader)return;try{const keep=qfSkipList().filter(k=>!(k in qfReader.read));
-  document.querySelectorAll('#quote-form .qf-use').forEach(c=>{if(!c.checked)keep.push(c.dataset.k);});localStorage.setItem(QF_SKIP_KEY,JSON.stringify(keep));}catch(e){}}
-function qfUseBox(k){if(!qfReader||!(k in qfReader.read))return '';
-  return `<span class="qf-use-wrap" title="Use the worksheet's value: ${esc(String(qfReader.read[k]??''))}"><input type="checkbox" class="qf-use" data-k="${esc(k)}"${qfSkipList().includes(k)?'':' checked'} onchange="qfToggleRead(this)">use</span>`;}
-function qfToggleRead(c){const k=c.dataset.k,el=document.getElementById('qf-'+k);if(!el||!qfReader)return;
-  const v=c.checked?qfReader.read[k]:qfReader.base[k],sv=v==null?'':String(v);
+  document.querySelectorAll('#quote-form .qf-read.qf-off').forEach(l=>keep.push(l.dataset.k));localStorage.setItem(QF_SKIP_KEY,JSON.stringify(keep));}catch(e){}}
+// Attributes for a field's <label>: marks it as read from the worksheet.
+function qfReadAttr(k){if(!qfReader||!(k in qfReader.read))return '';
+  return ` class="qf-read${qfSkipList().includes(k)?' qf-off':''}" data-k="${esc(k)}" onclick="qfToggleRead(this,event)" title="From the worksheet: ${esc(String(qfReader.read[k]??''))} — click to leave out / put back"`;}
+function qfApplyRead(lab){const k=lab.dataset.k,el=document.getElementById('qf-'+k);if(!el||!qfReader)return;
+  const off=lab.classList.contains('qf-off'),v=off?qfReader.base[k]:qfReader.read[k],sv=v==null?'':String(v);
   if(el.tagName==='SELECT'&&sv&&![...el.options].some(o=>o.value===sv))el.add(new Option(sv,sv));
-  el.value=sv;el.classList.toggle('qf-skipped',!c.checked);qfRecalc();}
+  el.value=sv;el.closest('.form-field')?.classList.toggle('qf-field-off',off);}
+function qfToggleRead(lab,ev){if(ev)ev.preventDefault();lab.classList.toggle('qf-off');qfApplyRead(lab);qfRecalc();}
 lsInjectModal('quote-modal',`
   <div class="modal-header"><div class="modal-title" id="quote-modal-title">Quote</div><button class="modal-close" onclick="closeQuoteModal()">✕</button></div>
   <div class="modal-body" id="quote-form"></div>
@@ -297,10 +300,10 @@ function quoteFormHtml(q){
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
     else input=`<input id="qf-${k}" ${t&&t.startsWith('num')||t==='int'?`type="number" step="${t==='int'?'1':t==='num4'?'0.0001':'0.01'}"`:''} value="${esc(String(v))}" oninput="qfRecalc()">`;
-    return `<div class="form-field"><label for="qf-${k}" class="qf-lab">${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}${qfUseBox(k)}</label>${input}</div>`;
+    return `<div class="form-field"><label for="qf-${k}"${qfReadAttr(k)}>${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}</label>${input}</div>`;
   }).join('')+'</div>').join('');
-  const head=qfReader?`<div class="notes-box" style="margin-bottom:10px">Filled from the worksheet. Untick <b>use</b> on any field you don't want from it — unticked fields stay unticked for the next worksheet too.</div>`:'';
-  return head+sec+`<div class="form-row"><div class="form-field"><label class="qf-lab">Standard items${qfUseBox('standard_items')}</label><textarea id="qf-standard_items">${esc(q.standard_items||'')}</textarea></div><div class="form-field"><label class="qf-lab">Optional extras${qfUseBox('optional_extras')}</label><textarea id="qf-optional_extras">${esc(q.optional_extras||'')}</textarea></div></div>
+  const head=qfReader?`<div class="notes-box" style="margin-bottom:10px">Fields in teal came from the worksheet. Click a field's name to leave it out, click again to put it back.</div>`:'';
+  return head+sec+`<div class="form-row"><div class="form-field"><label${qfReadAttr('standard_items')}>Standard items</label><textarea id="qf-standard_items">${esc(q.standard_items||'')}</textarea></div><div class="form-field"><label${qfReadAttr('optional_extras')}>Optional extras</label><textarea id="qf-optional_extras">${esc(q.optional_extras||'')}</textarea></div></div>
     <div class="form-field"><label>Notes</label><textarea id="qf-notes">${esc(q.notes||'')}</textarea></div>
     ${q.reader_notes?`<div class="notes-box" style="white-space:pre-line">⚠ From the worksheet reader — please check: ${esc(q.reader_notes)}</div>`:''}
     <div class="detail-section-head">Worked out (not typed)</div><div class="financials-row" id="qf-sums"></div>`;
@@ -317,7 +320,7 @@ function qfRecalc(){const lab=document.querySelector('label[for="qf-engine_size"
 function openQuoteForm(q,title){
   document.getElementById('quote-modal-title').textContent=title;
   document.getElementById('quote-form').innerHTML=quoteFormHtml(q);
-  document.querySelectorAll('#quote-form .qf-use:not(:checked)').forEach(qfToggleRead);qfRecalc();
+  document.querySelectorAll('#quote-form .qf-read.qf-off').forEach(qfApplyRead);qfRecalc();
   document.getElementById('quote-modal').classList.add('open');
 }
 function openNewQuote(prefill){
