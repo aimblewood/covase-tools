@@ -439,29 +439,31 @@ async function readFunderWorksheet(file){
 // House print layout (quotation, dealer PO): A4 landscape, measured from the
 // Covase quotation template. Fonts per Simon (29 Oct 2026): Netto OT for the
 // vertical title (64pt), the reference box (20pt) and the price headings
-// (12pt caps); Open Sans 10pt for everything else. Netto OT is a licensed
-// font, not on a web CDN: it is used when installed on the PC printing, with
-// Barlow (closest open match) standing in otherwise.
+// (12pt caps); Open Sans 10pt for everything else. Both fonts are Covase's
+// purchased copies, served from fonts/ (Simon confirmed full rights, 29 Oct).
 const COVASE_LOGO_URL=new URL('img/covase-logo.png',location.href).href;
+const COVASE_FONT_URL=f=>new URL('fonts/'+f,location.href).href;
 function lsPrint(html,title){
   // Opened as a Blob page rather than document.write into about:blank, so the
   // logo and fonts load like any normal page before printing.
   const page=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Barlow:wght@300;400&display=swap" rel="stylesheet"><style>
+  <style>
+  @font-face{font-family:'Covase Netto';src:url('${COVASE_FONT_URL('NettoOT.otf')}') format('opentype');font-weight:400;font-style:normal}
+  @font-face{font-family:'Covase Open Sans';src:url('${COVASE_FONT_URL('OpenSans-Regular.ttf')}') format('truetype');font-weight:400;font-style:normal}
   @page{size:A4 landscape;margin:0}
-  :root{--netto:'NettoOT','Netto OT','Netto','Barlow',sans-serif;--teal:#03C4B8}
-  html,body{margin:0}body{font-family:'Open Sans',Arial,sans-serif;font-size:10pt;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  :root{--netto:'Covase Netto','NettoOT','Netto OT',Arial,sans-serif;--teal:#03C4B8}
+  html,body{margin:0}body{font-family:'Covase Open Sans','Open Sans',Arial,sans-serif;font-size:10pt;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .page{position:relative;width:297mm;min-height:210mm;box-sizing:border-box;padding:9mm 12mm 8mm 52mm;margin:0 auto}
-  .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'Open Sans';padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
+  .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'Covase Open Sans',Arial;padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
   @media print{.bar{display:none}}@media screen{body{background:#eee}.page{background:#fff;margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.15)}}
   .logo{position:absolute;left:18mm;top:9mm;width:55mm;height:auto}
   .co{display:flex;gap:11mm;justify-content:flex-end;font-size:10pt;color:#8a8a8a;line-height:1.45;min-height:22mm}
   .teal{color:var(--teal)}
-  .side{position:absolute;left:14mm;top:33mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:300}
+  .side{position:absolute;left:14mm;top:33mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:400}
   .grid{display:flex;justify-content:space-between;gap:8mm;margin:2mm 0 9mm;align-items:flex-start}
   .kv{border-collapse:collapse}.kv td{padding:0 4mm 1mm 0;vertical-align:top;font-size:10pt;line-height:1.45}.kv td:first-child{color:var(--teal)}
   .box{border:1px solid #222;padding:4mm 9mm;text-align:center;font-family:var(--netto);font-size:20pt;line-height:1.2;min-width:48mm;box-sizing:border-box}
-  .box small{display:block;font-family:'Open Sans',Arial,sans-serif;font-size:10pt;margin-top:1.5mm}
+  .box small{display:block;font-family:'Covase Open Sans','Open Sans',Arial,sans-serif;font-size:10pt;margin-top:1.5mm}
   table.v{width:100%;border-collapse:collapse;margin-bottom:6mm}
   table.v th{font-family:var(--netto);font-size:12pt;font-weight:400;text-transform:uppercase;line-height:1.25;border-bottom:2px solid var(--teal);padding:0 2mm 1.5mm;text-align:center;vertical-align:bottom}
   table.v th:first-child{text-align:left;padding-left:0}
