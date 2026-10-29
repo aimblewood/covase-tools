@@ -269,6 +269,23 @@ const QUOTE_FIELDS=[
   ['Money (monthly, ex VAT)',[['finance_rental','Finance rental £','num'],['service_rental','Service rental £','num'],['commissions','Commission £','num'],['setup_fee','Set-up fee £','num'],['management_fee','Management fee £/month','num'],['other_revenue','Other revenue £','num'],['costs','Costs £','num']]]
 ];
 let editQuoteId=null,quoteDraftDoc=null;
+// Worksheet reader → quote (Simon, 29 Oct): every field the reader filled gets
+// a "use" tick. Unticking puts the field back to its default (or blank),
+// ticking brings the worksheet value back. Unticked fields are remembered on
+// this machine (localStorage covase_reader_skip) and start unticked on the
+// next worksheet, so a field he never wants filled stays out until re-ticked.
+let qfReader=null; // {read:{k:v}, base:{k:v}} while a worksheet quote is open
+const QF_SKIP_KEY='covase_reader_skip';
+const QF_KEYS=new Set([...QUOTE_FIELDS.flatMap(([,f])=>f.map(x=>x[0])),'standard_items','optional_extras']);
+function qfSkipList(){try{return JSON.parse(localStorage.getItem(QF_SKIP_KEY)||'[]');}catch(e){return [];}}
+function qfSaveSkipList(){if(!qfReader)return;try{const keep=qfSkipList().filter(k=>!(k in qfReader.read));
+  document.querySelectorAll('#quote-form .qf-use').forEach(c=>{if(!c.checked)keep.push(c.dataset.k);});localStorage.setItem(QF_SKIP_KEY,JSON.stringify(keep));}catch(e){}}
+function qfUseBox(k){if(!qfReader||!(k in qfReader.read))return '';
+  return `<span class="qf-use-wrap" title="Use the worksheet's value: ${esc(String(qfReader.read[k]??''))}"><input type="checkbox" class="qf-use" data-k="${esc(k)}"${qfSkipList().includes(k)?'':' checked'} onchange="qfToggleRead(this)">use</span>`;}
+function qfToggleRead(c){const k=c.dataset.k,el=document.getElementById('qf-'+k);if(!el||!qfReader)return;
+  const v=c.checked?qfReader.read[k]:qfReader.base[k],sv=v==null?'':String(v);
+  if(el.tagName==='SELECT'&&sv&&![...el.options].some(o=>o.value===sv))el.add(new Option(sv,sv));
+  el.value=sv;el.classList.toggle('qf-skipped',!c.checked);qfRecalc();}
 lsInjectModal('quote-modal',`
   <div class="modal-header"><div class="modal-title" id="quote-modal-title">Quote</div><button class="modal-close" onclick="closeQuoteModal()">✕</button></div>
   <div class="modal-body" id="quote-form"></div>
@@ -280,9 +297,10 @@ function quoteFormHtml(q){
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
     else input=`<input id="qf-${k}" ${t&&t.startsWith('num')||t==='int'?`type="number" step="${t==='int'?'1':t==='num4'?'0.0001':'0.01'}"`:''} value="${esc(String(v))}" oninput="qfRecalc()">`;
-    return `<div class="form-field"><label for="qf-${k}">${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}</label>${input}</div>`;
+    return `<div class="form-field"><label for="qf-${k}" class="qf-lab">${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}${qfUseBox(k)}</label>${input}</div>`;
   }).join('')+'</div>').join('');
-  return sec+`<div class="form-row"><div class="form-field"><label>Standard items</label><textarea id="qf-standard_items">${esc(q.standard_items||'')}</textarea></div><div class="form-field"><label>Optional extras</label><textarea id="qf-optional_extras">${esc(q.optional_extras||'')}</textarea></div></div>
+  const head=qfReader?`<div class="notes-box" style="margin-bottom:10px">Filled from the worksheet. Untick <b>use</b> on any field you don't want from it — unticked fields stay unticked for the next worksheet too.</div>`:'';
+  return head+sec+`<div class="form-row"><div class="form-field"><label class="qf-lab">Standard items${qfUseBox('standard_items')}</label><textarea id="qf-standard_items">${esc(q.standard_items||'')}</textarea></div><div class="form-field"><label class="qf-lab">Optional extras${qfUseBox('optional_extras')}</label><textarea id="qf-optional_extras">${esc(q.optional_extras||'')}</textarea></div></div>
     <div class="form-field"><label>Notes</label><textarea id="qf-notes">${esc(q.notes||'')}</textarea></div>
     ${q.reader_notes?`<div class="notes-box" style="white-space:pre-line">⚠ From the worksheet reader — please check: ${esc(q.reader_notes)}</div>`:''}
     <div class="detail-section-head">Worked out (not typed)</div><div class="financials-row" id="qf-sums"></div>`;
@@ -295,19 +313,23 @@ function qfRead(){
 }
 // "Engine size" reads "Battery size" for electric cars (same field).
 function engineSizeLabel(fuel){return fuel==='Electric'?'Battery size':'Engine size';}
-function qfRecalc(){const lab=document.querySelector('label[for="qf-engine_size"]');if(lab)lab.textContent=engineSizeLabel(document.getElementById('qf-fuel_type')?.value);const s=leaseSums(qfRead());const el=document.getElementById('qf-sums');if(el)el.innerHTML=`<div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Unreclaimable VAT</span><strong>${lsMoney(s.unreclaimable)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div><div><span>Mgmt fee profit</span><strong>${lsMoney(s.mgmtProfit)}</strong></div><div><span>Total profit</span><strong class="${s.profit>0?'profit-pos':s.profit<0?'profit-neg':''}">${lsMoney(s.profit)}</strong></div>`;}
+function qfRecalc(){const lab=document.querySelector('label[for="qf-engine_size"]');if(lab&&lab.firstChild)lab.firstChild.textContent=engineSizeLabel(document.getElementById('qf-fuel_type')?.value);const s=leaseSums(qfRead());const el=document.getElementById('qf-sums');if(el)el.innerHTML=`<div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Unreclaimable VAT</span><strong>${lsMoney(s.unreclaimable)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div><div><span>Mgmt fee profit</span><strong>${lsMoney(s.mgmtProfit)}</strong></div><div><span>Total profit</span><strong class="${s.profit>0?'profit-pos':s.profit<0?'profit-neg':''}">${lsMoney(s.profit)}</strong></div>`;}
 function openQuoteForm(q,title){
   document.getElementById('quote-modal-title').textContent=title;
-  document.getElementById('quote-form').innerHTML=quoteFormHtml(q);qfRecalc();
+  document.getElementById('quote-form').innerHTML=quoteFormHtml(q);
+  document.querySelectorAll('#quote-form .qf-use:not(:checked)').forEach(qfToggleRead);qfRecalc();
   document.getElementById('quote-modal').classList.add('open');
 }
 function openNewQuote(prefill){
   const o=allOrders.find(x=>x.id===editOrderId)||{};
   editQuoteId=null;
-  const base={vehicle_type:'Car',funding_method:'Contract Hire',vat_type:'excluding VAT',funder_account_id:o.funder_account_id,setup_fee:250,management_fee:15,...(prefill||{})};
+  const defaults={vehicle_type:'Car',funding_method:'Contract Hire',vat_type:'excluding VAT',funder_account_id:o.funder_account_id,setup_fee:250,management_fee:15};
+  const base={...defaults,...(prefill||{})};
+  qfReader=null;
+  if(prefill){const read={};Object.entries(prefill).forEach(([k,v])=>{if(k!=='reader_notes'&&v!=null&&v!==''&&QF_KEYS.has(k))read[k]=v;});qfReader={read,base:defaults};}
   openQuoteForm(base,prefill?'New quote — from the funder worksheet':'New quote');
 }
-function openEditQuote(id){const q=allQuotes.find(x=>x.id===id);if(!q)return;editQuoteId=id;quoteDraftDoc=null;openQuoteForm(q,`${q.quote_no} — ${vehicleTitle(q)}`);}
+function openEditQuote(id){const q=allQuotes.find(x=>x.id===id);if(!q)return;editQuoteId=id;quoteDraftDoc=null;qfReader=null;openQuoteForm(q,`${q.quote_no} — ${vehicleTitle(q)}`);}
 function closeQuoteModal(){document.getElementById('quote-modal').classList.remove('open');}
 async function saveQuote(){
   const body={...qfRead(),updated_at:new Date().toISOString()};
@@ -321,7 +343,7 @@ async function saveQuote(){
       if(o&&body.funder_account_id&&!o.funder_account_id){o.funder_account_id=body.funder_account_id;sbReq(`covase_orders?id=eq.${encodeURIComponent(o.id)}`,{method:'PATCH',body:{funder_account_id:body.funder_account_id},prefer:'return=minimal'}).catch(()=>{});}
       toast(`${q.quote_no} saved`,'success');
     }
-    quoteDraftDoc=null;closeQuoteModal();renderOrderQuotes();renderOrders();updateOrderStats();
+    qfSaveSkipList();quoteDraftDoc=null;qfReader=null;closeQuoteModal();renderOrderQuotes();renderOrders();updateOrderStats();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
 
