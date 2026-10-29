@@ -266,7 +266,7 @@ function quoteFormHtml(q){
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
     else input=`<input id="qf-${k}" ${t&&t.startsWith('num')||t==='int'?`type="number" step="${t==='int'?'1':t==='num4'?'0.0001':'0.01'}"`:''} value="${esc(String(v))}" oninput="qfRecalc()">`;
-    return `<div class="form-field"><label>${esc(l)}</label>${input}</div>`;
+    return `<div class="form-field"><label for="qf-${k}">${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}</label>${input}</div>`;
   }).join('')+'</div>').join('');
   return sec+`<div class="form-row"><div class="form-field"><label>Standard items</label><textarea id="qf-standard_items">${esc(q.standard_items||'')}</textarea></div><div class="form-field"><label>Optional extras</label><textarea id="qf-optional_extras">${esc(q.optional_extras||'')}</textarea></div></div>
     <div class="form-field"><label>Notes</label><textarea id="qf-notes">${esc(q.notes||'')}</textarea></div>
@@ -279,7 +279,9 @@ function qfRead(){
   ['standard_items','optional_extras','notes'].forEach(k=>{const v=document.getElementById('qf-'+k)?.value;out[k]=v?v:null;});
   return out;
 }
-function qfRecalc(){const s=leaseSums(qfRead());const el=document.getElementById('qf-sums');if(el)el.innerHTML=`<div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Unreclaimable VAT</span><strong>${lsMoney(s.unreclaimable)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div><div><span>Mgmt fee profit</span><strong>${lsMoney(s.mgmtProfit)}</strong></div><div><span>Total profit</span><strong class="${s.profit>0?'profit-pos':s.profit<0?'profit-neg':''}">${lsMoney(s.profit)}</strong></div>`;}
+// "Engine size" reads "Battery size" for electric cars (same field).
+function engineSizeLabel(fuel){return fuel==='Electric'?'Battery size':'Engine size';}
+function qfRecalc(){const lab=document.querySelector('label[for="qf-engine_size"]');if(lab)lab.textContent=engineSizeLabel(document.getElementById('qf-fuel_type')?.value);const s=leaseSums(qfRead());const el=document.getElementById('qf-sums');if(el)el.innerHTML=`<div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Unreclaimable VAT</span><strong>${lsMoney(s.unreclaimable)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div><div><span>Mgmt fee profit</span><strong>${lsMoney(s.mgmtProfit)}</strong></div><div><span>Total profit</span><strong class="${s.profit>0?'profit-pos':s.profit<0?'profit-neg':''}">${lsMoney(s.profit)}</strong></div>`;}
 function openQuoteForm(q,title){
   document.getElementById('quote-modal-title').textContent=title;
   document.getElementById('quote-form').innerHTML=quoteFormHtml(q);qfRecalc();
@@ -394,7 +396,7 @@ function worksheetToQuote(parsed,rules){
   const g=parsed.got,q={},notes=[];
   if(g.funders_quote_no)q.funders_quote_no=g.funders_quote_no.replace(/\s+/g,' ').trim();
   if(g.vehicle){const words=g.vehicle.replace(/\s+\d{2}$/,'').split(/\s+/);const tc=w=>/\d/.test(w)?w:w.charAt(0)+w.slice(1).toLowerCase();
-    q.manufacturer=tc(words[0]||'');q.model=words[1]?tc(words[1]):null;q.derivative=words.slice(2).join(' ')||null;notes.push('model / derivative split from "'+g.vehicle+'"');}
+    q.manufacturer=tc(words[0]||'');q.model=words[1]?tc(words[1]):null;q._rest=words.slice(2);notes.push('make / model / derivative split from "'+g.vehicle+'"');}
   if(g.funding_method)q.funding_method=g.funding_method;
   q.term_months=lsAmount(g.term_months)||null;
   if(g.mileage){const pa=lsAmount(String(g.mileage).split('/')[0]);if(pa)q.annual_mileage=pa;}
@@ -413,6 +415,7 @@ function worksheetToQuote(parsed,rules){
   if(g.fuel_type){const map=rules.fuel||{};const key=Object.keys(map).find(k=>String(g.fuel_type).toLowerCase().includes(k.toLowerCase()));
     if(key){q.fuel_type=map[key];if(key==='Elec H'&&/Diesel\/PlugIn/i.test(parsed.flat))q.fuel_type='Plugin Hybrid (Diesel)';}else notes.push('fuel type "'+g.fuel_type+'" — no rule');}
   if(g.engine_cc&&q.fuel_type!=='Electric')q.engine_cc=parseInt(lsAmount(g.engine_cc));
+  if(q._rest){Object.assign(q,splitFunderVehicle(q._rest,q));delete q._rest;}
   if(q.fuel_type==='Electric'&&(q.co2_emissions==null||isNaN(q.co2_emissions)))q.co2_emissions=0;
   const ext=parsed.extras.map(c=>c[0]).filter(Boolean);
   if(ext.length){q.optional_extras=ext.join('\n');const paint=ext.find(e=>/paint/i.test(e));if(paint){q.exterior_colour=paint;if(!/-/.test(paint))notes.push('paint colour name not on the worksheet ("'+paint+'")');}}
@@ -425,6 +428,44 @@ function worksheetToQuote(parsed,rules){
   if(missing.length)notes.push('not found on the worksheet: '+missing.join(', '));
   return {quote:q,notes};
 }
+// The words after make and model on a funder's vehicle line, e.g. Lex's
+// "ESTATE 1.4 e-Hybrid Sport 5dr S Tronic [Sound+Vision]", go into their own
+// fields (Simon, 29 Oct): EV battery (the kW and kWh figures) or engine size,
+// body style, gearbox; doors and fuel words are dropped as they have fields
+// already; whatever is left is the derivative.
+const LS_GEARBOX=[['s tronic','S Tronic'],['s-tronic','S Tronic'],['steptronic','Steptronic'],['dsg','DSG'],['e-cvt','e-CVT'],['cvt','CVT'],['dct','DCT'],['edc','EDC'],['powershift','Powershift'],['automatic','Automatic'],['auto','Automatic'],['manual','Manual']];
+const LS_ENGINE_TECH=/^(e-?hybrid|hybrid|phev|mhev|hev|t?fsi|tsi|tdi|gdi|t-gdi|crdi|ecoboost|ecoblue|bluehdi|puretech|hdi|dci|tce|vtec|skyactiv-?[gdx]?|mild|turbo|t)$/i;
+function splitFunderVehicle(words,q){
+  const out={},used=new Set(),low=words.map(w=>w.toLowerCase());
+  const take=i=>used.add(i);
+  if(q.fuel_type==='Electric'){
+    const bat=[];words.forEach((w,i)=>{if(/^\d+(\.\d+)?kW(h)?$/i.test(w)){bat.push(w);take(i);}});
+    if(bat.length)out.engine_size=bat.join(' ');
+  }else{
+    const i=words.findIndex(w=>/^\d\.\d$/.test(w));
+    if(i>=0){take(i);let eng=words[i];if(words[i+1]&&ENGINE_TECH_OK(words[i+1])){eng+=' '+words[i+1];take(i+1);}out.engine_size=eng;}
+  }
+  // gearbox: two-word names first ("S Tronic"), then one word
+  let gear=null;
+  for(let i=0;i<words.length&&!gear;i++){
+    if(used.has(i))continue;
+    const two=(low[i]+' '+(low[i+1]||'')).trim();
+    const m2=LS_GEARBOX.find(([k])=>k===two);
+    if(m2&&!used.has(i+1)){gear=m2[1];take(i);take(i+1);break;}
+    const m1=LS_GEARBOX.find(([k])=>k===low[i]);
+    if(m1){gear=m1[1];take(i);}
+  }
+  if(gear)out.transmission=gear;
+  // body style: the word matching the worksheet's Body Style
+  const body=String(q.body_style||'').toLowerCase();
+  words.forEach((w,i)=>{if(body&&low[i]===body&&!used.has(i))take(i);});
+  // doors and fuel words already have their own fields
+  words.forEach((w,i)=>{if(/^\d+dr$/i.test(w)||/^(electric|petrol|diesel)$/i.test(w))take(i);});
+  const rest=words.filter((w,i)=>!used.has(i)).map(w=>w.replace(/^\[(.*)\]$/,'$1'));
+  out.derivative=rest.join(' ')||null;
+  return out;
+}
+function ENGINE_TECH_OK(w){return LS_ENGINE_TECH.test(w);}
 async function readFunderWorksheet(file){
   if(!file||!editOrderId)return;
   toast('Reading worksheet…','info');
