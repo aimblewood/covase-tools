@@ -520,6 +520,7 @@ function clRenderSettings(){
     <div class="form-row quad">${f('cls-ele','Electricity £ per kWh (UK average)',S.elec_kwh)}<div class="form-field"><label>Electricity price as of</label><input id="cls-easof" type="date" value="${esc(S.elec_as_of||'')}"></div>
       <div class="form-field"><label>&nbsp;</label><a class="btn" href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap" target="_blank" rel="noopener">Ofgem price cap ↗</a></div>
       <div class="form-field"><label>Petrol ↔ electricity factor (worked out)</label><input id="cls-factor" value="${clMpgeFactor()?clMpgeFactor().toFixed(2):''}" readonly title="£ per gallon of petrol ÷ £ per kWh"></div></div>
+    <div class="notes-box" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="cls-fetch" onclick="clFetchPrices()">↻ Fetch latest prices</button><span>${clFeedLine()}</span></div>
     <div style="font-size:12px;color:var(--n500);margin:-4px 0 8px">Electric running costs use the electricity price directly. The factor is only used to show an MPGe (cost-equivalent MPG) for electric cars, and updates itself when you change a price — no tuning needed. A warning shows on the choice list when fuel prices are over a week old or the electricity price is from before the current price-cap quarter.</div>
     <div class="form-section-label">Battery sizes the description doesn't give</div>
     <div style="font-size:12px;color:var(--n500);margin-bottom:6px">Used only when the file and the description have no kWh figure. Every word must appear in the make and description; the most specific match wins.</div>
@@ -541,6 +542,20 @@ function clReadSettings(){
   document.querySelectorAll('#cls-body [data-year]').forEach(i=>{S.bik[i.dataset.bik].years[+i.dataset.year]=i.value.trim();});
   document.querySelectorAll('#cls-body [data-path]').forEach(i=>{const t=S.bik[i.dataset.bik],p=i.dataset.path.split('.');const v=clN(i.value);const val=v==null?null:v/100;
     if(p[0]==='zero')t.zero[+p[1]]=val;else if(p[0]==='range')t.range[p[1]][+p[2]]=val;else t.co2[+p[1]][+p[2]]=val;});
+}
+// Weekly n8n job (WLC Price Feed) fills these from GOV.UK weekly road fuel prices and the
+// Ofgem price cap; this button runs it now. Prices it couldn't read keep their old value.
+const CL_PRICE_FEED='https://covase.app.n8n.cloud/webhook/covase-wlc-price-refresh';
+function clFeedLine(){const f=clSettings.price_feed;if(!f||!f.ran_at)return 'Updates automatically every Wednesday from GOV.UK (fuel) and Ofgem (electricity) once the n8n job is switched on.';
+  const when=new Date(f.ran_at).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return 'Last automatic update '+esc(when)+((f.problems||[]).length?' — <span style="color:#c0392b">'+f.problems.map(esc).join('; ')+'</span>':' — all prices updated');}
+async function clFetchPrices(){
+  const b=document.getElementById('cls-fetch');if(b){b.disabled=true;b.textContent='Fetching…';}
+  try{const r=await fetch(CL_PRICE_FEED,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw new Error('the price job answered '+r.status+' — is it switched on in n8n?');
+    const j=await r.json().catch(()=>({}));const res=Array.isArray(j)?j[0]:j;
+    await clLoadConfig();clRenderSettings();clRender();
+    toast(res&&res.problems&&res.problems.length?'Some prices could not be fetched — see the note':'Prices updated',res&&res.problems&&res.problems.length?'error':'success');}
+  catch(e){toast('Could not fetch prices: '+e.message,'error');if(b){b.disabled=false;b.textContent='↻ Fetch latest prices';}}
 }
 function clBattRow(i){clReadSettings();clSettings.battery_rules=clSettings.battery_rules||[];if(i<0)clSettings.battery_rules.push({match:'',kwh:null});else clSettings.battery_rules.splice(i,1);clRenderSettings();}
 function clAddYear(which){

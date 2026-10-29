@@ -1,0 +1,93 @@
+{
+  "name": "WLC Price Feed (fuel + electricity)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/London",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "nodes": [
+    {
+      "id": "a1f0c0de-0001-4c00-9000-000000000001",
+      "name": "Weekly — Wednesday 10:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                3
+              ],
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1f0c0de-0002-4c00-9000-000000000002",
+      "name": "Fetch now (from ORBIS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "8d2b6c1e-6a52-4b7e-9a51-2f0c7a1d4e11",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "covase-wlc-price-refresh",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "https://aimblewood.github.io"
+        }
+      }
+    },
+    {
+      "id": "a1f0c0de-0003-4c00-9000-000000000003",
+      "name": "Fetch & save prices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// WLC price feed: official UK fuel and electricity prices -> covase_config 'wlc_settings'.\n// Fuel: GOV.UK \"Weekly road fuel prices\" (DESNZ), latest row of the CSV, found via the\n// GOV.UK content API so the weekly-changing file link never needs updating.\n// Electricity: Ofgem price-cap page, the electricity unit rate in pence per kWh.\n// Every figure is range-checked; anything that fails is not written, and an alert goes\n// to admin@ instead. Prices that did pass are still written.\nconst http = (o) => this.helpers.httpRequest(Object.assign({ timeout: 20000, headers: { 'User-Agent': 'Covase ORBIS price feed (admin@covase.co.uk)' } }, o));\nconst SB = $vars.SUPABASE_URL, KEY = $vars.SUPABASE_ANON_KEY;\nconst sbHead = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };\nconst iso = (d) => d.toISOString().slice(0, 10);\nconst out = { ran_at: new Date().toISOString(), fuel: null, elec: null, problems: [] };\n\n// ── Fuel (GOV.UK) ──\ntry {\n  const page = await http({ url: 'https://www.gov.uk/api/content/government/statistics/weekly-road-fuel-prices', json: true });\n  const atts = [];\n  const walk = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) return x.forEach(walk); if (typeof x.url === 'string' && /\\.csv(\\?|$)/i.test(x.url)) atts.push(x); Object.values(x).forEach(walk); };\n  walk(page);\n  if (!atts.length) throw new Error('no CSV attached to the GOV.UK weekly road fuel prices page');\n  const csvUrl = atts[0].url.startsWith('http') ? atts[0].url : 'https://www.gov.uk' + atts[0].url;\n  const csv = String(await http({ url: csvUrl }));\n  const rows = csv.split(/\\r?\\n/).map(l => { const r = []; let c = '', q = false; for (const ch of l) { if (ch === '\"') q = !q; else if (ch === ',' && !q) { r.push(c.trim()); c = ''; } else c += ch; } r.push(c.trim()); return r; });\n  const h = rows.findIndex(r => r.some(x => /ULSP/i.test(x)) && r.some(x => /ULSD/i.test(x)));\n  if (h < 0) throw new Error('fuel CSV has no ULSP/ULSD heading');\n  const hdr = rows[h];\n  const col = (fuel) => hdr.findIndex(x => new RegExp(fuel, 'i').test(x) && /pump\\s*price/i.test(x));\n  const ip = col('ULSP'), id = col('ULSD'), idate = hdr.findIndex(x => /date/i.test(x));\n  if (ip < 0 || id < 0) throw new Error('fuel CSV has no pump price columns');\n  const data = rows.slice(h + 1).filter(r => parseFloat(r[ip]) > 0 && parseFloat(r[id]) > 0);\n  if (!data.length) throw new Error('fuel CSV has no price rows');\n  const last = data[data.length - 1];\n  const petrol = parseFloat(last[ip]) / 100, diesel = parseFloat(last[id]) / 100; // p/litre -> £/litre\n  if (!(petrol > 1 && petrol < 2.5) || !(diesel > 1 && diesel < 2.5)) throw new Error(`fuel prices out of range (petrol ${petrol}, diesel ${diesel})`);\n  let asOf = iso(new Date());\n  const ds = idate >= 0 ? last[idate] : '';\n  let m = ds.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/); if (m) asOf = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;\n  else if ((m = ds.match(/^(\\d{4})-(\\d{2})-(\\d{2})/))) asOf = m[0];\n  else if (ds && !isNaN(Date.parse(ds))) asOf = iso(new Date(Date.parse(ds)));\n  if ((Date.now() - Date.parse(asOf)) / 864e5 > 21) throw new Error(`newest GOV.UK figure is from ${asOf} — over three weeks old, so not used`);\n  out.fuel = { petrol_litre: Math.round(petrol * 10000) / 10000, diesel_litre: Math.round(diesel * 10000) / 10000, as_of: asOf, source: csvUrl };\n} catch (e) { out.problems.push('Fuel: ' + e.message); }\n\n// ── Electricity (Ofgem price cap) ──\ntry {\n  const html = String(await http({ url: 'https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap' }));\n  const text = html.replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ');\n  const i = text.search(/electricity/i);\n  if (i < 0) throw new Error('Ofgem page has no electricity section');\n  const m = text.slice(i).match(/(\\d{1,2}\\.\\d{1,2})\\s*(?:p|pence)\\s*(?:per|\\/)\\s*kWh/i);\n  if (!m) throw new Error('no \"pence per kWh\" figure after the electricity heading on the Ofgem page');\n  const kwh = parseFloat(m[1]) / 100;\n  if (!(kwh > 0.12 && kwh < 0.6)) throw new Error(`electricity price out of range (${kwh})`);\n  out.elec = { elec_kwh: Math.round(kwh * 10000) / 10000, as_of: iso(new Date()), source: 'https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap' };\n} catch (e) { out.problems.push('Electricity: ' + e.message); }\n\n// ── Save: read-modify-write so tax tables, rates and battery rules are untouched ──\nconst cur = await http({ url: `${SB}/rest/v1/covase_config?key=eq.wlc_settings&select=value`, headers: sbHead, json: true });\nconst value = (Array.isArray(cur) && cur[0] && cur[0].value) || {};\nif (out.fuel) Object.assign(value, { petrol_litre: out.fuel.petrol_litre, diesel_litre: out.fuel.diesel_litre, fuel_as_of: out.fuel.as_of });\nif (out.elec) Object.assign(value, { elec_kwh: out.elec.elec_kwh, elec_as_of: out.elec.as_of });\nvalue.price_feed = { ran_at: out.ran_at, fuel_source: out.fuel && out.fuel.source, elec_source: out.elec && out.elec.source, problems: out.problems };\nawait http({ method: 'POST', url: `${SB}/rest/v1/covase_config`, headers: Object.assign({ Prefer: 'resolution=merge-duplicates,return=minimal' }, sbHead), body: { key: 'wlc_settings', value, updated_at: out.ran_at }, json: true });\n\n// ── Alert admin@ if anything failed (reuses the proven Graph sender) ──\nif (out.problems.length) {\n  try {\n    await http({ method: 'POST', url: 'https://covase.app.n8n.cloud/webhook/covase-supplier-booking-request', json: true, body: {\n      to: 'admin@covase.co.uk', from: 'rentals@covase.co.uk', customer: 'ORBIS price feed',\n      subject: 'ORBIS choice lists: price update needs a look',\n      bodyHtml: '<p>The weekly fuel/electricity price update could not fill everything in. Anything listed below kept its old price — please type the current figure in Choice lists → ⚙ Tax tables.</p><ul>' + out.problems.map(p => '<li>' + p.replace(/</g, '&lt;') + '</li>').join('') + '</ul>' } });\n  } catch (e) { out.problems.push('Alert email failed: ' + e.message); }\n}\nreturn [{ json: { ok: !out.problems.length, fuel: out.fuel, electricity: out.elec, problems: out.problems } }];\n"
+      }
+    }
+  ],
+  "connections": {
+    "Weekly — Wednesday 10:00": {
+      "main": [
+        [
+          {
+            "node": "Fetch & save prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch now (from ORBIS)": {
+      "main": [
+        [
+          {
+            "node": "Fetch & save prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
