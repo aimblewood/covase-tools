@@ -407,7 +407,7 @@ function clToggleSel(k,on){if(on)clSelected.add(k);else clSelected.delete(k);if(
 // ── Adjust selected cars ──
 lsInjectModal('cl-tinker-modal',`
   <div class="modal-header"><div class="modal-title">Adjust selected cars</div><button class="modal-close" onclick="clCloseTinker()">✕</button></div>
-  <div class="modal-body"><div style="font-size:12px;color:var(--n500);margin-bottom:10px">Type the funder's revised figures — rentals as they quote them, on the ratebook's payment plan. The client's payment profile and commission are applied on top, and the results update as you type. Leave commission blank to use the policy's. Nothing changes on the list until you press Save.</div><div id="clt-body"></div></div>
+  <div class="modal-body"><div style="font-size:12px;color:var(--n500);margin-bottom:10px">Type the new figures as you see them in the list: rentals on the client's payment profile, with the finance rental <em>before</em> commission. Commission is added on top (leave it blank to use the policy's). The results update as you type; nothing changes on the list until you press Save.</div><div id="clt-body"></div></div>
   <div class="modal-footer"><button class="btn-secondary-modal" style="margin-right:auto" onclick="clTinkerResetAll()">Reset all to ratebook</button><button class="btn-secondary-modal" onclick="clCloseTinker()">Cancel</button><button class="btn-primary-modal" onclick="clSaveTinker()">Save</button></div>`,true);
 let clTinkerRows=[];
 function clOpenTinker(){
@@ -419,16 +419,19 @@ function clOpenTinker(){
   clRenderTinker();document.getElementById('cl-tinker-modal').classList.add('open');
 }
 function clCloseTinker(){document.getElementById('cl-tinker-modal').classList.remove('open');}
+// Rentals are typed on the client's profile; they're stored on the ratebook's own plan (the
+// same basis as the file) so a later change of profile in the policy still converts correctly.
+function clTinkerRatio(v0){const pp=clLastPP,src=clPlanCount(v0.plan,v0.term),dst=clProfileCount(pp,v0.term);return src&&dst?src/dst:1;}
 function clTinkerOverride(t){const o=t.o;return [o.p11d,o.finance,o.service,o.commission].some(x=>x!=null)?o:null;}
 function clRenderTinker(){
   const pp=clLastPP;
-  document.getElementById('clt-body').innerHTML=clTinkerRows.map((t,i)=>{const v=t.v0,f=(fld,label,val,ph)=>`<div class="form-field"><label>${label}</label><input type="number" step="0.01" data-clt="${i}" data-f="${fld}" value="${val==null?'':val}" placeholder="${esc(ph)}" oninput="clTinkerInput(${i},'${fld}',this.value)"></div>`;
+  document.getElementById('clt-body').innerHTML=clTinkerRows.map((t,i)=>{const v=t.v0,base=clApplyPolicy(clCalc(v,pp,null),pp),k=clTinkerRatio(v),c2=x=>x==null?null:Math.round(x*k*100)/100,f=(fld,label,val,ph)=>`<div class="form-field"><label>${label}</label><input type="number" step="0.01" data-clt="${i}" data-f="${fld}" value="${val==null?'':val}" placeholder="${esc(ph)}" oninput="clTinkerInput(${i},'${fld}',this.value)"></div>`;
     return `<div class="ls-quote"><div class="ls-quote-head"><strong>${esc(v.make)}</strong> ${esc(v.desc)} <span style="color:var(--n400)">· ${esc(String(v.term))} months · ${Number(v.mileage).toLocaleString('en-GB')} miles · ${esc(v.plan||'payment plan not given')}</span><button class="btn" style="margin-left:auto" onclick="clTinkerReset(${i})">Reset</button></div>
-      <div class="form-row quad">${f('p11d','P11D value £',t.o.p11d,'ratebook '+v.p11d)}${f('finance','Funder finance rental £',t.o.finance,'ratebook '+v.finance)}${f('service','Funder service rental £',t.o.service,'ratebook '+v.service)}${f('commission','Commission £ (whole contract)',t.o.commission,'policy '+((pp&&pp.commission)||0))}</div>
+      <div class="form-row quad">${f('p11d','P11D value £',t.o.p11d,'ratebook '+v.p11d)}${f('finance','Finance rental £ (before commission)',c2(t.o.finance),'now '+(base.finance-base.commissionPm).toFixed(2))}${f('service','Service rental £',c2(t.o.service),'now '+base.service.toFixed(2))}${f('commission','Commission £ (whole contract)',t.o.commission,'policy '+((pp&&pp.commission)||0))}</div>
       <div id="clt-res-${i}"></div></div>`;}).join('');
   clTinkerRows.forEach((t,i)=>clTinkerResult(i));
 }
-function clTinkerInput(i,fld,val){clTinkerRows[i].o[fld]=clN(val);clTinkerResult(i);}
+function clTinkerInput(i,fld,val){const t=clTinkerRows[i],n=clN(val);t.o[fld]=n!=null&&(fld==='finance'||fld==='service')?n/clTinkerRatio(t.v0):n;clTinkerResult(i);}
 function clTinkerReset(i){const t=clTinkerRows[i];t.o={p11d:null,finance:null,service:null,commission:null};document.querySelectorAll(`[data-clt="${i}"]`).forEach(x=>x.value='');clTinkerResult(i);}
 function clTinkerResetAll(){clTinkerRows.forEach((t,i)=>clTinkerReset(i));}
 function clTinkerResult(i){
@@ -438,7 +441,7 @@ function clTinkerResult(i){
   const tax=(r,i,b)=>r.years[i]&&r.years[i].rate!=null?r.v.p11d*r.years[i].rate*b/12:null;
   const status=r=>r.ok?(r.grade?'On the list — '+esc(r.grade.name):'On the list'):'<span style="color:#c0392b">Left off: '+esc(r.why.join('; '))+'</span>';
   document.getElementById('clt-res-'+i).innerHTML=`<table class="ls-table"><tr><th></th><th>Ratebook</th><th>Adjusted</th></tr>
-    ${row('Client finance rental (incl. commission)',before.finance,after.finance)}${row('Client service rental',before.service,after.service)}${row('Commission per payment',before.commissionPm,after.commissionPm)}
+    ${row('Finance rental before commission',before.finance-before.commissionPm,after.finance-after.commissionPm)}${row('Finance rental incl. commission',before.finance,after.finance)}${row('Client service rental',before.service,after.service)}${row('Commission per payment',before.commissionPm,after.commissionPm)}
     ${row('Irrecoverable VAT',before.vatLost,after.vatLost)}${row('Lease rental restriction',before.lrr,after.lrr)}${row("Employer's NI",before.ni,after.ni)}${row('Fuel / energy',before.fuelPm,after.fuelPm)}
     ${row('<strong>WLC per month</strong>',pp.budget_includes_fuel===false?before.wlcNoFuel:before.wlc,pp.budget_includes_fuel===false?after.wlcNoFuel:after.wlc)}${row('WLC over term',before.wlcTerm,after.wlcTerm)}
     ${after.years.map((y,k)=>row('BIK '+esc(y.year),before.years[k].rate,y.rate,clPct)
