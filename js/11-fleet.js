@@ -31,7 +31,7 @@ function vehicleStage(v){
   return v.status==='ordered'?'order_to_dealer':'on_fleet';
 }
 function vehicleRegOf(v){return (v.reg||(v.registration&&v.registration!=='TBC'?v.registration:'')||'').toUpperCase();}
-function vehicleLabel(v){return [vehicleRegOf(v)||'Reg TBC',[v.manufacturer||v.make,v.model].filter(Boolean).join(' ')||v.name||''].filter(Boolean).join(' · ');}
+function vehicleLabel(v){return [vehicleRegOf(v)||'Reg TBC',[lsMake(v.manufacturer||v.make),v.model].filter(Boolean).join(' ')||v.name||''].filter(Boolean).join(' · ');}
 function stageChecklist(v,stage){const c=STAGE_CHECKLIST[stage];if(!c)return [];if(Array.isArray(c))return c;const d=(allAccounts||[]).find(a=>a.id===v.dealer_id);return c[(d&&d.ordering_route)||'email_po']||c.email_po;}
 function daysSince(iso){if(!iso)return null;return Math.floor((Date.now()-new Date(iso).getTime())/864e5);}
 
@@ -86,7 +86,7 @@ function fleetCard(v){
   return `<div class="mv-kan-wrap" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${esc(v.id)}')">
     <div class="kan-card${days>=14?' ls-stuck':''}" onclick="openVehicleRecord('${esc(v.id)}')"><div class="kan-card-grid">
       <div class="kan-card-l1">${esc(vehicleRegOf(v)||'Reg TBC')}</div><div class="kan-card-r">${list.length?done+'/'+list.length:''}</div>
-      <div class="kan-card-l2">${esc([v.manufacturer||v.make,v.model].filter(Boolean).join(' ')||v.name||'')}</div><div class="kan-card-r"></div>
+      <div class="kan-card-l2">${esc([lsMake(v.manufacturer||v.make),v.model].filter(Boolean).join(' ')||v.name||'')}</div><div class="kan-card-r"></div>
       <div class="kan-card-l3">${esc(accName(v.account_id)||'—')} · ${esc(conName(v.driver_id)||'no driver')}</div>
       ${v.expected_delivery_date&&!['on_fleet','off_hire'].includes(st)?`<div class="kan-card-l4">Delivery ${esc(fmtUK(v.expected_delivery_date))}${days!=null?' · '+days+'d in stage':''}</div>`:(days!=null?`<div class="kan-card-l4">${days}d in stage</div>`:'')}
     </div></div>${(adv||move)?`<div class="mv-kan-actions">${move}${adv}</div>`:''}</div>`;
@@ -159,14 +159,14 @@ const VR_RENDER={
     return `${list.length?`<div class="detail-section-head">To do at “${esc(stageLabel(st))}”</div><div class="ls-check">${list.map(([k,l])=>`<label><input type="checkbox" ${cl[k]?'checked':''} onchange="toggleChecklist('${esc(v.id)}','${st}','${k}',this.checked)"> ${esc(l)}${cl[k]?` <span>${esc(fmtUK(cl[k]))}</span>`:''}</label>`).join('')}</div>`:''}
       ${nextStage(st)&&st!=='on_fleet'?`<div class="action-row"><button class="btn btn-recharge" onclick="vehicleSetStage('${esc(v.id)}','${nextStage(st)}')">→ Move to ${esc(stageLabel(nextStage(st)))}</button></div>`:''}
       <div class="detail-section-head">Vehicle</div><div class="detail-grid">
-      ${dv('Registration',vehicleRegOf(v))}${dv('Vehicle',[v.manufacturer||v.make,v.model,v.derivative].filter(Boolean).join(' '))}${dv('Fuel',v.fuel_type)}${dv('Colour',[v.exterior_colour,v.interior_trim].filter(Boolean).join(' / '))}
+      ${dv('Registration',vehicleRegOf(v))}${dv('Vehicle',[lsMake(v.manufacturer||v.make),v.model,v.derivative].filter(Boolean).join(' '))}${dv('Fuel',v.fuel_type)}${dv('Colour',[v.exterior_colour,v.interior_trim].filter(Boolean).join(' / '))}
       ${dv('P11D',v.p11d_value!=null?lsMoney(v.p11d_value):'')}${dv('CO2',v.co2_emissions??v.co2_gkm)}${dv('EV range',v.ev_range)}${dv('Chassis',v.chassis_number)}
       ${dv('Client',accName(v.account_id))}${dv('Driver',conName(v.driver_id))}${dv('Funder',accName(v.funder_id))}${dv('Dealer',accName(v.dealer_id))}
       ${dv('Funder quote no',v.funders_quote_no)}${dv('Lex 900 number',v.lex_900_number)}${dv('Expected delivery',fmtUK(v.expected_delivery_date))}${dv('Renewal',fmtUK(vehicleRenewal(v)))}</div>
       ${v.order_id?`<div class="action-row"><button class="btn btn-edit" onclick="closeVehicleRecord();showView('orders',document.querySelector('[data-view=orders]'));setTimeout(()=>openEditOrder('${esc(v.order_id)}'),400)">Open the order →</button></div>`:''}`;
   },
   financials(v){const s=leaseSums(v);return `<div class="financials-row">
-    <div><span>Term / miles</span><strong>${esc(v.term_months||'—')}m · ${v.annual_mileage?Number(v.annual_mileage).toLocaleString('en-GB'):'—'} pa</strong></div><div><span>Profile</span><strong>${esc(v.payment_profile||'—')}</strong></div>
+    <div><span>Term / miles</span><strong>${esc(v.term_months||'—')}m · ${v.annual_mileage?Number(v.annual_mileage).toLocaleString('en-GB'):'—'} pa</strong></div><div><span>Profile</span><strong>${esc(lsProfile(v.payment_profile)||'—')}</strong></div>
     <div><span>Finance rental</span><strong>${lsMoney(v.finance_rental)}</strong></div><div><span>Service rental</span><strong>${lsMoney(v.service_rental)}</strong></div>
     <div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div></div>
     <div class="financials-row"><div><span>Commission</span><strong>${lsMoney(v.commissions)}</strong></div><div><span>Set-up fee</span><strong>${lsMoney(v.setup_fee)}</strong></div>
@@ -283,7 +283,7 @@ async function openNewPo(){
     if(inv)invAddr=[fn,addrBlock(inv)].join('\n');}catch(e){}}
   const drv=(allContacts||[]).find(c=>c.id===v.driver_id)||{};
   const body={vehicle_id:v.id,order_id:v.order_id||null,dealer_account_id:v.dealer_id||null,funder_account_id:v.funder_id||null,
-    vehicle_description:[v.manufacturer||v.make,v.model,v.derivative].filter(Boolean).join(' '),
+    vehicle_description:[lsMake(v.manufacturer||v.make),v.model,v.derivative].filter(Boolean).join(' '),
     extras:(()=>{const col=[v.exterior_colour,v.interior_trim].filter(Boolean).join(' with ');const rest=String(v.optional_extras||'').split('\n').map(s=>s.trim()).filter(s=>s&&s!==v.exterior_colour&&s!==v.interior_trim);return [col,...rest].filter(Boolean).join('\n');})(),otr:v.otr??null,
     registration_address:regAddr||null,invoice_address:invAddr||null,
     delivery_contact:[contactDisplayName(drv.first_name?drv:{first_name:'',last_name:''}).trim(),drv.mobile].filter(Boolean).join(' - ')||null,delivery_phone:drv.mobile||null,
@@ -332,7 +332,7 @@ async function exportP11d(){
     allocs.forEach(a=>{const v=(allVehicles||[]).find(x=>x.id===a.vehicle_id)||{};const c=(allContacts||[]).find(x=>x.id===a.contact_id)||{};
       const s=a.start_date>from?a.start_date:from,e=a.end_date&&a.end_date<to?a.end_date:to;
       const days=Math.round((new Date(e)-new Date(s))/864e5)+1;
-      rows.push([accName(v.account_id),contactDisplayName(c.first_name?c:{first_name:'',last_name:''}),c.employee_number||'',vehicleRegOf(v),[v.manufacturer||v.make,v.model,v.derivative].filter(Boolean).join(' '),v.fuel_type||'',v.p11d_value??'',v.co2_emissions??v.co2_gkm??'',v.ev_range??'',v.registration_date||v.date_of_registration||'',fmtUK(s),fmtUK(e),days,v.driver_contribution??'']);});
+      rows.push([accName(v.account_id),contactDisplayName(c.first_name?c:{first_name:'',last_name:''}),c.employee_number||'',vehicleRegOf(v),[lsMake(v.manufacturer||v.make),v.model,v.derivative].filter(Boolean).join(' '),v.fuel_type||'',v.p11d_value??'',v.co2_emissions??v.co2_gkm??'',v.ev_range??'',v.registration_date||v.date_of_registration||'',fmtUK(s),fmtUK(e),days,v.driver_contribution??'']);});
     if(rows.length===1){toast('No allocations in that tax year yet','info');return;}
     const csv=rows.map(r=>r.map(x=>{const t=String(x??'');return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;}).join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`P11D vehicles ${ys}-${String(ys+1).slice(2)}.csv`;a.click();

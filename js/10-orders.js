@@ -24,10 +24,18 @@ function leaseSums(q){
   const profit=lsRound(lsNum(q.commissions)+lsNum(q.setup_fee)+mgmtProfit+lsNum(q.other_revenue)-lsNum(q.costs));
   return {total,unreclaimable,effective,mgmtProfit,profit};
 }
-function vehicleTitle(q){return [q.manufacturer,q.model,q.derivative].filter(Boolean).join(' ')||'Vehicle not set';}
+// Makes written in capitals (Simon, 29 Oct: "BMW should always be all caps").
+// Applied wherever a make is shown or saved, so quotes and vehicles stored as
+// "Bmw" before this rule still come out right.
+const LS_CAPS_MAKES=/^(BMW|MG|DS|BYD|GWM|KGM|LEVC|MINI)$/i;
+function lsMake(m){const t=String(m??'').trim();return LS_CAPS_MAKES.test(t)?t.toUpperCase():(m??'');}
+// Payment profile is just the payments, e.g. "3+45" (Simon, 29 Oct). Quotes
+// saved earlier as "3+45 terminal pause" are shown and re-saved that way too.
+function lsProfile(p){const m=String(p??'').match(/(\d+)\s*\+\s*(\d+)/);return m?m[1]+'+'+m[2]:(p??'');}
+function vehicleTitle(q){return [lsMake(q.manufacturer),q.model,q.derivative].filter(Boolean).join(' ')||'Vehicle not set';}
 // Description on the Covase quotation (Simon, 29 Oct): make, model, engine
 // size, fuel type, derivative, body style, gearbox.
-function quotationVehicleTitle(q){return [q.manufacturer,q.model,q.engine_size,q.fuel_type,q.derivative,q.body_style,q.transmission].map(v=>String(v??'').trim()).filter(Boolean).join(' ')||'Vehicle not set';}
+function quotationVehicleTitle(q){return [lsMake(q.manufacturer),q.model,q.engine_size,q.fuel_type,q.derivative,q.body_style,q.transmission].map(v=>String(v??'').trim()).filter(Boolean).join(' ')||'Vehicle not set';}
 // Bullets under it: exterior colour + interior trim on one line, then each
 // optional extra (one per line), skipping extras that repeat the colour/trim.
 function quotationVehicleBullets(q){
@@ -301,7 +309,7 @@ lsInjectModal('quote-modal',`
   <div class="modal-footer"><button class="btn-secondary-modal" onclick="closeQuoteModal()">Cancel</button><button class="btn-primary-modal" onclick="saveQuote()">Save quote</button></div>`,true);
 function quoteFormHtml(q){
   const sec=QUOTE_FIELDS.map(([label,fields])=>`<div class="form-section-label">${esc(label)}</div><div class="ls-grid">`+fields.map(([k,l,t,opts])=>{
-    let v=q[k]??'';if(t==='num0'&&v!=='')v=Math.ceil(lsNum(v));
+    let v=q[k]??'';if(t==='num0'&&v!=='')v=Math.ceil(lsNum(v));if(k==='manufacturer')v=lsMake(v);if(k==='payment_profile')v=lsProfile(v);
     let input;
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
@@ -318,6 +326,8 @@ function qfRead(){
   const out={};
   QUOTE_FIELDS.forEach(([,fields])=>fields.forEach(([k,,t])=>{const v=document.getElementById('qf-'+k)?.value;out[k]=(v===''||v==null)?null:(t==='int'?parseInt(v):t==='num0'?Math.ceil(parseFloat(v)):t&&t.startsWith('num')?parseFloat(v):v);}));
   ['standard_items','optional_extras','notes'].forEach(k=>{const v=document.getElementById('qf-'+k)?.value;out[k]=v?v:null;});
+  if(out.manufacturer)out.manufacturer=lsMake(out.manufacturer);
+  if(out.payment_profile)out.payment_profile=lsProfile(out.payment_profile);
   return out;
 }
 // "Engine size" reads "Battery size" for electric cars (same field).
@@ -487,8 +497,6 @@ function funderPaymentProfile(text,term,rules){
   if(type==='spread'){const k=next||2;return {profile:init+'+'+(term-k+1),type};}
   return {why:'no rule says whether this is spread or terminal pause'};
 }
-// Makes written in capitals (Simon, 29 Oct: "BMW should always be all caps").
-const LS_CAPS_MAKES=/^(BMW|MG|DS|BYD|GWM|KGM|LEVC|MINI)$/i;
 function worksheetToQuote(parsed,rules){
   const g=parsed.got,q={},notes=[];
   if(g.funders_quote_no)q.funders_quote_no=g.funders_quote_no.replace(/\s+/g,' ').trim();
@@ -668,7 +676,7 @@ function printQuotation(id){
   const html=`<div class="side">Quotation</div>${covaseHeader()}
   <table class="q-kv client"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
     <tr><td>Contract</td><td>${esc(String(q.term_months||'—'))} month${q.contract_type?'<br>'+esc(q.contract_type):''}${q.funding_method?'<br>'+esc(q.funding_method):''}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
-    <tr><td>Payments</td><td>${esc(q.payment_profile||'—')} monthly payments<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
+    <tr><td>Payments</td><td>${q.payment_profile?esc(lsProfile(q.payment_profile))+' payments':'—'}<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
   <table class="q-kv prep"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
   <div class="q-box"><div>Quotation</div><div>${esc(q.quote_no)}</div><small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div>
   <div class="q-body">
