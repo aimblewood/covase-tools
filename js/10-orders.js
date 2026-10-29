@@ -265,7 +265,7 @@ async function markQuoteSent(id){
 // ── Quote editor ──
 const QUOTE_FIELDS=[
   ['Vehicle',[['vehicle_type','Vehicle type','select',['Car','LCV']],['manufacturer','Manufacturer'],['model','Model'],['derivative','Derivative'],['engine_size','Engine size'],['engine_cc','Engine CC','int'],['fuel_type','Fuel type','select',['Petrol','Diesel','Hybrid','Plugin Hybrid (Petrol)','Plugin Hybrid (Diesel)','Electric']],['transmission','Transmission','select',['Manual','Automatic','DCT']],['body_style','Body style'],['num_doors','Doors','int'],['exterior_colour','Exterior colour'],['interior_trim','Interior trim'],['co2_emissions','CO2 g/km','int'],['p11d_value','P11D value £','num'],['otr','OTR £','num'],['ev_range','EV range (miles)','num'],['fuel_consumption','Fuel consumption','num']]],
-  ['Contract',[['funder_account_id','Funder','funder'],['funders_quote_no','Funder quote no'],['funding_method','Funding method','select',['Contract Hire','Finance Lease','Contract Purchase','Lease Purchase']],['contract_type','Contract type','select',['Full Maintenance','Maintenance','Finance Only']],['term_months','Term (months)','int'],['annual_mileage','Annual mileage','int'],['payment_profile','Payment profile'],['excess_mileage_ppm','Excess mileage £/mile','num4'],['vat_type','VAT','select',['excluding VAT','including VAT']]]],
+  ['Contract',[['funder_account_id','Funder','funder'],['funders_quote_no','Funder quote no'],['funding_method','Funding method','select',['Contract Hire','Finance Lease','Contract Purchase','Lease Purchase']],['contract_type','Contract type','select',['Full Maintenance','Non Maintenance','Maintenance','Finance Only']],['term_months','Term (months)','int'],['annual_mileage','Annual mileage','int'],['payment_profile','Payment profile'],['excess_mileage_ppm','Excess mileage £/mile','num4'],['vat_type','VAT','select',['excluding VAT','including VAT']]]],
   ['Money (monthly, ex VAT)',[['finance_rental','Finance rental £','num'],['service_rental','Service rental £','num'],['commissions','Commission £','num'],['setup_fee','Set-up fee £','num'],['management_fee','Management fee £/month','num'],['other_revenue','Other revenue £','num'],['costs','Costs £','num']]]
 ];
 let editQuoteId=null,quoteDraftDoc=null;
@@ -411,7 +411,13 @@ function worksheetToQuote(parsed,rules){
   if(g.funders_quote_no)q.funders_quote_no=g.funders_quote_no.replace(/\s+/g,' ').trim();
   if(g.vehicle){const words=g.vehicle.replace(/\s+\d{2}$/,'').split(/\s+/);const tc=w=>/\d/.test(w)?w:w.charAt(0)+w.slice(1).toLowerCase();
     q.manufacturer=tc(words[0]||'');q.model=words[1]?tc(words[1]):null;q._rest=words.slice(2);notes.push('make / model / derivative split from "'+g.vehicle+'"');}
-  if(g.funding_method)q.funding_method=g.funding_method;
+  // Lex's "Contract Type" (Simon, 29 Oct): "Contract Hire" = full maintenance;
+  // "Contract Hire without maintenance" = non maintenance. Anything else is
+  // kept as the funding method and the contract type left for checking.
+  if(g.funding_method){const ct=String(g.funding_method).trim();
+    if(/^contract hire\s+without\s+maintenance$/i.test(ct)){q.funding_method='Contract Hire';q.contract_type='Non Maintenance';}
+    else if(/^contract hire$/i.test(ct)){q.funding_method='Contract Hire';q.contract_type='Full Maintenance';}
+    else{q.funding_method=ct;notes.push('contract type "'+ct+'" — no rule, please set full or non maintenance');}}
   q.term_months=lsAmount(g.term_months)||null;
   if(g.mileage){const pa=lsAmount(String(g.mileage).split('/')[0]);if(pa)q.annual_mileage=pa;}
   if(g.payment_plan){
@@ -433,7 +439,6 @@ function worksheetToQuote(parsed,rules){
   if(q.fuel_type==='Electric'&&(q.co2_emissions==null||isNaN(q.co2_emissions)))q.co2_emissions=0;
   const ext=parsed.extras.map(c=>c[0]).filter(Boolean);
   if(ext.length){q.optional_extras=ext.join('\n');const paint=ext.find(e=>/paint/i.test(e));if(paint){q.exterior_colour=paint;if(!/-/.test(paint))notes.push('paint colour name not on the worksheet ("'+paint+'")');}}
-  if(!q.contract_type)notes.push('contract type (full maintenance or not) is not on the worksheet');
   // check our effective rental against the funder's own figure
   const s=leaseSums({...q,vehicle_type:'Car'});
   if(g.monthly_rental&&Math.abs(lsAmount(g.monthly_rental)-s.total)>0.005)notes.push(`monthly rental ${g.monthly_rental} ≠ finance + service (${lsMoney(s.total)})`);
