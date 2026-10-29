@@ -301,7 +301,7 @@ lsInjectModal('quote-modal',`
   <div class="modal-footer"><button class="btn-secondary-modal" onclick="closeQuoteModal()">Cancel</button><button class="btn-primary-modal" onclick="saveQuote()">Save quote</button></div>`,true);
 function quoteFormHtml(q){
   const sec=QUOTE_FIELDS.map(([label,fields])=>`<div class="form-section-label">${esc(label)}</div><div class="ls-grid">`+fields.map(([k,l,t,opts])=>{
-    const v=q[k]??'';
+    let v=q[k]??'';if(t==='num0'&&v!=='')v=Math.ceil(lsNum(v));
     let input;
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
@@ -642,7 +642,18 @@ function lsPrint(html,title){
   .q-foot{display:flex;gap:3.4mm;align-items:flex-start;margin-top:.4mm}
   .q-foot .small{width:117mm;padding-top:2.2mm;line-height:3.66mm}
   .q-foot .sig{width:110.4mm;height:30.4mm;min-height:0;box-sizing:border-box;padding:2.6mm 3mm;line-height:4.85mm}
-  </style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div><div class="page">${html}</div></body></html>`;
+  .fit1{white-space:nowrap;overflow:hidden}
+  </style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div><div class="page">${html}</div>
+  <script>
+  // .fit1 = keep on one line (Simon, 29 Oct: the vehicle description must not
+  // wrap): shrink the text in small steps until it fits, no smaller than 7pt;
+  // if it still doesn't fit at 7pt, let it wrap rather than cut words off.
+  (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>document.querySelectorAll('.fit1').forEach(e=>{
+    let pt=parseFloat(getComputedStyle(e).fontSize)*0.75;
+    while(e.scrollWidth>e.clientWidth+0.5&&pt>7){pt-=0.25;e.style.fontSize=pt+'pt';}
+    if(e.scrollWidth>e.clientWidth+0.5){e.style.whiteSpace='normal';e.style.fontSize='';}
+  }));
+  <\/script></body></html>`;
   const url=URL.createObjectURL(new Blob([page],{type:'text/html'}));
   const w=window.open(url,'_blank');if(!w){toast('Allow pop-ups to print','error');return;}
   setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -663,7 +674,7 @@ function printQuotation(id){
   <div class="q-body">
   <table class="q-v"><colgroup><col style="width:99.3mm"><col style="width:17.6mm"><col style="width:17.35mm"><col style="width:17.75mm"><col style="width:16.8mm"><col style="width:15.1mm"><col style="width:16.8mm"></colgroup>
     <tr><th>Vehicle details</th><th>Finance<br>rental</th><th>Service<br>rental</th><th>Total<br>rental</th><th>P11D<br>value</th><th>CO₂</th><th>Excess<br>mileage</th></tr>
-    <tr><td>${esc(quotationVehicleTitle(q))}${bullets.length?`<ul>${bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}</td><td>${lsMoney(q.finance_rental)}</td><td>${lsMoney(q.service_rental)}</td><td>${lsMoney(s.total)}</td><td>${lsMoney(q.p11d_value)}</td><td>${esc(String(q.co2_emissions??'—'))}</td><td>${ppm}<br>ppm*</td></tr></table>
+    <tr><td><div class="fit1">${esc(quotationVehicleTitle(q))}</div>${bullets.length?`<ul>${bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}</td><td>${lsMoney(q.finance_rental)}</td><td>${lsMoney(q.service_rental)}</td><td>${lsMoney(s.total)}</td><td>${q.p11d_value==null||q.p11d_value===''?'—':'£'+Math.ceil(lsNum(q.p11d_value)).toLocaleString('en-GB')}</td><td>${esc(String(q.co2_emissions??'—'))}</td><td>${ppm}<br>ppm*</td></tr></table>
   ${lsNum(q.setup_fee)?`<p>At the point the contract is raised prior to delivery, a set-up fee of ${lsMoney(q.setup_fee)} (+VAT) will be invoiced.</p>`:''}
   ${lsNum(q.management_fee)?`<p>When the vehicle is delivered, a rolling ${lsMoney(q.management_fee)} (+VAT) per month, fleet management charge will commence.</p>`:''}
   <p><strong>To place an order</strong> for this vehicle based on the above figures please return a signed/scanned copy of this quotation to admin@covase.co.uk</p>
