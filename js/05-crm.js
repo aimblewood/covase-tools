@@ -358,11 +358,15 @@ function openEditVehicle(id){
   const v=allVehicles.find(x=>x.id===id);if(!v)return;editVehicleId=id;
   document.getElementById('vehicle-modal-title').textContent='Edit vehicle — '+esc(v.reg||v.name||'');
   populateVehicleRelationSelects(v);
-  const f=(fid,val)=>{const e=document.getElementById(fid);if(e)e.value=val??''};
+  // A dropdown keeps a stored value it has no option for (e.g. an "S Tronic"
+  // gearbox from a funder quote) instead of blanking it and saving it away.
+  const f=(fid,val)=>{const e=document.getElementById(fid);if(!e)return;const v=val??'';
+    if(e.tagName==='SELECT'&&v!==''&&![...e.options].some(o=>o.value===String(v))){const o=document.createElement('option');o.value=o.textContent=String(v);e.appendChild(o);}
+    e.value=v;};
   // Overview
   f('vf-reg',v.reg);f('vf-name',v.name);f('vf-desc',v.description);f('vf-fqno',v.funders_quote_no);f('vf-cpo',v.covase_po_number);f('vf-lpo',v.legacy_po_number);f('vf-lex',v.lex_900_number);f('vf-source',v.source);f('vf-status',v.status||'active');f('vf-notes',v.notes);f('vf-dynamics',v.dynamics_id);
   // Spec
-  f('vf-vtype',v.vehicle_type);f('vf-body',v.body_style);f('vf-doors',v.num_doors);f('vf-make',v.manufacturer);f('vf-model',v.model);f('vf-deriv',v.derivative);f('vf-engsize',v.engine_size);f('vf-engcc',v.engine_cc);f('vf-fuel',v.fuel_type);f('vf-trans',v.transmission);f('vf-evrange',v.ev_range);f('vf-extcol',v.exterior_colour);f('vf-intrim',v.interior_trim);f('vf-chassis',v.chassis_number);f('vf-key',v.key_number);f('vf-p11d',v.p11d_value);f('vf-co2',v.co2_emissions);f('vf-mpg',v.fuel_consumption);f('vf-motheld',String(v.mot_held||false));f('vf-std',v.standard_items);f('vf-opts',v.optional_extras);
+  f('vf-vtype',v.vehicle_type);f('vf-body',v.body_style);f('vf-doors',v.num_doors);f('vf-make',v.manufacturer);f('vf-model',v.model);f('vf-deriv',v.derivative);f('vf-engsize',v.engine_size);f('vf-engcc',v.engine_cc);f('vf-fuel',v.fuel_type);f('vf-trans',v.transmission);f('vf-evrange',v.ev_range);f('vf-extcol',v.exterior_colour);f('vf-intrim',v.interior_trim);f('vf-chassis',v.chassis_number);f('vf-key',v.key_number);f('vf-p11d',v.p11d_value);f('vf-co2',v.co2_emissions);f('vf-mpg',v.fuel_consumption);f('vf-motheld',String(v.mot_held||false));f('vf-std',v.standard_items);f('vf-opts',v.optional_extras);vfEngineLabel();
   // Contract
   f('vf-term',v.term_months);f('vf-miles',v.annual_mileage);f('vf-profile',v.payment_profile);f('vf-vattype',v.vat_type);f('vf-fundmethod',v.funding_method);f('vf-conttype',v.contract_type);f('vf-finrent',v.finance_rental);f('vf-svcrent',v.service_rental);f('vf-xsmile',v.excess_mileage_ppm);f('vf-otr',v.otr);f('vf-initpay',v.initial_payment);f('vf-finalpay',v.final_payment);f('vf-drivercon',v.driver_contribution);
   // Financials
@@ -407,6 +411,8 @@ function getVehiclePayload(){
     updated_at:new Date().toISOString()
   };
 }
+// "Engine size" reads "Battery size" for electric vehicles (same field).
+function vfEngineLabel(){const l=document.getElementById('vf-engsize-label');if(l)l.textContent=document.getElementById('vf-fuel')?.value==='Electric'?'Battery size':'Engine size';}
 async function saveVehicle(){
   const payload=getVehiclePayload();
   try{
