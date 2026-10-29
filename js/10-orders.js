@@ -384,11 +384,18 @@ async function acceptQuote(id){
   if(!confirm(`Client accepted ${q.quote_no}?\n\nThis closes ${o.order_ref} as won and creates the vehicle record (${vehicleTitle(q)}) ready to order from the dealer.`))return;
   try{
     const now=new Date().toISOString(),today=now.slice(0,10);
-    const veh={id:'veh-'+Date.now(),registration:'TBC',reg:null,name:[q.manufacturer,q.model].filter(Boolean).join(' ')||'New vehicle',status:'ordered',lease_stage:'order_to_dealer',stage_changed_at:now,
+    // No registration until the car is registered: the live table only allows
+    // one active vehicle per registration (uq_vehicle_registration_active), so
+    // a shared 'TBC' broke the second accepted quote. If the column refuses an
+    // empty value, fall back to a placeholder unique to this order.
+    const veh={id:'veh-'+Date.now(),registration:null,reg:null,name:[q.manufacturer,q.model].filter(Boolean).join(' ')||'New vehicle',status:'ordered',lease_stage:'order_to_dealer',stage_changed_at:now,
       account_id:o.account_id,driver_id:o.driver_contact_id,funder_id:q.funder_account_id||o.funder_account_id,dealer_id:o.dealer_account_id,
       order_id:o.id,quote_id:q.id,order_received_date:today,expected_delivery_date:o.expected_delivery_date,source:o.source,updated_at:now};
     QUOTE_TO_VEHICLE.forEach(k=>{if(q[k]!==null&&q[k]!==undefined)veh[k]=q[k];});
-    const r=await sbReq('covase_vehicles',{method:'POST',body:veh});const v=Array.isArray(r)?r[0]:(r||veh);
+    let r;
+    try{r=await sbReq('covase_vehicles',{method:'POST',body:veh});}
+    catch(e){if(!/23502|null value/i.test(e.message))throw e;veh.registration='TBC-'+o.order_ref;r=await sbReq('covase_vehicles',{method:'POST',body:veh});}
+    const v=Array.isArray(r)?r[0]:(r||veh);
     if(Array.isArray(allVehicles))allVehicles.unshift(v);
     await sbReq(`covase_quotes?id=eq.${encodeURIComponent(q.id)}`,{method:'PATCH',body:{status:'accepted',updated_at:now},prefer:'return=minimal'});q.status='accepted';
     const others=orderQuotes(o.id).filter(x=>x.id!==q.id&&x.status!=='declined');

@@ -30,7 +30,7 @@ function vehicleStage(v){
   for(let i=LEASE_STAGES.length-1;i>=0;i--){const d=LEASE_STAGES[i][2];if(d&&v[d])return LEASE_STAGES[i][0];}
   return v.status==='ordered'?'order_to_dealer':'on_fleet';
 }
-function vehicleRegOf(v){return (v.reg||(v.registration&&v.registration!=='TBC'?v.registration:'')||'').toUpperCase();}
+function vehicleRegOf(v){return (v.reg||(v.registration&&!/^TBC\b/i.test(v.registration)?v.registration:'')||'').toUpperCase();}
 function vehicleLabel(v){return [vehicleRegOf(v)||'Reg TBC',[lsMake(v.manufacturer||v.make),v.model].filter(Boolean).join(' ')||v.name||''].filter(Boolean).join(' · ');}
 function stageChecklist(v,stage){const c=STAGE_CHECKLIST[stage];if(!c)return [];if(Array.isArray(c))return c;const d=(allAccounts||[]).find(a=>a.id===v.dealer_id);return c[(d&&d.ordering_route)||'email_po']||c.email_po;}
 function daysSince(iso){if(!iso)return null;return Math.floor((Date.now()-new Date(iso).getTime())/864e5);}
