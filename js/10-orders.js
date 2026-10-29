@@ -237,9 +237,23 @@ function renderOrderQuotes(){
         <button class="btn btn-edit" onclick="printQuotation('${esc(q.id)}')">🖨 Covase quotation</button>
         ${q.status==='draft'?`<button class="btn btn-edit" onclick="markQuoteSent('${esc(q.id)}')">Mark sent to client</button>`:''}
         ${!won?`<button class="btn btn-recharge" onclick="acceptQuote('${esc(q.id)}')">✓ Client accepted — create vehicle</button>`:''}
+        ${q.status!=='accepted'?`<button class="btn btn-danger" title="Delete this quote" onclick="deleteQuote('${esc(q.id)}')">✗ Delete</button>`:''}
         ${won&&chosen&&o.vehicle_id?`<button class="btn btn-recharge" onclick="closeOrderModal();openVehicleRecord('${esc(o.vehicle_id)}')">Open vehicle →</button>`:''}
       </div></div>`;
   }).join('');
+}
+// Delete a quote outright. The accepted one is kept: it is what the vehicle
+// record was created from (the order is won on it). The worksheet PDF it was
+// read from stays in the order's documents.
+async function deleteQuote(id){
+  const q=allQuotes.find(x=>x.id===id);if(!q)return;
+  if(q.status==='accepted'){toast("The accepted quote created the vehicle record, so it can't be deleted",'error');return;}
+  if(!confirm(`Delete ${q.quote_no} (${vehicleTitle(q)})?\n\nThis can't be undone. The worksheet PDF stays in the order's documents.`))return;
+  try{
+    await sbReq(`covase_quotes?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',prefer:'return=minimal'});
+    allQuotes=allQuotes.filter(x=>x.id!==id);
+    renderOrderQuotes();renderOrders();updateOrderStats();toast(q.quote_no+' deleted','success');
+  }catch(e){toast('Delete failed: '+e.message,'error');}
 }
 async function markQuoteSent(id){
   const q=allQuotes.find(x=>x.id===id);if(!q)return;
