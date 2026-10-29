@@ -264,7 +264,7 @@ async function markQuoteSent(id){
 
 // ── Quote editor ──
 const QUOTE_FIELDS=[
-  ['Vehicle',[['vehicle_type','Vehicle type','select',['Car','LCV']],['manufacturer','Manufacturer'],['model','Model'],['derivative','Derivative'],['engine_size','Engine size'],['engine_cc','Engine CC','int'],['fuel_type','Fuel type','select',['Petrol','Diesel','Hybrid','Plugin Hybrid (Petrol)','Plugin Hybrid (Diesel)','Electric']],['transmission','Transmission','select',['Manual','Automatic','DCT']],['body_style','Body style'],['num_doors','Doors','int'],['exterior_colour','Exterior colour'],['interior_trim','Interior trim'],['co2_emissions','CO2 g/km','int'],['p11d_value','P11D value £','num'],['otr','OTR £','num'],['ev_range','EV range (miles)','num'],['fuel_consumption','Fuel consumption','num']]],
+  ['Vehicle',[['vehicle_type','Vehicle type','select',['Car','LCV']],['manufacturer','Manufacturer'],['model','Model'],['derivative','Derivative'],['engine_size','Engine size'],['engine_cc','Engine CC','int'],['fuel_type','Fuel type','select',['Petrol','Diesel','Hybrid','Plugin Hybrid (Petrol)','Plugin Hybrid (Diesel)','Electric']],['transmission','Transmission','select',['Manual','Automatic','DCT']],['body_style','Body style'],['num_doors','Doors','int'],['exterior_colour','Exterior colour'],['interior_trim','Interior trim'],['co2_emissions','CO2 g/km','int'],['p11d_value','P11D value £','num0'],['otr','OTR £','num'],['ev_range','EV range (miles)','num'],['fuel_consumption','Fuel consumption','num']]],
   ['Contract',[['funder_account_id','Funder','funder'],['funders_quote_no','Funder quote no'],['funding_method','Funding method','select',['Contract Hire','Finance Lease','Contract Purchase','Lease Purchase']],['contract_type','Contract type','select',['Full Maintenance','Non Maintenance','Maintenance','Finance Only']],['term_months','Term (months)','int'],['annual_mileage','Annual mileage','int'],['payment_profile','Payment profile'],['excess_mileage_ppm','Excess mileage £/mile','num4'],['vat_type','VAT','select',['excluding VAT','including VAT']]]],
   ['Money (monthly, ex VAT)',[['finance_rental','Finance rental £','num'],['service_rental','Service rental £','num'],['commissions','Commission £','num'],['setup_fee','Set-up fee £','num'],['management_fee','Management fee £/month','num'],['other_revenue','Other revenue £','num'],['costs','Costs £','num']]]
 ];
@@ -275,7 +275,12 @@ let editQuoteId=null,quoteDraftDoc=null;
 // through; clicking again restores the worksheet value. Left-out fields are
 // remembered on this machine (localStorage covase_reader_skip) and start left
 // out on the next worksheet. (Tickboxes were tried first and were too busy.)
-let qfReader=null; // {read:{k:v}, base:{k:v}} while a worksheet quote is open
+// Leaving a field out only affects what goes into the quote (Simon, 29 Oct):
+// everything the reader found is kept on the quote in worksheet_values
+// ({values, off}, phase-quote-worksheet-values.sql), so editing the quote
+// later shows the same marking and a left-out value can still be brought in.
+let qfReader=null; // {read:{k:v}, base:{k:v}, off?:Set, isNew} while a worksheet quote is open
+let qfWsWarned=false;
 const QF_SKIP_KEY='covase_reader_skip';
 const QF_KEYS=new Set([...QUOTE_FIELDS.flatMap(([,f])=>f.map(x=>x[0])),'standard_items','optional_extras']);
 function qfSkipList(){try{return JSON.parse(localStorage.getItem(QF_SKIP_KEY)||'[]');}catch(e){return [];}}
@@ -283,7 +288,8 @@ function qfSaveSkipList(){if(!qfReader)return;try{const keep=qfSkipList().filter
   document.querySelectorAll('#quote-form .qf-read.qf-off').forEach(l=>keep.push(l.dataset.k));localStorage.setItem(QF_SKIP_KEY,JSON.stringify(keep));}catch(e){}}
 // Attributes for a field's <label>: marks it as read from the worksheet.
 function qfReadAttr(k){if(!qfReader||!(k in qfReader.read))return '';
-  return ` class="qf-read${qfSkipList().includes(k)?' qf-off':''}" data-k="${esc(k)}" onclick="qfToggleRead(this,event)" title="From the worksheet: ${esc(String(qfReader.read[k]??''))} — click to leave out / put back"`;}
+  const off=qfReader.off?qfReader.off.has(k):qfSkipList().includes(k);
+  return ` class="qf-read${off?' qf-off':''}" data-k="${esc(k)}" onclick="qfToggleRead(this,event)" title="From the worksheet: ${esc(String(qfReader.read[k]??''))} — click to leave out / put back"`;}
 function qfApplyRead(lab){const k=lab.dataset.k,el=document.getElementById('qf-'+k);if(!el||!qfReader)return;
   const off=lab.classList.contains('qf-off'),v=off?qfReader.base[k]:qfReader.read[k],sv=v==null?'':String(v);
   if(el.tagName==='SELECT'&&sv&&![...el.options].some(o=>o.value===sv))el.add(new Option(sv,sv));
@@ -299,7 +305,7 @@ function quoteFormHtml(q){
     let input;
     if(t==='select')input=`<select id="qf-${k}" oninput="qfRecalc()">${lsOptions(opts.includes(v)||!v?opts:[v,...opts],v,'—')}</select>`;
     else if(t==='funder')input=`<select id="qf-${k}">${lsAccountOptions(['funder'],v,'— select —')}</select>`;
-    else input=`<input id="qf-${k}" ${t&&t.startsWith('num')||t==='int'?`type="number" step="${t==='int'?'1':t==='num4'?'0.0001':'0.01'}"`:''} value="${esc(String(v))}" oninput="qfRecalc()">`;
+    else input=`<input id="qf-${k}" ${t&&t.startsWith('num')||t==='int'?`type="number" step="${t==='int'||t==='num0'?'1':t==='num4'?'0.0001':'0.01'}"`:''} value="${esc(String(v))}" oninput="qfRecalc()">`;
     return `<div class="form-field"><label for="qf-${k}"${qfReadAttr(k)}>${esc(k==='engine_size'?engineSizeLabel(q.fuel_type):l)}</label>${input}</div>`;
   }).join('')+'</div>').join('');
   const head=qfReader?`<div class="notes-box" style="margin-bottom:10px">Fields in teal came from the worksheet. Click a field's name to leave it out, click again to put it back.</div>`:'';
@@ -310,7 +316,7 @@ function quoteFormHtml(q){
 }
 function qfRead(){
   const out={};
-  QUOTE_FIELDS.forEach(([,fields])=>fields.forEach(([k,,t])=>{const v=document.getElementById('qf-'+k)?.value;out[k]=(v===''||v==null)?null:(t==='int'?parseInt(v):t&&t.startsWith('num')?parseFloat(v):v);}));
+  QUOTE_FIELDS.forEach(([,fields])=>fields.forEach(([k,,t])=>{const v=document.getElementById('qf-'+k)?.value;out[k]=(v===''||v==null)?null:(t==='int'?parseInt(v):t==='num0'?Math.ceil(parseFloat(v)):t&&t.startsWith('num')?parseFloat(v):v);}));
   ['standard_items','optional_extras','notes'].forEach(k=>{const v=document.getElementById('qf-'+k)?.value;out[k]=v?v:null;});
   return out;
 }
@@ -320,7 +326,7 @@ function qfRecalc(){const lab=document.querySelector('label[for="qf-engine_size"
 function openQuoteForm(q,title){
   document.getElementById('quote-modal-title').textContent=title;
   document.getElementById('quote-form').innerHTML=quoteFormHtml(q);
-  document.querySelectorAll('#quote-form .qf-read.qf-off').forEach(qfApplyRead);qfRecalc();
+  document.querySelectorAll('#quote-form .qf-read.qf-off').forEach(l=>{if(qfReader&&qfReader.isNew)qfApplyRead(l);else l.closest('.form-field')?.classList.add('qf-field-off');});qfRecalc();
   document.getElementById('quote-modal').classList.add('open');
 }
 function openNewQuote(prefill){
@@ -329,10 +335,16 @@ function openNewQuote(prefill){
   const defaults={vehicle_type:'Car',funding_method:'Contract Hire',vat_type:'excluding VAT',funder_account_id:o.funder_account_id,setup_fee:250,management_fee:15};
   const base={...defaults,...(prefill||{})};
   qfReader=null;
-  if(prefill){const read={};Object.entries(prefill).forEach(([k,v])=>{if(k!=='reader_notes'&&v!=null&&v!==''&&QF_KEYS.has(k))read[k]=v;});qfReader={read,base:defaults};}
+  if(prefill){const read={};Object.entries(prefill).forEach(([k,v])=>{if(k!=='reader_notes'&&v!=null&&v!==''&&QF_KEYS.has(k))read[k]=v;});qfReader={read,base:defaults,isNew:true};}
   openQuoteForm(base,prefill?'New quote — from the funder worksheet':'New quote');
 }
-function openEditQuote(id){const q=allQuotes.find(x=>x.id===id);if(!q)return;editQuoteId=id;quoteDraftDoc=null;qfReader=null;openQuoteForm(q,`${q.quote_no} — ${vehicleTitle(q)}`);}
+function openEditQuote(id){const q=allQuotes.find(x=>x.id===id);if(!q)return;editQuoteId=id;quoteDraftDoc=null;qfReader=null;
+  const ws=q.worksheet_values;
+  if(ws&&ws.values){const off=new Set(ws.off||[]),base={};
+    // left out at save → "off" means what was saved; taken → "off" means blank
+    Object.keys(ws.values).forEach(k=>{base[k]=off.has(k)?q[k]:null;});
+    qfReader={read:ws.values,base,off,isNew:false};}
+  openQuoteForm(q,`${q.quote_no} — ${vehicleTitle(q)}`);}
 function closeQuoteModal(){document.getElementById('quote-modal').classList.remove('open');}
 async function saveQuote(){
   const body={...qfRead(),updated_at:new Date().toISOString()};
@@ -346,6 +358,11 @@ async function saveQuote(){
       if(o&&body.funder_account_id&&!o.funder_account_id){o.funder_account_id=body.funder_account_id;sbReq(`covase_orders?id=eq.${encodeURIComponent(o.id)}`,{method:'PATCH',body:{funder_account_id:body.funder_account_id},prefer:'return=minimal'}).catch(()=>{});}
       toast(`${q.quote_no} saved`,'success');
     }
+    const qid=editQuoteId||(allQuotes[allQuotes.length-1]||{}).id;
+    if(qfReader&&qid){const wv={values:qfReader.read,off:[...document.querySelectorAll('#quote-form .qf-read.qf-off')].map(l=>l.dataset.k)};
+      sbReq(`covase_quotes?id=eq.${encodeURIComponent(qid)}`,{method:'PATCH',body:{worksheet_values:wv},prefer:'return=minimal'})
+        .then(()=>{const qq=allQuotes.find(x=>x.id===qid);if(qq)qq.worksheet_values=wv;})
+        .catch(()=>{if(!qfWsWarned){qfWsWarned=true;toast('Quote saved, but the worksheet figures could not be kept — the database needs its update','error');}});}
     qfSaveSkipList();quoteDraftDoc=null;qfReader=null;closeQuoteModal();renderOrderQuotes();renderOrders();updateOrderStats();
   }catch(e){toast('Save failed: '+e.message,'error');}
 }
@@ -451,8 +468,8 @@ function parseFunderWorksheet(lines,rules){
 }
 // Funder payment plan wording -> ORBIS profile. Spread: 3 up front then
 // monthly from month Y to the end = 3+(term-Y+1). Terminal pause: total
-// payments = the term, so 3 up front leaves term-3 (3+45 on 48m), stored as
-// "3+45 terminal pause". The type comes from rules.plan_words; a sentence with
+// payments = the term, so 3 up front leaves term-3 (3+45 on 48m). Only the
+// payments are stored, e.g. "3+45" (Simon, 29 Oct). The type comes from rules.plan_words; a sentence with
 // none of them is only taken as a spread when it is Lex's "next payment is
 // month Y" form. Anything else is refused, never guessed.
 function funderPaymentProfile(text,term,rules){
@@ -461,20 +478,22 @@ function funderPaymentProfile(text,term,rules){
   const words=rules.plan_words||DEFAULT_FUNDER_RULES.lex.plan_words;
   const hit=Object.keys(words).filter(w=>s.includes(w.toLowerCase())).sort((a,b)=>b.length-a.length)[0];
   const pm=s.match(/(\d+)\s*\+\s*(\d+)/); // already written as a profile, e.g. "3+35"
-  if(pm)return words[hit]==='terminal'?{profile:pm[1]+'+'+pm[2]+' terminal pause',type:'terminal'}:{profile:pm[1]+'+'+pm[2],type:'spread'};
+  if(pm)return words[hit]==='terminal'?{profile:pm[1]+'+'+pm[2],type:'terminal'}:{profile:pm[1]+'+'+pm[2],type:'spread'};
   const im=s.match(/(\w+) months?'? (?:initial rental|in advance|advance rental|up ?front|down)/)||s.match(/with (\w+) down/);
   const init=im&&num(im[1]);if(!init)return {why:'no number of payments up front'};
   const nm=s.match(/next payment (?:is )?(?:at |in )?month (\w+)/),next=nm?num(nm[1]):null;
   const type=hit?words[hit]:(next?'spread':null);
-  if(type==='terminal'){if(init>=term)return {why:'more payments up front than the term'};return {profile:init+'+'+(term-init)+' terminal pause',type};}
+  if(type==='terminal'){if(init>=term)return {why:'more payments up front than the term'};return {profile:init+'+'+(term-init),type};}
   if(type==='spread'){const k=next||2;return {profile:init+'+'+(term-k+1),type};}
   return {why:'no rule says whether this is spread or terminal pause'};
 }
+// Makes written in capitals (Simon, 29 Oct: "BMW should always be all caps").
+const LS_CAPS_MAKES=/^(BMW|MG|DS|BYD|GWM|KGM|LEVC|MINI)$/i;
 function worksheetToQuote(parsed,rules){
   const g=parsed.got,q={},notes=[];
   if(g.funders_quote_no)q.funders_quote_no=g.funders_quote_no.replace(/\s+/g,' ').trim();
   if(g.vehicle){const words=g.vehicle.replace(/\s+\d{2}$/,'').split(/\s+/);const tc=w=>/\d/.test(w)?w:w.charAt(0)+w.slice(1).toLowerCase();
-    q.manufacturer=tc(words[0]||'');q.model=words[1]?tc(words[1]):null;q._rest=words.slice(2);notes.push('make / model / derivative split from "'+g.vehicle+'"');}
+    q.manufacturer=LS_CAPS_MAKES.test(words[0]||'')?String(words[0]).toUpperCase():tc(words[0]||'');q.model=words[1]?tc(words[1]):null;q._rest=words.slice(2);notes.push('make / model / derivative split from "'+g.vehicle+'"');}
   // Lex's "Contract Type" (Simon, 29 Oct): "Contract Hire" = full maintenance;
   // "Contract Hire without maintenance" = non maintenance. Anything else is
   // kept as the funding method and the contract type left for checking.
@@ -487,6 +506,7 @@ function worksheetToQuote(parsed,rules){
   if(g.payment_plan){const pp=funderPaymentProfile(g.payment_plan,q.term_months,rules);
     if(pp.profile)q.payment_profile=pp.profile;else notes.push('payment plan not recognised: "'+g.payment_plan+'" — '+pp.why);}
   ['otr','commissions','p11d_value','finance_rental','service_rental'].forEach(k=>{if(g[k]!==undefined)q[k]=lsAmount(g[k]);});
+  if(q.p11d_value!=null)q.p11d_value=Math.ceil(q.p11d_value); // whole pounds, rounded up (Simon, 29 Oct)
   ['co2_emissions','num_doors'].forEach(k=>{if(g[k]!==undefined)q[k]=parseInt(lsAmount(g[k]));});
   if(g.fuel_consumption)q.fuel_consumption=lsAmount(g.fuel_consumption);
   if(g.ev_range)q.ev_range=lsAmount(g.ev_range);
@@ -637,7 +657,7 @@ function printQuotation(id){
   const html=`<div class="side">Quotation</div>${covaseHeader()}
   <table class="q-kv client"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
     <tr><td>Contract</td><td>${esc(String(q.term_months||'—'))} month${q.contract_type?'<br>'+esc(q.contract_type):''}${q.funding_method?'<br>'+esc(q.funding_method):''}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
-    <tr><td>Payments</td><td>${esc(String(q.payment_profile||'—').replace(/\s*terminal pause$/i,''))} monthly payments${/terminal pause$/i.test(q.payment_profile||'')?' (terminal pause)':''}<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
+    <tr><td>Payments</td><td>${esc(q.payment_profile||'—')} monthly payments<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
   <table class="q-kv prep"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
   <div class="q-box"><div>Quotation</div><div>${esc(q.quote_no)}</div><small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div>
   <div class="q-body">
