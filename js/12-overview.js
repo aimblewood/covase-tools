@@ -131,11 +131,17 @@ lsInjectModal('funder-rules-modal',`
 async function openFunderRules(){await loadFunderRules();renderFunderRules();document.getElementById('funder-rules-modal').classList.add('open');}
 function renderFunderRules(){
   document.getElementById('fr-body').innerHTML=Object.entries(funderRules).map(([key,r])=>`<div class="form-section-label">${esc(r.name)}</div><table class="ls-table">${Object.keys(FR_FIELD_LABELS).map(f=>`<tr><td style="width:38%">${esc(FR_FIELD_LABELS[f])}</td><td><input style="width:100%" data-fr="${esc(key)}" data-field="${esc(f)}" value="${esc((r.fields[f]||[]).join(' | '))}"></td></tr>`).join('')}</table>
-    <div class="form-section-label">Fuel wording</div><table class="ls-table">${Object.entries(r.fuel||{}).map(([w,v])=>`<tr><td style="width:38%">“${esc(w)}” means</td><td><input style="width:100%" data-frfuel="${esc(key)}" data-word="${esc(w)}" value="${esc(v)}"></td></tr>`).join('')}</table>`).join('');
+    <div class="form-section-label">Fuel wording</div><table class="ls-table">${Object.entries(r.fuel||{}).map(([w,v])=>`<tr><td style="width:38%">“${esc(w)}” means</td><td><input style="width:100%" data-frfuel="${esc(key)}" data-word="${esc(w)}" value="${esc(v)}"></td></tr>`).join('')}</table>
+    <div class="form-section-label">Payment plan wording</div><div style="font-size:12px;color:var(--n500);margin-bottom:6px">Words in the payment plan that say how the payments run. Spread: payments up front, then one a month to the end (3+35 on 36 months). Terminal pause: the total number of payments equals the term (3+45 on 48 months).</div>
+    <table class="ls-table" data-frplans="${esc(key)}">${Object.entries(r.plan_words||DEFAULT_FUNDER_RULES.lex.plan_words).map(([w,v])=>frPlanRow(w,v)).join('')}</table>
+    <button class="btn btn-edit" type="button" style="margin-top:6px" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend',frPlanRow('',''))">+ Add wording</button>`).join('');
+}
+function frPlanRow(w,v){return `<tr><td style="width:38%"><input style="width:100%" data-planword placeholder="e.g. terminal pause" value="${esc(w)}"></td><td><select style="width:100%" data-plantype>${[['spread','Spread'],['terminal','Terminal pause']].map(([k,l])=>`<option value="${k}"${v===k?' selected':''}>${l}</option>`).join('')}</select></td></tr>`;
 }
 async function saveFunderRulesForm(){
   document.querySelectorAll('#fr-body [data-fr]').forEach(i=>{const r=funderRules[i.dataset.fr];r.fields[i.dataset.field]=i.value.split('|').map(s=>s.trim()).filter(Boolean);});
   document.querySelectorAll('#fr-body [data-frfuel]').forEach(i=>{funderRules[i.dataset.frfuel].fuel[i.dataset.word]=i.value.trim();});
+  document.querySelectorAll('#fr-body [data-frplans]').forEach(t=>{const pw={};t.querySelectorAll('tr').forEach(tr=>{const w=tr.querySelector('[data-planword]').value.trim();if(w)pw[w]=tr.querySelector('[data-plantype]').value;});funderRules[t.dataset.frplans].plan_words=pw;});
   try{await saveFunderRules();toast('Funder rules saved','success');document.getElementById('funder-rules-modal').classList.remove('open');}catch(e){toast('Save failed: '+e.message,'error');}
 }
 
