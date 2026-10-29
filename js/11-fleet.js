@@ -166,7 +166,7 @@ const VR_RENDER={
       ${v.order_id?`<div class="action-row"><button class="btn btn-edit" onclick="closeVehicleRecord();showView('orders',document.querySelector('[data-view=orders]'));setTimeout(()=>openEditOrder('${esc(v.order_id)}'),400)">Open the order →</button></div>`:''}`;
   },
   financials(v){const s=leaseSums(v);return `<div class="financials-row">
-    <div><span>Term / miles</span><strong>${esc(v.term_months||'—')}m · ${v.annual_mileage?Number(v.annual_mileage).toLocaleString('en-GB'):'—'} pa</strong></div><div><span>Profile</span><strong>${esc(v.payment_profile||'—')}</strong></div>
+    <div><span>Term / miles</span><strong>${esc(v.term_months||'—')}m · ${v.annual_mileage?Number(v.annual_mileage).toLocaleString('en-GB'):'—'} pa</strong></div><div><span>Profile</span><strong>${esc(lsProfile(v.payment_profile)||'—')}</strong></div>
     <div><span>Finance rental</span><strong>${lsMoney(v.finance_rental)}</strong></div><div><span>Service rental</span><strong>${lsMoney(v.service_rental)}</strong></div>
     <div><span>Total rental</span><strong>${lsMoney(s.total)}</strong></div><div><span>Effective rental</span><strong>${lsMoney(s.effective)}</strong></div></div>
     <div class="financials-row"><div><span>Commission</span><strong>${lsMoney(v.commissions)}</strong></div><div><span>Set-up fee</span><strong>${lsMoney(v.setup_fee)}</strong></div>
