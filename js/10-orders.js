@@ -25,6 +25,17 @@ function leaseSums(q){
   return {total,unreclaimable,effective,mgmtProfit,profit};
 }
 function vehicleTitle(q){return [q.manufacturer,q.model,q.derivative].filter(Boolean).join(' ')||'Vehicle not set';}
+// Description on the Covase quotation (Simon, 29 Oct): make, model, engine
+// size, fuel type, derivative, body style, gearbox.
+function quotationVehicleTitle(q){return [q.manufacturer,q.model,q.engine_size,q.fuel_type,q.derivative,q.body_style,q.transmission].map(v=>String(v??'').trim()).filter(Boolean).join(' ')||'Vehicle not set';}
+// Bullets under it: exterior colour + interior trim on one line, then each
+// optional extra (one per line), skipping extras that repeat the colour/trim.
+function quotationVehicleBullets(q){
+  const ext=String(q.exterior_colour||'').trim(),int=String(q.interior_trim||'').trim();
+  const out=[];if(ext||int)out.push([ext,int].filter(Boolean).join(' with '));
+  String(q.optional_extras||'').split(/\r?\n|;/).map(x=>x.trim()).filter(Boolean).forEach(x=>{if(x!==ext&&x!==int&&!out.includes(x))out.push(x);});
+  return out;
+}
 function accName(id){const a=(allAccounts||[]).find(x=>x.id===id);return a?a.company_name:'';}
 function conName(id){const c=(allContacts||[]).find(x=>x.id===id);return c?contactDisplayName(c):'';}
 function lsInjectView(id,html){if(document.getElementById(id))return;const anchor=document.getElementById('view-vehicles');if(!anchor)return;const d=document.createElement('div');d.className='view';d.id=id;d.innerHTML=html;anchor.parentNode.appendChild(d);}
@@ -453,13 +464,13 @@ function lsPrint(html,title){
   @page{size:A4 landscape;margin:0}
   :root{--netto:'Covase Netto','NettoOT','Netto OT',Arial,sans-serif;--teal:#03C4B8}
   html,body{margin:0}body{font-family:'Covase Open Sans','Open Sans',Arial,sans-serif;font-size:10pt;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .page{position:relative;width:297mm;min-height:210mm;box-sizing:border-box;padding:9mm 12mm 8mm 52mm;margin:0 auto}
+  .page{position:relative;width:297mm;height:210mm;box-sizing:border-box;padding:35mm 13mm 14mm 52.2mm;margin:0 auto;overflow:hidden}
   .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'Covase Open Sans',Arial;padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
   @media print{.bar{display:none}}@media screen{body{background:#eee}.page{background:#fff;margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.15)}}
-  .logo{position:absolute;left:18mm;top:9mm;width:55mm;height:auto}
-  .co{display:flex;gap:11mm;justify-content:flex-end;font-size:8pt;color:#8a8a8a;line-height:1.45;min-height:22mm}
+  .logo{position:absolute;left:18.2mm;top:11.2mm;width:55.8mm;height:auto}
+  .co{position:absolute;left:170.7mm;top:10.9mm;display:grid;grid-template-columns:47.9mm 38.4mm auto;font-size:8pt;color:#8a8a8a;line-height:3.9mm}
   .teal{color:var(--teal)}
-  .side{position:absolute;left:14mm;top:33mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:400}
+  .side{position:absolute;left:16.2mm;top:34.2mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:400}
   .grid{display:flex;justify-content:space-between;gap:8mm;margin:2mm 0 9mm;align-items:flex-start}
   .kv{border-collapse:collapse}.kv td{padding:0 4mm 1mm 0;vertical-align:top;font-size:10pt;line-height:1.45}.kv td:first-child{color:var(--teal)}
   .box{border:1px solid #222;padding:4mm 9mm;text-align:center;font-family:var(--netto);font-size:20pt;line-height:1.2;min-width:48mm;box-sizing:border-box}
@@ -474,7 +485,22 @@ function lsPrint(html,title){
   p{margin:0 0 4mm;font-size:10pt}
   .small{font-size:8pt;line-height:1.45;color:#333}
   .sig{border:1px solid var(--teal);padding:3mm 5mm;min-height:30mm;line-height:1.8;font-size:10pt}
-  .foot{position:absolute;left:0;right:0;bottom:7mm;font-size:8pt;color:#8a8a8a;text-align:center}
+  .foot{position:absolute;left:52.2mm;right:13.2mm;top:200.6mm;font-size:8pt;color:#8a8a8a;text-align:right}
+  /* quotation: blocks placed where the Covase template puts them */
+  .q-kv{position:absolute;border-collapse:collapse}.q-kv td{padding:0;vertical-align:top;line-height:4.85mm}.q-kv td:first-child{color:var(--teal)}
+  .q-kv.client{left:52.2mm;top:35.4mm}.q-kv.client td:first-child{width:18.3mm}.q-kv.prep{left:148.4mm;top:34.3mm}.q-kv.prep td:first-child{width:22.9mm}
+  .q-box{position:absolute;left:226.4mm;top:34.6mm;width:56.3mm;height:27mm;box-sizing:border-box;border:1px solid #222;display:flex;flex-direction:column;justify-content:center;align-items:center;font-family:var(--netto);font-size:20pt;line-height:8.6mm;padding-bottom:1mm}
+  .q-box small{font-family:'Covase Open Sans','Open Sans',Arial,sans-serif;font-size:10pt;line-height:4.85mm}
+  .q-body{position:absolute;left:52.2mm;top:83.4mm;width:231.75mm}
+  table.q-v{width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 4.6mm}
+  table.q-v th{font-family:var(--netto);font-size:12pt;font-weight:400;text-transform:uppercase;line-height:5.2mm;text-align:center;vertical-align:top;padding:0 0 .3mm;border-bottom:2px solid var(--teal)}
+  table.q-v td{text-align:center;vertical-align:top;padding:1.6mm 0 0;line-height:4.5mm;white-space:nowrap}
+  table.q-v th:first-child,table.q-v td:first-child{text-align:left;white-space:normal}
+  table.q-v ul{margin:0 0 0 7mm;padding:0;font-size:8pt;line-height:3.9mm}
+  .q-body p{margin:0 0 4.9mm;line-height:4.85mm}
+  .q-foot{display:flex;gap:3.4mm;align-items:flex-start;margin-top:.4mm}
+  .q-foot .small{width:117mm;padding-top:2.2mm;line-height:3.66mm}
+  .q-foot .sig{width:110.4mm;height:30.4mm;min-height:0;box-sizing:border-box;padding:2.6mm 3mm;line-height:4.85mm}
   </style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div><div class="page">${html}</div></body></html>`;
   const url=URL.createObjectURL(new Blob([page],{type:'text/html'}));
   const w=window.open(url,'_blank');if(!w){toast('Allow pop-ups to print','error');return;}
@@ -486,19 +512,22 @@ function ownerEmail(owner){const p=String(owner||'Simon Homer').trim().toLowerCa
 function printQuotation(id){
   const q=allQuotes.find(x=>x.id===id);if(!q)return;const o=allOrders.find(x=>x.id===q.order_id)||{};const s=leaseSums(q);
   const ppm=q.excess_mileage_ppm!=null?'£'+lsNum(q.excess_mileage_ppm).toFixed(4):'—';
+  const bullets=quotationVehicleBullets(q);
   const html=`<div class="side">Quotation</div>${covaseHeader()}
-  <div class="grid"><table class="kv"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
-    <tr><td>Contract</td><td>${esc(q.term_months||'—')} month<br>${esc(q.contract_type||'')}${q.contract_type?'<br>':''}${esc(q.funding_method||'')}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
+  <table class="q-kv client"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
+    <tr><td>Contract</td><td>${esc(String(q.term_months||'—'))} month${q.contract_type?'<br>'+esc(q.contract_type):''}${q.funding_method?'<br>'+esc(q.funding_method):''}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
     <tr><td>Payments</td><td>${esc(q.payment_profile||'—')} monthly payments<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
-    <table class="kv"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
-    <div class="box">Quotation<br>${esc(q.quote_no)}<small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div></div>
-  <table class="v"><tr><th>VEHICLE DETAILS</th><th class="r">FINANCE<br>RENTAL</th><th class="r">SERVICE<br>RENTAL</th><th class="r">TOTAL<br>RENTAL</th><th class="r">P11D<br>VALUE</th><th class="r">CO₂</th><th class="r">EXCESS<br>MILEAGE</th></tr>
-    <tr><td>${esc(vehicleTitle(q))}${q.exterior_colour||q.interior_trim?`<ul><li>${esc([q.exterior_colour,q.interior_trim].filter(Boolean).join(' with '))}</li></ul>`:''}</td><td class="r">${lsMoney(q.finance_rental)}</td><td class="r">${lsMoney(q.service_rental)}</td><td class="r">${lsMoney(s.total)}</td><td class="r">${lsMoney(q.p11d_value)}</td><td class="r">${esc(String(q.co2_emissions??'—'))}</td><td class="r">${ppm}<br>ppm*</td></tr></table>
+  <table class="q-kv prep"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
+  <div class="q-box"><div>Quotation</div><div>${esc(q.quote_no)}</div><small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div>
+  <div class="q-body">
+  <table class="q-v"><colgroup><col style="width:99.3mm"><col style="width:17.6mm"><col style="width:17.35mm"><col style="width:17.75mm"><col style="width:16.8mm"><col style="width:15.1mm"><col style="width:16.8mm"></colgroup>
+    <tr><th>Vehicle details</th><th>Finance<br>rental</th><th>Service<br>rental</th><th>Total<br>rental</th><th>P11D<br>value</th><th>CO₂</th><th>Excess<br>mileage</th></tr>
+    <tr><td>${esc(quotationVehicleTitle(q))}${bullets.length?`<ul>${bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}</td><td>${lsMoney(q.finance_rental)}</td><td>${lsMoney(q.service_rental)}</td><td>${lsMoney(s.total)}</td><td>${lsMoney(q.p11d_value)}</td><td>${esc(String(q.co2_emissions??'—'))}</td><td>${ppm}<br>ppm*</td></tr></table>
   ${lsNum(q.setup_fee)?`<p>At the point the contract is raised prior to delivery, a set-up fee of ${lsMoney(q.setup_fee)} (+VAT) will be invoiced.</p>`:''}
   ${lsNum(q.management_fee)?`<p>When the vehicle is delivered, a rolling ${lsMoney(q.management_fee)} (+VAT) per month, fleet management charge will commence.</p>`:''}
   <p><strong>To place an order</strong> for this vehicle based on the above figures please return a signed/scanned copy of this quotation to admin@covase.co.uk</p>
-  <div class="grid" style="align-items:stretch"><div class="small" style="flex:1">This quotation is in respect of a qualifying car under 7 (2) of the VAT (input tax) order 1992 (as amended). Hirers should independently clarify their VAT position in respect of any restrictions which may be applicable. This quotation is valid for a period of 28 days and is not an offer to enter into a legally binding contract. Acceptance is subject to final credit approval which will be at our sole discretion and to you completing all documents required in connection with this transaction. Where applicable our quotes reflect manufacturer's support. E &amp; O E. * ppm = pence per mile.</div>
-  <div class="sig" style="flex:1">Name<br>Date<br><br>Signature</div></div>${COVASE_FOOTER}`;
+  <div class="q-foot"><div class="small">This quotation is in respect of a qualifying car under 7 (2) of the VAT (input tax) order 1992 (as amended). Hirers should independently clarify their VAT position in respect of any restrictions which may be applicable. This quotation is valid for a period of 28 days and is not an offer to enter into a legally binding contract. Acceptance is subject to final credit approval which will be at our sole discretion and to you completing all documents required in connection with this transaction. Where applicable our quotes reflect manufacturer's support. E &amp; O E. * ppm = pence per mile.</div>
+  <div class="sig">Name<br>Date<br><br>Signature</div></div></div>${COVASE_FOOTER}`;
   lsPrint(html,q.quote_no+' quotation');
 }
 
