@@ -436,42 +436,67 @@ async function readFunderWorksheet(file){
 }
 
 // ── Covase quotation (print / save as PDF) ──
+// House print layout (quotation, dealer PO): A4 landscape, measured from the
+// Covase quotation template. Fonts per Simon (29 Oct 2026): Netto OT for the
+// vertical title (64pt), the reference box (20pt) and the price headings
+// (12pt caps); Open Sans 10pt for everything else. Netto OT is a licensed
+// font, not on a web CDN: it is used when installed on the PC printing, with
+// Barlow (closest open match) standing in otherwise.
+const COVASE_LOGO_URL=new URL('img/covase-logo.png',location.href).href;
 function lsPrint(html,title){
-  const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print','error');return;}
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet"><style>
-  @page{size:A4 landscape;margin:12mm}body{font-family:'DM Sans',Arial,sans-serif;color:#222;margin:0}
-  .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'DM Sans';padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
-  @media print{.bar{display:none}}
-  .logo{font-size:44px;letter-spacing:10px;color:#777;font-weight:400}.hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
-  .co{font-size:12px;color:#888;display:flex;gap:28px;line-height:1.5}.teal{color:#03BFB3}.side{writing-mode:vertical-rl;transform:rotate(180deg);font-size:64px;color:#03D3C6;position:absolute;left:0;top:90px}
-  .wrap{position:relative;padding-left:90px}.grid{display:flex;justify-content:space-between;gap:24px;margin:28px 0 20px}
-  .kv td{padding:2px 10px 2px 0;font-size:17px;vertical-align:top}.kv td:first-child{color:#03BFB3}
-  .box{border:1.5px solid #222;padding:12px 30px;text-align:center;font-size:30px;line-height:1.15}.box small{font-size:15px;display:block;margin-top:4px}
-  table.v{width:100%;border-collapse:collapse;font-size:16px}table.v th{text-align:left;font-weight:400;border-bottom:2px solid #03D3C6;padding:4px 6px;font-size:17px}
-  table.v td{padding:4px 6px;vertical-align:top}.r{text-align:right}p{font-size:16px;margin:12px 0}
-  .small{font-size:11px;line-height:1.45;color:#333}.sig{border:1.5px solid #03D3C6;padding:10px 14px;font-size:16px;min-height:110px;line-height:1.7}
-  .foot{font-size:10.5px;color:#888;text-align:center;margin-top:18px}</style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div>${html}</body></html>`);
-  w.document.close();
+  // Opened as a Blob page rather than document.write into about:blank, so the
+  // logo and fonts load like any normal page before printing.
+  const page=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Barlow:wght@300;400&display=swap" rel="stylesheet"><style>
+  @page{size:A4 landscape;margin:0}
+  :root{--netto:'NettoOT','Netto OT','Netto','Barlow',sans-serif;--teal:#03C4B8}
+  html,body{margin:0}body{font-family:'Open Sans',Arial,sans-serif;font-size:10pt;color:#222;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{position:relative;width:297mm;min-height:210mm;box-sizing:border-box;padding:9mm 12mm 8mm 52mm;margin:0 auto}
+  .bar{position:fixed;bottom:0;right:0;padding:12px}.bar button{font:600 13px 'Open Sans';padding:8px 14px;border-radius:8px;border:0;background:#03D3C6;color:#08303a;cursor:pointer}
+  @media print{.bar{display:none}}@media screen{body{background:#eee}.page{background:#fff;margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.15)}}
+  .logo{position:absolute;left:18mm;top:9mm;width:55mm;height:auto}
+  .co{display:flex;gap:11mm;justify-content:flex-end;font-size:10pt;color:#8a8a8a;line-height:1.45;min-height:22mm}
+  .teal{color:var(--teal)}
+  .side{position:absolute;left:14mm;top:33mm;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--netto);font-size:64pt;line-height:1;color:var(--teal);font-weight:300}
+  .grid{display:flex;justify-content:space-between;gap:8mm;margin:2mm 0 9mm;align-items:flex-start}
+  .kv{border-collapse:collapse}.kv td{padding:0 4mm 1mm 0;vertical-align:top;font-size:10pt;line-height:1.45}.kv td:first-child{color:var(--teal)}
+  .box{border:1px solid #222;padding:4mm 9mm;text-align:center;font-family:var(--netto);font-size:20pt;line-height:1.2;min-width:48mm;box-sizing:border-box}
+  .box small{display:block;font-family:'Open Sans',Arial,sans-serif;font-size:10pt;margin-top:1.5mm}
+  table.v{width:100%;border-collapse:collapse;margin-bottom:6mm}
+  table.v th{font-family:var(--netto);font-size:12pt;font-weight:400;text-transform:uppercase;line-height:1.25;border-bottom:2px solid var(--teal);padding:0 2mm 1.5mm;text-align:center;vertical-align:bottom}
+  table.v th:first-child{text-align:left;padding-left:0}
+  table.v td{padding:1.5mm 2mm;vertical-align:top;font-size:10pt;text-align:center;white-space:nowrap}
+  table.v td:first-child{text-align:left;padding-left:0;white-space:normal}
+  table.v ul{margin:1mm 0 0 6mm;padding:0}.r{text-align:center}
+  table.v.left th,table.v.left td{text-align:left;white-space:normal;padding-left:0}
+  p{margin:0 0 4mm;font-size:10pt}
+  .small{font-size:8pt;line-height:1.45;color:#333}
+  .sig{border:1px solid var(--teal);padding:3mm 5mm;min-height:30mm;line-height:1.8;font-size:10pt}
+  .foot{position:absolute;left:0;right:0;bottom:7mm;font-size:8pt;color:#8a8a8a;text-align:center}
+  </style></head><body><div class="bar"><button onclick="print()">Print / save as PDF</button></div><div class="page">${html}</div></body></html>`;
+  const url=URL.createObjectURL(new Blob([page],{type:'text/html'}));
+  const w=window.open(url,'_blank');if(!w){toast('Allow pop-ups to print','error');return;}
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
-function covaseHeader(){return `<div class="hdr"><div class="logo">C<span class="teal">Ø</span>VASE</div><div class="co"><div>Woodgreen Farm Barns<br>Mead Lane, Upper Basildon<br>Berkshire, RG8 8NA</div><div>0345 369 7100<br>admin@covase.co.uk</div><div>www.covase.co.uk</div></div></div>`;}
+function covaseHeader(){return `<img class="logo" src="${COVASE_LOGO_URL}" alt="Covase"><div class="co"><div>Woodgreen Farm Barns<br>Mead Lane, Upper Basildon<br>Berkshire, RG8 8NA</div><div>0345 369 7100<br>admin@covase.co.uk</div><div>www.covase.co.uk</div></div>`;}
 const COVASE_FOOTER='<div class="foot">VAT No: 866 3107 19 | Registered in England + Wales: 5569777 | Covase Ltd. is a credit broker, not a lender and is a member of the BVRLA (membership number 2181).</div>';
 function ownerEmail(owner){const p=String(owner||'Simon Homer').trim().toLowerCase().split(/\s+/);return p.length>1?p[0]+'.'+p[p.length-1]+'@covase.co.uk':'admin@covase.co.uk';}
 function printQuotation(id){
   const q=allQuotes.find(x=>x.id===id);if(!q)return;const o=allOrders.find(x=>x.id===q.order_id)||{};const s=leaseSums(q);
   const ppm=q.excess_mileage_ppm!=null?'£'+lsNum(q.excess_mileage_ppm).toFixed(4):'—';
-  const html=`<div class="wrap"><div class="side">Quotation</div>${covaseHeader()}
+  const html=`<div class="side">Quotation</div>${covaseHeader()}
   <div class="grid"><table class="kv"><tr><td>Client</td><td>${esc(conName(o.driver_contact_id)||'—')}</td></tr><tr><td>Company</td><td>${esc(accName(o.account_id)||'—')}</td></tr>
     <tr><td>Contract</td><td>${esc(q.term_months||'—')} month<br>${esc(q.contract_type||'')}${q.contract_type?'<br>':''}${esc(q.funding_method||'')}<br>${q.annual_mileage?Number(q.annual_mileage).toLocaleString('en-GB'):'—'} miles p/a</td></tr>
     <tr><td>Payments</td><td>${esc(q.payment_profile||'—')} monthly payments<br>${esc(q.vat_type||'excluding VAT')}</td></tr></table>
     <table class="kv"><tr><td>Prepared by</td><td>${esc(o.owner||'Simon Homer')}</td></tr><tr><td>Call</td><td>0345 369 7100</td></tr><tr><td>Email</td><td>${esc(ownerEmail(o.owner))}</td></tr></table>
     <div class="box">Quotation<br>${esc(q.quote_no)}<small>${esc(new Date(q.quote_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div></div>
   <table class="v"><tr><th>VEHICLE DETAILS</th><th class="r">FINANCE<br>RENTAL</th><th class="r">SERVICE<br>RENTAL</th><th class="r">TOTAL<br>RENTAL</th><th class="r">P11D<br>VALUE</th><th class="r">CO₂</th><th class="r">EXCESS<br>MILEAGE</th></tr>
-    <tr><td>${esc(vehicleTitle(q))}${q.exterior_colour||q.interior_trim?`<ul style="margin:2px 0 0 18px;font-size:14px"><li>${esc([q.exterior_colour,q.interior_trim].filter(Boolean).join(' with '))}</li></ul>`:''}</td><td class="r">${lsMoney(q.finance_rental)}</td><td class="r">${lsMoney(q.service_rental)}</td><td class="r">${lsMoney(s.total)}</td><td class="r">${lsMoney(q.p11d_value)}</td><td class="r">${esc(String(q.co2_emissions??'—'))}</td><td class="r">${ppm}<br>ppm*</td></tr></table>
+    <tr><td>${esc(vehicleTitle(q))}${q.exterior_colour||q.interior_trim?`<ul><li>${esc([q.exterior_colour,q.interior_trim].filter(Boolean).join(' with '))}</li></ul>`:''}</td><td class="r">${lsMoney(q.finance_rental)}</td><td class="r">${lsMoney(q.service_rental)}</td><td class="r">${lsMoney(s.total)}</td><td class="r">${lsMoney(q.p11d_value)}</td><td class="r">${esc(String(q.co2_emissions??'—'))}</td><td class="r">${ppm}<br>ppm*</td></tr></table>
   ${lsNum(q.setup_fee)?`<p>At the point the contract is raised prior to delivery, a set-up fee of ${lsMoney(q.setup_fee)} (+VAT) will be invoiced.</p>`:''}
   ${lsNum(q.management_fee)?`<p>When the vehicle is delivered, a rolling ${lsMoney(q.management_fee)} (+VAT) per month, fleet management charge will commence.</p>`:''}
   <p><strong>To place an order</strong> for this vehicle based on the above figures please return a signed/scanned copy of this quotation to admin@covase.co.uk</p>
   <div class="grid" style="align-items:stretch"><div class="small" style="flex:1">This quotation is in respect of a qualifying car under 7 (2) of the VAT (input tax) order 1992 (as amended). Hirers should independently clarify their VAT position in respect of any restrictions which may be applicable. This quotation is valid for a period of 28 days and is not an offer to enter into a legally binding contract. Acceptance is subject to final credit approval which will be at our sole discretion and to you completing all documents required in connection with this transaction. Where applicable our quotes reflect manufacturer's support. E &amp; O E. * ppm = pence per mile.</div>
-  <div class="sig" style="flex:1">Name<br>Date<br><br>Signature</div></div>${COVASE_FOOTER}</div>`;
+  <div class="sig" style="flex:1">Name<br>Date<br><br>Signature</div></div>${COVASE_FOOTER}`;
   lsPrint(html,q.quote_no+' quotation');
 }
 

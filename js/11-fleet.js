@@ -308,14 +308,14 @@ async function poSetStatus(id,status){
 function printPo(id){
   const p=vrData.pos.find(x=>x.id===id);if(!p){toast('PO not loaded yet — try again','error');return;}
   const nl=s=>esc(s||'').replace(/\n/g,'<br>');
-  const html=`${covaseHeader()}<div style="display:flex;gap:30px;margin:26px 0 18px;align-items:flex-start"><div style="font-size:26px;line-height:1.1">Purchase Order<br><span class="teal" style="font-size:18px">Dealer</span></div>
-    <div style="flex:1;font-size:16px"><span class="teal">Order prepared for</span><br><strong>${esc(accName(p.dealer_account_id)||'Dealer')}</strong></div>
+  const html=`${covaseHeader()}<div class="grid"><div style="font-family:var(--netto);font-size:20pt;line-height:1.15">Purchase Order<br><span class="teal" style="font-size:14pt">Dealer</span></div>
+    <div style="flex:1"><span class="teal">Order prepared for</span><br><strong>${esc(accName(p.dealer_account_id)||'Dealer')}</strong></div>
     <div class="box">${esc(p.po_number)}<small>${esc(new Date(p.po_date||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}))}</small></div></div>
   <table class="v"><tr><th>VEHICLE DETAILS</th><th class="r">TOTAL OTR</th><th class="r">REFERENCE</th></tr>
-    <tr><td><strong>${esc(p.vehicle_description||'')}</strong><br>${nl(p.extras)}</td><td class="r">${lsMoney(p.otr)}<br><span style="font-size:12px">(incl. VAT &amp; RFL)</span></td><td class="r">${esc(p.dealer_quote_ref||'')}${p.dealer_quote_date?'<br>'+esc(fmtUK(p.dealer_quote_date)):''}</td></tr></table>
-  <table class="v" style="margin-top:18px"><tr><th>REGISTRATION ADDRESS*</th><th>INVOICE ADDRESS**</th><th>DELIVERY DETAILS</th><th>DELIVERY DATE</th></tr>
+    <tr><td><strong>${esc(p.vehicle_description||'')}</strong><br>${nl(p.extras)}</td><td class="r">${lsMoney(p.otr)}<br><span style="font-size:8pt">(incl. VAT &amp; RFL)</span></td><td class="r">${esc(p.dealer_quote_ref||'')}${p.dealer_quote_date?'<br>'+esc(fmtUK(p.dealer_quote_date)):''}</td></tr></table>
+  <table class="v left" style="margin-top:6mm"><tr><th>REGISTRATION ADDRESS*</th><th>INVOICE ADDRESS**</th><th>DELIVERY DETAILS</th><th>DELIVERY DATE</th></tr>
     <tr><td>${nl(p.registration_address)||'—'}</td><td>${nl(p.invoice_address)||'—'}</td><td>${nl([p.delivery_contact,p.delivery_address].filter(Boolean).join('\n'))}</td><td>Please advise an expected delivery date${p.required_not_before?'<br><br>Required no sooner than<br>'+esc(fmtUK(p.required_not_before)):''}</td></tr></table>
-  <div class="grid" style="align-items:stretch"><div style="flex:1;font-size:14px"><p>To accept/confirm this order please return a signed/scanned copy of this PO to admin@covase.co.uk</p><p class="small">* Please provide a copy of the AFRL certificate to confirm the above registration address<br><br>**Please send all invoices to Covase, Woodgreen Farm Barns, Mead Lane, Upper Basildon, Berkshire, RG8 8NA</p></div>
+  <div class="grid" style="align-items:stretch;margin-top:8mm"><div style="flex:1"><p>To accept/confirm this order please return a signed/scanned copy of this PO to admin@covase.co.uk</p><p class="small">* Please provide a copy of the AFRL certificate to confirm the above registration address<br><br>**Please send all invoices to Covase, Woodgreen Farm Barns, Mead Lane, Upper Basildon, Berkshire, RG8 8NA</p></div>
   <div class="sig" style="flex:1">Name<br>Projected build date (if applicable)<br>Estimated delivery date<br>Today's date<br>Signature</div></div>${COVASE_FOOTER}`;
   lsPrint(html,p.po_number);
 }
