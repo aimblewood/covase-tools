@@ -639,3 +639,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .ls-bar{background:var(--n50);border-radius:4px;height:8px;overflow:hidden}.ls-bar span{display:block;height:100%;background:var(--covase)}
 @media (max-width:1024px){.ls-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:700px){.ls-grid{grid-template-columns:1fr}.ls-dash{grid-template-columns:1fr}.ls-step{flex-basis:44%}.ls-table{font-size:11px}}
+/* worksheet reader: per-field "use" tick on a quote read from a funder worksheet */
+.qf-lab{display:flex;align-items:center;gap:6px}
+.qf-use-wrap{margin-left:auto;font-size:10px;font-weight:600;color:var(--n500);display:inline-flex;align-items:center;gap:3px;cursor:pointer;text-transform:none;letter-spacing:0}
+.qf-use-wrap input{width:auto;margin:0}
+.qf-skipped{opacity:.55}
