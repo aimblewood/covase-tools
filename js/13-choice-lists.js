@@ -13,7 +13,10 @@
 // ── Defaults (tax tables copied from the Stihl WLC workbook, Aug 2026) ──
 const CL_RANGE_BANDS=[['130+',130],['70-129',70],['40-69',40],['30-39',30],['<30',0]];
 const CL_DEFAULT_SETTINGS={
-  petrol_litre:1.58,diesel_litre:1.91,elec_kwh:0.2467,
+  petrol_litre:1.58,diesel_litre:1.91,elec_kwh:0.2467,fuel_as_of:'',elec_as_of:'',
+  // Battery sizes for cars whose description doesn't print one (Tesla). Used only when
+  // neither the file nor the description gives a size; every word must appear.
+  battery_rules:[{match:'Tesla Model 3 RWD',kwh:65},{match:'Tesla Model Y RWD',kwh:65},{match:'Tesla Model Y Long Range',kwh:85},{match:'Tesla Model Y Performance',kwh:85}],
   ni_rate:0.15,diesel_supplement:0.04,vat_rate:0.2,vat_unrecoverable_share:0.5,lrr_share:0.15,
   bik:{
     post:{years:['2021/22','2022/23','2023/24','2024/25','2025/26','2026/27','2027/28','2028/29','2029/30'],
@@ -158,6 +161,30 @@ function clPlanCount(plan,term){
 }
 function clProfileCount(p,term){if(!p||p.profile_type==='ratebook'||!term)return null;const n=Math.max(1,parseInt(p.profile_upfront)||1);return p.profile_type==='terminal'?term:n+term-1;}
 function clProfileLabel(p,term){if(!p||p.profile_type==='ratebook')return 'as the ratebook';const n=Math.max(1,parseInt(p.profile_upfront)||1);return p.profile_type==='terminal'?`${n}+${term-n} terminal pause`:`${n}+${term-1} spread`;}
+// Battery size from the rules: the rule with the most words wins; two equally specific
+// rules that disagree means no answer (flagged, not guessed).
+function clBatteryRule(v){
+  const toks=new Set(clWords(v.make+' '+v.desc));
+  const hits=(clSettings.battery_rules||[]).filter(r=>r.kwh>0&&clWords(r.match).length&&clWords(r.match).every(w=>toks.has(w)));
+  if(!hits.length)return null;
+  const top=Math.max(...hits.map(r=>clWords(r.match).length)),best=hits.filter(r=>clWords(r.match).length===top);
+  return new Set(best.map(r=>r.kwh)).size===1?{kwh:best[0].kwh,match:best[0].match}:{clash:best.map(r=>r.match)};
+}
+function clWords(s){return String(s||'').toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean);}
+// What a mile costs in petrol vs electricity: £ per gallon of petrol ÷ £ per kWh.
+// Multiply a car's miles per kWh by it to get a cost-equivalent MPG ("MPGe") that
+// drops into a petrol-style fuel economy column and gives the same fuel cost.
+function clMpgeFactor(){const S=clSettings;return S.elec_kwh>0?S.petrol_litre*4.54609/S.elec_kwh:null;}
+// Stale prices: fuel older than 7 days; electricity older than the start of the current
+// Ofgem price-cap quarter (1 Jan / Apr / Jul / Oct).
+function clPriceWarnings(){
+  const S=clSettings,now=new Date(),w=[];
+  const fd=clDate(S.fuel_as_of),ed=clDate(S.elec_as_of);
+  const q=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
+  if(!fd)w.push('fuel prices have no “as of” date');else if((now-fd)/864e5>7)w.push('fuel prices are from '+fmtUK(S.fuel_as_of)+' — more than a week old');
+  if(!ed)w.push('the electricity price has no “as of” date');else if(ed<q)w.push('the electricity price is from '+fmtUK(S.elec_as_of)+', before the current price-cap quarter began on '+fmtUK(clIso(q)));
+  return w;
+}
 function clCalc(v,p){
   const S=clSettings,out={v,flags:[],data:[]};
   // Re-profile the rentals, then spread commission over the client's payments (finance only)
@@ -188,8 +215,10 @@ function clCalc(v,p){
   // Fuel / energy per month
   const miles=p.mileage||v.mileage||0;
   if(v.fuel==='electric'){
-    if(v.ev_range&&v.battery){out.mpu=v.ev_range/v.battery*(p.ev_range_factor||1);out.fuelPm=miles/out.mpu*S.elec_kwh/12;}
-    else{out.fuelPm=null;out.flags.push('no '+(v.battery?'electric range':'battery size')+' — energy cost unknown');}
+    out.battery=v.battery;out.batterySrc=v.battery?'file':'';
+    if(!v.battery){const b=clBatteryRule(v);if(b&&b.kwh){out.battery=b.kwh;out.batterySrc='rule: '+b.match;}else if(b&&b.clash)out.flags.push('battery size rules disagree ('+b.clash.join(' / ')+')');}
+    if(v.ev_range&&out.battery){out.mpu=v.ev_range/out.battery*(p.ev_range_factor||1);out.fuelPm=miles/out.mpu*S.elec_kwh/12;out.mpge=out.mpu*clMpgeFactor();}
+    else{out.fuelPm=null;out.flags.push('no '+(out.battery?'electric range':'battery size')+' — energy cost unknown');}
   }else{
     const mpg=v.mpg?v.mpg*(v.fuel==='phev'?(p.phev_mpg_factor||1):1):null;out.mpu=mpg;
     if(mpg){out.fuelPm=miles/mpg*(v.diesel?S.diesel_litre:S.petrol_litre)*4.54609/12;}else{out.fuelPm=null;out.flags.push('no MPG — fuel cost unknown');}
@@ -287,6 +316,7 @@ function clRender(){
     +(Object.keys(reasons).length?'<br><span style="color:var(--n400)">Left off: '+Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>esc(k)+' ('+n+')').join(' · ')+'</span>':'')
     +(p&&(p.profile_type!=='ratebook'||p.commission>0)?`<br>Rentals shown on a <strong>${esc(clProfileLabel(p,want[0]))}</strong> profile`+(p.commission>0?` including ${lsMoney(p.commission)} commission (${lsMoney(p.commission/(clProfileCount(p,want[0])||clResults.map(r=>r.payments).find(Boolean)||1))} a month on the finance rental)`:''):'')
     +(clResults.some(r=>r.niAssumed)?'<br><span style="color:var(--n400)">The term runs past the last tax year in the tables, so employer\'s NI for the later years uses that year\'s rates.</span>':'')
+    +(clPriceWarnings().length?'<br><span style="color:#c0392b">⚠ Check prices in ⚙ Tax tables: '+clPriceWarnings().map(esc).join('; ')+'</span>':'')
     +(clImportNotes.length?'<br><span style="color:var(--n400)">'+clImportNotes.map(esc).join('<br>')+'</span>':'');
   clRenderTable();
 }
@@ -302,6 +332,7 @@ function clCols(){
     {key:'fuel',label:'Fuel',get:r=>r.v.fuel_raw},
     {key:'co2',label:'CO₂',num:1,get:r=>r.v.co2},
     {key:'range',label:'Range',num:1,get:r=>r.v.ev_range},
+    {key:'mpg',label:'MPG / MPGe',num:1,get:r=>r.v.fuel==='electric'?r.mpge:r.mpu,fmt:x=>x==null?'—':(Math.round(x*10)/10).toFixed(1)},
     {key:'p11d',label:'P11D',num:1,get:r=>r.v.p11d,fmt:money},
     {key:'finance',label:'Finance',num:1,get:r=>r.finance,fmt:money},
     {key:'service',label:'Service',num:1,get:r=>r.service,fmt:money},
@@ -362,8 +393,8 @@ function clNeedRows(){if(!clRows.length){toast('Import a ratebook first','error'
 async function clExportWorking(){
   if(!clNeedRows())return;await loadSheetJS();
   const yrs=clResults[0].years.map(y=>y.year);const r2=x=>x==null?null:Math.round(x*100)/100;
-  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','P11D','Term','Mileage','Ratebook payment plan','Ratebook finance','Ratebook service','Payments','Commission / month','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Reasons / notes']];
-  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,v.battery,v.p11d,v.term,v.mileage,v.plan,v.finance,v.service,r.payments,r2(r.commissionPm),r2(r.finance),r2(r.service),r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',[...r.why,...r.flags].join('; ')]);});
+  const aoa=[['Make','Model','Variant','CAP code','Fuel','CO2','Electric range','Battery kWh','Battery size from','Miles per kWh','MPG used / MPGe (cost-equivalent)','P11D','Term','Mileage','Ratebook payment plan','Ratebook finance','Ratebook service','Payments','Commission / month','Finance rental','Service rental','Irrecoverable VAT','Lease rental restriction','Employer NI','Fuel / energy','Insurance','WLC per month','WLC excl fuel','WLC over term',...yrs.map(y=>'BIK '+y),'BIK value (yr 1)','Tax 20% / month','Tax 40% / month','Grade','On list','Reasons / notes']];
+  clResults.forEach(r=>{const v=r.v;aoa.push([v.make,v.model,v.variant||v.desc,v.cap,v.fuel_raw,v.co2,v.ev_range,r.battery??null,r.batterySrc||'',v.fuel==='electric'&&r.mpu?Math.round(r.mpu*100)/100:null,(v.fuel==='electric'?r.mpge:r.mpu)==null?null:Math.round((v.fuel==='electric'?r.mpge:r.mpu)*10)/10,v.p11d,v.term,v.mileage,v.plan,v.finance,v.service,r.payments,r2(r.commissionPm),r2(r.finance),r2(r.service),r2(r.vatLost),r2(r.lrr),r2(r.ni),r2(r.fuelPm),r.insurance,r2(r.wlc),r2(r.wlcNoFuel),r2(r.wlcTerm),...r.years.map(y=>y.rate),r2(r.bikValue),r2(r.bikValue==null?null:r.bikValue*0.2/12),r2(r.bikValue==null?null:r.bikValue*0.4/12),r.grade?r.grade.name:'',r.ok?'Yes':'No',[...r.why,...r.flags].join('; ')]);});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'WLC');
   const p=clPolicy();XLSX.writeFile(wb,'WLC-'+((p&&p.name)||'ratebook').replace(/[^\w-]+/g,'_')+'-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
@@ -484,7 +515,16 @@ function clRenderSettings(){
   const S=clSettings,f=(id,label,val,pct)=>`<div class="form-field"><label>${label}</label><input id="${id}" type="number" step="0.0001" value="${pct?Math.round(val*10000)/100:val}"></div>`;
   document.getElementById('cls-body').innerHTML=`
     <div class="form-section-label">Fuel and energy</div>
-    <div class="form-row trio">${f('cls-pet','Petrol £ per litre',S.petrol_litre)}${f('cls-die','Diesel £ per litre',S.diesel_litre)}${f('cls-ele','Electricity £ per kWh',S.elec_kwh)}</div>
+    <div class="form-row quad">${f('cls-pet','Petrol £ per litre',S.petrol_litre)}${f('cls-die','Diesel £ per litre',S.diesel_litre)}<div class="form-field"><label>Fuel prices as of</label><input id="cls-fasof" type="date" value="${esc(S.fuel_as_of||'')}"></div>
+      <div class="form-field"><label>&nbsp;</label><a class="btn" href="https://www.rac.co.uk/drive/advice/fuel-watch/" target="_blank" rel="noopener">RAC Fuel Watch ↗</a></div></div>
+    <div class="form-row quad">${f('cls-ele','Electricity £ per kWh (UK average)',S.elec_kwh)}<div class="form-field"><label>Electricity price as of</label><input id="cls-easof" type="date" value="${esc(S.elec_as_of||'')}"></div>
+      <div class="form-field"><label>&nbsp;</label><a class="btn" href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap" target="_blank" rel="noopener">Ofgem price cap ↗</a></div>
+      <div class="form-field"><label>Petrol ↔ electricity factor (worked out)</label><input id="cls-factor" value="${clMpgeFactor()?clMpgeFactor().toFixed(2):''}" readonly title="£ per gallon of petrol ÷ £ per kWh"></div></div>
+    <div style="font-size:12px;color:var(--n500);margin:-4px 0 8px">Electric running costs use the electricity price directly. The factor is only used to show an MPGe (cost-equivalent MPG) for electric cars, and updates itself when you change a price — no tuning needed. A warning shows on the choice list when fuel prices are over a week old or the electricity price is from before the current price-cap quarter.</div>
+    <div class="form-section-label">Battery sizes the description doesn't give</div>
+    <div style="font-size:12px;color:var(--n500);margin-bottom:6px">Used only when the file and the description have no kWh figure. Every word must appear in the make and description; the most specific match wins.</div>
+    <table class="ls-table" id="cls-batt"><tr><th>Description contains</th><th>Battery kWh</th><th></th></tr>${(S.battery_rules||[]).map((r,i)=>`<tr><td><input data-bm="${i}" value="${esc(r.match)}" style="width:100%"></td><td><input data-bk="${i}" type="number" step="0.1" value="${esc(String(r.kwh??''))}" style="width:90px"></td><td><button class="btn btn-danger" onclick="clBattRow(${i})">✗</button></td></tr>`).join('')}</table>
+    <button class="btn" onclick="clBattRow(-1)">+ Add battery size</button>
     <div class="form-section-label">Rates</div>
     <div class="form-row quad">${f('cls-ni','Employer\'s NI (Class 1A) %',S.ni_rate,1)}${f('cls-ds','Diesel supplement % (not RDE2)',S.diesel_supplement,1)}${f('cls-vat','VAT %',S.vat_rate,1)}${f('cls-vu','Share of finance VAT not reclaimable %',S.vat_unrecoverable_share,1)}</div>
     <div class="form-row quad">${f('cls-lrr','Lease rental restriction %',S.lrr_share,1)}</div>
@@ -492,14 +532,17 @@ function clRenderSettings(){
     <div style="font-size:12px;color:var(--n500);margin-bottom:6px">Check against HMRC after each Budget. 1–50 g/km cars use the electric-range rows; above 50 g/km the CO₂ rows apply whatever the range. The highest CO₂ rate each year is the cap, diesel supplement included.</div>
     ${clTableGrid('post')}
     <div class="form-section-label" style="margin-top:12px">Cars registered before 6 April 2020</div>${clTableGrid('pre')}`;
+  ['cls-pet','cls-ele'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{const pt=clN(document.getElementById('cls-pet').value),el=clN(document.getElementById('cls-ele').value);document.getElementById('cls-factor').value=pt&&el?(pt*4.54609/el).toFixed(2):'';}));
 }
 function clReadSettings(){
   const n=id=>clN(document.getElementById(id).value),S=clSettings;
-  Object.assign(S,{petrol_litre:n('cls-pet'),diesel_litre:n('cls-die'),elec_kwh:n('cls-ele'),ni_rate:n('cls-ni')/100,diesel_supplement:n('cls-ds')/100,vat_rate:n('cls-vat')/100,vat_unrecoverable_share:n('cls-vu')/100,lrr_share:n('cls-lrr')/100});
+  Object.assign(S,{petrol_litre:n('cls-pet'),diesel_litre:n('cls-die'),elec_kwh:n('cls-ele'),ni_rate:n('cls-ni')/100,diesel_supplement:n('cls-ds')/100,vat_rate:n('cls-vat')/100,vat_unrecoverable_share:n('cls-vu')/100,lrr_share:n('cls-lrr')/100,fuel_as_of:document.getElementById('cls-fasof').value,elec_as_of:document.getElementById('cls-easof').value});
+  S.battery_rules=[...document.querySelectorAll('#cls-batt [data-bm]')].map(i=>({match:i.value.trim(),kwh:clN(document.querySelector(`#cls-batt [data-bk="${i.dataset.bm}"]`).value)})).filter(r=>r.match||r.kwh);
   document.querySelectorAll('#cls-body [data-year]').forEach(i=>{S.bik[i.dataset.bik].years[+i.dataset.year]=i.value.trim();});
   document.querySelectorAll('#cls-body [data-path]').forEach(i=>{const t=S.bik[i.dataset.bik],p=i.dataset.path.split('.');const v=clN(i.value);const val=v==null?null:v/100;
     if(p[0]==='zero')t.zero[+p[1]]=val;else if(p[0]==='range')t.range[p[1]][+p[2]]=val;else t.co2[+p[1]][+p[2]]=val;});
 }
+function clBattRow(i){clReadSettings();clSettings.battery_rules=clSettings.battery_rules||[];if(i<0)clSettings.battery_rules.push({match:'',kwh:null});else clSettings.battery_rules.splice(i,1);clRenderSettings();}
 function clAddYear(which){
   clReadSettings();const t=clSettings.bik[which],last=t.years[t.years.length-1],y=parseInt(last)+1;
   t.years.push(y+'/'+String(y+1).slice(2));t.zero.push(t.zero[t.zero.length-1]);Object.values(t.range).forEach(a=>a.push(a[a.length-1]));t.co2.forEach(r=>r.push(r[r.length-1]));
@@ -508,6 +551,7 @@ function clAddYear(which){
 async function clSaveSettings(){
   clReadSettings();
   if(['petrol_litre','diesel_litre','elec_kwh','ni_rate'].some(k=>!(clSettings[k]>0))){toast('Fuel prices and the NI rate must be filled in','error');return;}
+  if((clSettings.battery_rules||[]).some(r=>!r.match||!(r.kwh>0))){toast('Each battery size needs wording and a kWh figure','error');return;}
   try{await clSaveConfig('wlc_settings',clSettings);toast('Saved','success');document.getElementById('cl-settings-modal').classList.remove('open');clRender();}catch(e){toast('Save failed: '+e.message,'error');}
 }
 
