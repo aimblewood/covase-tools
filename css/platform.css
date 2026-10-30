@@ -42,6 +42,38 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .sb-divider{border-top:1px solid rgba(255,255,255,.06);margin:8px 0}
 .sb-config-toggle{padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.28);cursor:pointer;display:flex;align-items:center;gap:6px;transition:color .15s;}
 .sb-config-toggle:hover{color:rgba(255,255,255,.5)}
+/* Collapsible sidebar (desktop): « in the logo row or the [ key shrinks it to an icon rail.
+   Labels are hidden with font-size:0 so static and organiser-rendered items both work;
+   names come back as a floating tooltip (.sb-tip, fixed — the sidebar's overflow would clip a pseudo-element). */
+.sb-logo{position:relative}
+.sb-collapse{position:absolute;top:8px;right:8px;width:24px;height:24px;border:none;border-radius:6px;background:transparent;color:rgba(255,255,255,.3);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.sb-collapse:hover{background:rgba(255,255,255,.08);color:#fff}
+.sb-tip{position:fixed;z-index:400;pointer-events:none;background:#1b1a40;color:#fff;font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25);opacity:0;transform:translateX(-4px);transition:opacity .12s,transform .12s;font-family:var(--font-body)}
+.sb-tip.show{opacity:1;transform:none}
+.sb-tip::before{content:'';position:absolute;left:-5px;top:50%;margin-top:-5px;border:5px solid transparent;border-left:0;border-right-color:#1b1a40}
+.sb-tip .n{margin-left:8px;background:var(--covase);color:var(--indigo);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+@media(min-width:1025px){
+  .sidebar,.main{transition:width .18s ease,margin-left .18s ease}
+  body.sb-collapsed{--sidebar-w:68px}
+  body.sb-collapsed .sidebar{overflow-x:hidden;scrollbar-width:none}
+  body.sb-collapsed .sidebar::-webkit-scrollbar{display:none}
+  body.sb-collapsed .sb-logo{flex-direction:column;padding:16px 0 10px;gap:6px}
+  body.sb-collapsed .sb-logo-text,body.sb-collapsed .sb-logo>img{display:none}
+  body.sb-collapsed .sb-collapse{position:static;transform:scaleX(-1)}
+  body.sb-collapsed .sb-section-label{display:none}
+  body.sb-collapsed .sb-section{margin:0}
+  body.sb-collapsed .sb-item,body.sb-collapsed .sb-config-toggle{position:relative;justify-content:center;font-size:0;gap:0;padding:10px 0;margin:2px 10px}
+  body.sb-collapsed .sb-config-toggle{margin:0;padding:12px 0}
+  body.sb-collapsed .sb-item .icon,body.sb-collapsed .sb-config-toggle .icon{font-size:16px;width:auto}
+  body.sb-collapsed .sb-label{display:none}
+  body.sb-collapsed .sb-badge{position:absolute;top:3px;right:3px;font-size:9px;padding:1px 5px;line-height:1.3;min-width:15px;text-align:center}
+  body.sb-collapsed .sb-badge[data-zero]{display:none}
+  body.sb-collapsed .sb-new-btn{display:block;width:calc(100% - 20px);margin:6px 10px 2px;padding:7px 0;text-align:center;font-size:0}
+  body.sb-collapsed .sb-new-btn::first-letter{font-size:16px}
+  body.sb-collapsed #rt-live{font-size:0;padding:6px 0;text-align:center}
+  body.sb-collapsed #rt-live::first-letter{font-size:12px}
+  body.sb-collapsed .sb-config-panel{display:none}
+}
 .sb-config-panel{display:none;padding:12px 16px 16px;background:rgba(0,0,0,.15);border-top:1px solid rgba(255,255,255,.06)}
 .sb-config-panel.open{display:block}
 .sb-config-panel label{display:block;font-size:10px;color:rgba(255,255,255,.28);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
@@ -533,6 +565,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 
 @media(max-width:1024px){
   .nav-toggle{display:flex}
+  .sb-collapse{display:none}
   .nav-scrim{display:block}
   body.nav-open .nav-scrim{opacity:1;pointer-events:auto}
   .sidebar{width:min(var(--sidebar-w),84vw);height:100dvh;transform:translateX(-100%);transition:transform .22s ease;will-change:transform;}
