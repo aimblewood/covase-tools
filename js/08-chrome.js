@@ -509,6 +509,66 @@ function initResponsiveNav(){
   if(window.matchMedia) window.matchMedia('(max-width:1024px)').addEventListener('change', ev=>{ if(!ev.matches) setNav(false); });
 }
 
+// ── Collapsible sidebar (desktop) ───────────────────────────────────
+// Per machine (localStorage), like the other display conveniences. Below 1024px
+// the CSS ignores the class and the off-canvas drawer is used as before.
+const SB_COLLAPSE_KEY='covase_sb_collapsed';
+function setSbCollapsed(on){
+  document.body.classList.toggle('sb-collapsed',!!on);
+  const b=document.querySelector('.sb-collapse');
+  if(b){const t=on?'Expand sidebar':'Collapse sidebar';b.setAttribute('aria-label',t);b.title=t+'  ( [ )';}
+  try{localStorage.setItem(SB_COLLAPSE_KEY,on?'1':'0');}catch(e){}
+  sbHideTip();
+}
+function toggleSbCollapse(){ setSbCollapsed(!document.body.classList.contains('sb-collapsed')); }
+// Settings and the organiser need the full width — open it out first
+function sbExpand(){ if(document.body.classList.contains('sb-collapsed')) setSbCollapsed(false); }
+
+function sbTipText(el){
+  if(el.id==='rt-live') return el.textContent.replace(/^[●○]\s*/,'');
+  let t='';
+  el.childNodes.forEach(n=>{ if(!(n.classList&&(n.classList.contains('icon')||n.classList.contains('sb-badge')))) t+=n.textContent; });
+  return t.trim();
+}
+function sbHideTip(){ const t=document.querySelector('.sb-tip'); if(t) t.classList.remove('show'); }
+function sbShowTip(el){
+  let tip=document.querySelector('.sb-tip');
+  if(!tip){ tip=document.createElement('div'); tip.className='sb-tip'; document.body.appendChild(tip); }
+  const badge=el.querySelector('.sb-badge'), n=badge?badge.textContent.trim():'';
+  tip.innerHTML=esc(sbTipText(el))+(el.classList.contains('disabled')?' <span style="opacity:.55;font-weight:500">· coming soon</span>':'')
+    +(n&&n!=='0'&&n!=='—'?'<span class="n">'+esc(n)+'</span>':'');
+  const r=el.getBoundingClientRect(), sr=document.querySelector('.sidebar').getBoundingClientRect();
+  tip.style.left=(sr.right+8)+'px';
+  tip.style.top=(r.top+r.height/2-tip.offsetHeight/2)+'px';
+  tip.classList.add('show');
+}
+
+function initSbCollapse(){
+  let on=false; try{on=localStorage.getItem(SB_COLLAPSE_KEY)==='1';}catch(e){}
+  setSbCollapsed(on);
+  const sb=document.querySelector('.sidebar'); if(!sb) return;
+  // Delegated — the organiser re-renders the nav
+  const TIP='.sb-item,.sb-new-btn,.sb-config-toggle,#rt-live';
+  sb.addEventListener('mouseover',e=>{
+    if(!document.body.classList.contains('sb-collapsed')) return;
+    const el=e.target.closest(TIP); if(el) sbShowTip(el); else sbHideTip();
+  });
+  sb.addEventListener('mouseleave',sbHideTip);
+  sb.addEventListener('scroll',sbHideTip,{passive:true});
+  // Zero / empty badges would be noise on the rail; flag them so CSS can hide them there
+  const nav=sb.querySelector('.sb-nav');
+  const markZero=()=>nav.querySelectorAll('.sb-badge').forEach(b=>{const v=b.textContent.trim();b.toggleAttribute('data-zero',v===''||v==='0'||v==='—');});
+  if(nav){ markZero(); new MutationObserver(markZero).observe(nav,{subtree:true,childList:true,characterData:true}); }
+  // [ toggles, unless typing
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='['||e.ctrlKey||e.metaKey||e.altKey) return;
+    const a=document.activeElement;
+    if(a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+    if(document.querySelector('.modal-overlay.open')) return;
+    e.preventDefault(); toggleSbCollapse();
+  });
+}
+
 // ── Tap-to-move sheet (replaces drag on touch) ──────────────────────
 let tapMoveCtx=null;
 
@@ -562,3 +622,4 @@ async function tapMoveApply(status){
 
 // Mobile/tablet chrome: hamburger + off-canvas sidebar + tap-to-move
 initResponsiveNav();
+initSbCollapse();
