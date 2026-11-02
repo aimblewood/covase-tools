@@ -6,6 +6,17 @@ const DEFAULT_N8N_SUPPLIER='https://covase.app.n8n.cloud/webhook/covase-supplier
 const DEFAULT_N8N_MANUAL_REPLY='https://covase.app.n8n.cloud/webhook/covase-supplier-manual-reply';
 const DEFAULT_N8N_REPLY_CHECK='https://covase.app.n8n.cloud/webhook/covase-supplier-reply-check';
 const D365_HOST='https://covase.crm11.dynamics.com';
+// Every search box on every screen goes through this. Two rules: each word
+// typed must appear somewhere in the record, in any order, so "trust wood"
+// finds The Woodland Trust; and a second pass with the spaces taken out, so
+// "AB12 CDE" still finds AB12CDE.
+function searchHit(query,fields){
+  const q=String(query==null?'':query).toLowerCase().trim();
+  if(!q)return true;
+  const hay=fields.map(x=>String(x==null?'':x).toLowerCase()).join(' ');
+  const bare=hay.replace(/\s+/g,'');
+  return q.split(/\s+/).every(w=>hay.indexOf(w)!==-1||bare.indexOf(w)!==-1);
+}
 function getConfig(){return{
   url:localStorage.getItem('covase_sb_url')||'',
   key:localStorage.getItem('covase_sb_key')||'',

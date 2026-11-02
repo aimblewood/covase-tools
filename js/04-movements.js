@@ -45,7 +45,7 @@ function movementRowsFiltered(applyStatus){
   const q=(document.getElementById('movement-search')?.value||'').toLowerCase().trim();
   let rows=(allMovements||[]).slice();
   if(applyStatus&&movementFilter!=='all')rows=rows.filter(m=>m.movement_status===movementFilter);
-  if(q){rows=rows.filter(m=>{const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.supplier,m.driver_name,m.notes].map(x=>String(x||'').toLowerCase()).join(' ');return hay.includes(q);});}
+  if(q)rows=rows.filter(m=>searchHit(q,[m.customer,m.customer_reference,m.job_ref,m.pickup_postcode,m.dropoff_postcode,m.pickup_town,m.dropoff_town,m.vehicle_reg,m.supplier,m.driver_name,m.notes]));
   return rows;
 }
 function applyMovementViewVis(){
@@ -141,13 +141,7 @@ function renderMovements(){
   const q=(document.getElementById('movement-search')?.value||'').toLowerCase().trim();
   let rows=allMovements.slice();
   if(movementFilter!=='all')rows=rows.filter(m=>m.movement_status===movementFilter);
-  if(q){
-    rows=rows.filter(m=>{
-      const hay=[m.customer,m.customer_reference,m.pickup_postcode,m.dropoff_postcode,m.vehicle_reg,m.notes]
-        .map(x=>String(x||'').toLowerCase()).join(' ');
-      return hay.includes(q);
-    });
-  }
+  if(q)rows=rows.filter(m=>searchHit(q,[m.customer,m.customer_reference,m.job_ref,m.pickup_postcode,m.dropoff_postcode,m.pickup_town,m.dropoff_town,m.vehicle_reg,m.supplier,m.driver_name,m.notes]));
   if(!rows.length){
     wrap.innerHTML='<div class="empty-state"><div class="empty-icon">🚛</div><div class="empty-title">No movements</div><div class="empty-sub">Click + New Movement to start.</div></div>';
     return;

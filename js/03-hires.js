@@ -119,15 +119,9 @@ function renderPipeline(){
                  ||(!h.client_account_id&&(h.customer||'')===clientFilter);
       if(!matches)return;
     }
-    if(search){
-      // Strip whitespace from reg too so "AB12 CDE" still matches "AB12CDE"
-      const reg=String(h.vehicle_reg||'').replace(/\s+/g,'').toLowerCase();
-      const ref=String(h.reference||'').toLowerCase();
-      const drv=String(h.driver||'').toLowerCase();
-      const needle=search.replace(/\s+/g,'');
-      const hit=reg.includes(needle)||ref.includes(search)||drv.includes(search);
-      if(!hit)return;
-    }
+    // The client name was missing from this list, so searching "wood" found
+    // nothing for The Woodland Trust even though the cards were showing it.
+    if(!searchHit(search,[h.customer,h.driver,h.vehicle_reg,h.reference,h.job_ref,h.make_model,h.supplier]))return;
     if(h.hire_status==='cancelled'){buckets.cancelled.push(h);return;}
     // Any hire with billing_status='paid' belongs in the Paid column regardless of hire_status
     if(h.billing_status==='paid'){buckets.paid.push(h);return;}

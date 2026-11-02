@@ -106,7 +106,7 @@ function updateOrderStats(){
 function renderOrders(){
   const wrap=document.getElementById('order-kanban');if(!wrap)return;
   const q=(document.getElementById('order-search')?.value||'').toLowerCase();
-  const rows=allOrders.filter(o=>{if(!q)return true;const hq=orderHeadlineQuote(o);return [o.order_ref,o.title,accName(o.account_id),conName(o.driver_contact_id),hq?vehicleTitle(hq):''].join(' ').toLowerCase().includes(q);});
+  const rows=allOrders.filter(o=>{const hq=orderHeadlineQuote(o);return searchHit(q,[o.order_ref,o.title,accName(o.account_id),conName(o.driver_contact_id),hq?vehicleTitle(hq):'']);});
   wrap.innerHTML=ORDER_STAGES.map(([key,label])=>{
     const items=rows.filter(o=>o.stage===key);
     const body=items.length?items.map(orderCard).join(''):'<div class="kan-col-empty">Nothing here</div>';
