@@ -59,7 +59,7 @@ async function loadFleet(){
 function renderFleet(){
   const wrap=document.getElementById('fleet-kanban');if(!wrap)return;
   const q=(document.getElementById('fleet-search')?.value||'').toLowerCase();
-  const rows=(allVehicles||[]).filter(v=>v.status!=='cancelled').filter(v=>!q||[vehicleLabel(v),accName(v.account_id),conName(v.driver_id)].join(' ').toLowerCase().includes(q));
+  const rows=(allVehicles||[]).filter(v=>v.status!=='cancelled').filter(v=>searchHit(q,[vehicleLabel(v),accName(v.account_id),conName(v.driver_id)]));
   const stages=LEASE_STAGES.filter(s=>fleetShowSettled||!['on_fleet','off_hire'].includes(s[0]));
   wrap.style.gridTemplateColumns=`repeat(${stages.length},minmax(200px,1fr))`;
   wrap.innerHTML=stages.map(([key,label])=>{

@@ -51,7 +51,7 @@ function finesFiltered(){
   const st=document.getElementById('fine-status-filter')?.value||'';
   let rows=(allFines||[]).slice();
   if(st)rows=rows.filter(f=>f.status===st);
-  if(q)rows=rows.filter(f=>[f.driver_name,f.vehicle_reg,f.issuer,f.issuer_ref,f.coin_invoice_no,f.location,f.vehicle_desc].map(x=>String(x||'').toLowerCase()).join(' ').includes(q));
+  if(q)rows=rows.filter(f=>searchHit(q,[f.driver_name,f.vehicle_reg,f.issuer,f.issuer_ref,f.coin_invoice_no,f.location,f.vehicle_desc]));
   // Sort: 'received' = created_at (when the fine entered the system, via email
   // intake or COIN import); 'offence' = the contravention date on the notice.
   const sort=document.getElementById('fine-sort')?.value||'received_desc';

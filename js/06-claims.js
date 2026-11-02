@@ -107,7 +107,7 @@ function setClaimView(v){claimView=v;document.querySelectorAll('#claim-view-seg 
 function claimsFiltered(){
   const q=(document.getElementById('claim-search')?.value||'').toLowerCase().trim();
   let rows=(allClaims||[]).slice();
-  if(q)rows=rows.filter(c=>[c.claim_reference,c.vehicle_reg,c.driver_name,c.client_group,c.company,c.vehicle_make,c.vehicle_model,c.insurer_reference,c.repairs_supplier].map(x=>String(x||'').toLowerCase()).join(' ').includes(q));
+  if(q)rows=rows.filter(c=>searchHit(q,[c.claim_reference,c.vehicle_reg,c.driver_name,c.client_group,c.company,c.vehicle_make,c.vehicle_model,c.insurer_reference,c.repairs_supplier]));
   return rows;
 }
 function renderClaimsView(){if(claimView==='dashboard')renderClaimsDashboard();else renderClaimsKanban();}

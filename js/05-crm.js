@@ -42,7 +42,7 @@ function renderAccounts(){
   const q=(document.getElementById('account-search')?.value||'').toLowerCase();
   let accounts=allAccounts;
   if(accountFilter!=='all')accounts=accounts.filter(a=>a.type===accountFilter);
-  if(q)accounts=accounts.filter(a=>(a.company_name||'').toLowerCase().includes(q)||(a.contact_name||'').toLowerCase().includes(q));
+  if(q)accounts=accounts.filter(a=>searchHit(q,[a.company_name,a.contact_name,a.contact_email,a.contact_phone,a.account_manager,a.mha]));
   if(!accounts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">No accounts found</div><div class="empty-sub">Click "+ New Account" to add your first account.</div></div>`;return;}
   el.innerHTML=accounts.map(a=>buildAccountCard(a)).join('');
 }
@@ -138,7 +138,7 @@ function renderContacts(){
   let contacts=allContacts;
   if(contactFilter==='leaver')contacts=contacts.filter(c=>c.employee_status==='leaver');
   else if(contactFilter!=='all')contacts=contacts.filter(c=>c.contact_type===contactFilter);
-  if(q)contacts=contacts.filter(c=>[(c.first_name||''),(c.last_name||''),(c.preferred_name||''),(c.email||''),(c.employee_number||'')].join(' ').toLowerCase().includes(q));
+  if(q)contacts=contacts.filter(c=>searchHit(q,[c.first_name,c.last_name,c.preferred_name,c.email,c.mobile,c.employee_number,c.job_description,contactAccountName(c)]));
   if(!contacts.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No contacts found</div><div class="empty-sub">Click "+ New Contact" to add one.</div></div>`;return;}
   el.innerHTML=contacts.map(c=>buildContactCard(c)).join('');
 }
@@ -255,7 +255,7 @@ function renderVehicles(){
   const q=(document.getElementById('vehicle-search')?.value||'').toLowerCase();
   let vehicles=allVehicles;
   if(vehicleFilter!=='all')vehicles=vehicles.filter(v=>v.status===vehicleFilter);
-  if(q)vehicles=vehicles.filter(v=>[(v.reg||''),(v.manufacturer||''),(v.model||''),(v.derivative||''),(v.name||'')].join(' ').toLowerCase().includes(q));
+  if(q)vehicles=vehicles.filter(v=>searchHit(q,[v.reg,v.manufacturer,v.model,v.derivative,v.name]));
   if(!vehicles.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🚙</div><div class="empty-title">No vehicles found</div><div class="empty-sub">Click "+ New Vehicle" to add one.</div></div>`;return;}
   el.innerHTML=vehicles.map(v=>buildVehicleCard(v)).join('');
 }
