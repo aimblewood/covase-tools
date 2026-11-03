@@ -598,6 +598,24 @@ async function saveHire(){
   // Strip ALL whitespace from reg + uppercase
   const regClean=(document.getElementById('hf-reg').value||'').replace(/\s+/g,'').toUpperCase()||null;
   const payload={customer:account.company_name,client_account_id:accountId,driver:document.getElementById('hf-driver').value.trim()||null,driver_contact_id:document.getElementById('hf-driver-contact-id').value||null,driver_mobile:document.getElementById('hf-mobile').value.trim()||null,reference:document.getElementById('hf-reference').value.trim()||null,hire_status:document.getElementById('hf-hire-status').value,billing_status:document.getElementById('hf-billing').value,delivery_address_line1:document.getElementById('hf-addr1').value.trim()||null,delivery_address_line2:document.getElementById('hf-addr2').value.trim()||null,delivery_town:document.getElementById('hf-town').value.trim()||null,delivery_county:document.getElementById('hf-county').value.trim()||null,delivery_postcode:(document.getElementById('hf-postcode').value||'').trim().toUpperCase()||null,vehicle_reg:regClean,make_model:document.getElementById('hf-makemodel').value.trim()||null,category:document.getElementById('hf-category').value||null,fuel_type:document.getElementById('hf-fuel').value||null,date_of_registration:document.getElementById('hf-reg-date').value||null,p11d_value:parseFloat(document.getElementById('hf-p11d').value)||null,co2_emissions:parseInt(document.getElementById('hf-co2').value,10)||null,engine_cc:parseInt(document.getElementById('hf-engine-cc').value,10)||null,ev_range:parseInt(document.getElementById('hf-ev-range').value,10)||null,supplier:document.getElementById('hf-supplier').value||null,supplier_ref:document.getElementById('hf-supplier-ref').value.trim()||null,start_date:document.getElementById('hf-start').value||null,end_date:document.getElementById('hf-end').value||null,tariff:document.getElementById('hf-tariff').value||null,preferred_start_time:document.getElementById('hf-start-time').value||null,cost_per_day:parseFloat(document.getElementById('hf-cost').value)||null,upsell_per_day:parseFloat(document.getElementById('hf-upsell').value)||null,rft_per_day:document.getElementById('hf-rft').value!==''?(parseFloat(document.getElementById('hf-rft').value)||0):null,vat_status:'full',supplementaries:cleanSupps,incoming_invoice_id:document.getElementById('hf-in-inv').value.trim()||null,outgoing_invoice_id:document.getElementById('hf-out-inv').value.trim()||null,notes:document.getElementById('hf-notes').value.trim()||null,updated_at:new Date().toISOString()};
+  // Re-opening a hire (e.g. Off-hired -> Active): if the end date has passed, or a
+  // booked offhire's collection time has passed, autoAdvanceHireStatuses() would
+  // flip it straight back to Off-hired on the reload below. Ask before saving.
+  if(editHireId&&['booked','active'].includes(payload.hire_status)){
+    const _n=new Date();const _today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+    const _h=(allHires||[]).find(x=>x.id===editHireId)||{};
+    const _ohDue=!!(_h.offhire_requested_at&&_h.collection_date&&new Date(String(_h.collection_date).slice(0,10)+'T'+(_h.collection_time?String(_h.collection_time).slice(0,5):'23:59')).getTime()<=_n.getTime());
+    const _endPast=!!(payload.end_date&&String(payload.end_date).slice(0,10)<_today);
+    if(_ohDue||_endPast){
+      const _why=[];
+      if(_ohDue)_why.push('an offhire was booked for collection on '+fmtUK(_h.collection_date));
+      if(_endPast)_why.push('the end date ('+fmtUK(payload.end_date)+') has already passed');
+      const _msg='This hire will go straight back to Off-hired, because '+_why.join(' and ')+'.\n\nOK — keep it on hire: '+(_ohDue?'cancel the offhire and ':'')+'clear the end date (you can add a new one later).\nCancel — go back and change the end date yourself.';
+      if(!confirm(_msg))return;
+      payload.end_date=null;document.getElementById('hf-end').value='';
+      if(_ohDue)payload.offhire_requested_at=null;
+    }
+  }
   try{
     if(editHireId){await sbReq(`covase_hires?id=eq.${encodeURIComponent(editHireId)}`,{method:'PATCH',body:payload,prefer:'return=minimal'});const idx=allHires.findIndex(x=>x.id===editHireId);if(idx>=0)allHires[idx]={...allHires[idx],...payload};toast('Hire updated','success');}
     else{const res=await sbReq('covase_hires',{method:'POST',body:{...payload,id:'hire-'+Date.now()}});allHires.unshift(Array.isArray(res)?res[0]:res||{...payload,id:'hire-'+Date.now()});toast('Hire saved','success');}
