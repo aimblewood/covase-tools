@@ -224,6 +224,7 @@ const SB_ITEMS={
   'outgoing':{icon:'↑',label:'Outgoing invoices',view:'outgoing'},
   'new-invoice':{button:true,label:'+ New invoice',action:'openGenerator()'},
   'hires-pipeline':{icon:'🚗',label:'Bookings',view:'hires-pipeline',badge:'badge-pipeline'},
+  'hires-dashboard':{icon:'📊',label:'Bookings dashboard',view:'hires-dashboard',home:'hires-pipeline'},
   'hires-recharge':{icon:'↑',label:'Pending recharge',view:'hires-recharge',badge:'badge-pending-recharge',badgeCls:'purple'},
   'movements':{icon:'🚛',label:'Movements',view:'movements',badge:'badge-movements'},
   'claims':{icon:'🚨',label:'Claims',view:'claims',badge:'badge-claims'},
@@ -242,7 +243,7 @@ const SB_ITEMS={
 };
 const DEFAULT_SB_LAYOUT={sections:[
   {label:'Billing',items:['received','outgoing','new-invoice']},
-  {label:'Short Hires',items:['hires-pipeline','hires-recharge']},
+  {label:'Short Hires',items:['hires-dashboard','hires-pipeline','hires-recharge']},
   {label:'Logistics',items:['movements']},
   {label:'Accident management',items:['claims']},
   {label:'Fines & penalties',items:['fines']},
