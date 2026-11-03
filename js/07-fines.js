@@ -533,52 +533,115 @@ const FINE_CHART_TYPES={bars:'Bars',columns:'Columns',donut:'Donut',line:'Line',
 const FINE_PALETTE=['#03d3c6','#6d5ef2','#f59e0b','#ef4444','#10b981','#3b82f6','#ec4899','#8b5cf6','#64748b','#f97316'];
 function fineWidgetBody(w,rows){return dashChartBody(FINE_METRICS[w.m]||FINE_METRICS.count,FINE_GROUPS[w.g]||FINE_GROUPS.offence_type,w,rows,'fines');}
 // Shared chart drawing for the configurable dashboards (fines, short hires).
-// M = {fn(rows),fmt(v)}, G = {key(row), ordered?}; groups flagged `ordered`
-// (months, length bands) keep their natural order instead of biggest-first.
+// M = {fn(rows),fmt(v)}, G = {key(row), ordered?, order?}; groups flagged
+// `ordered` (months, length bands) keep their natural order by default.
+// Optional widget settings (all blank = the original look):
+//   o order auto|desc|asc|az|natural · n how many · rest lump the rest as
+//   'Others' · hb hide blanks · vf value labels value|pct|both|none ·
+//   lg key auto|none|right|below · ax scale + gridlines · ymax fixed top ·
+//   xt/yt category/value axis titles · lf month labels iso|short|long|mmyy ·
+//   c colours auto|multi|single + col · h height s|m|l · wide (card width).
+const DASH_BLANKS=['Unknown','Not recorded','—','-',''];
+const DASH_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DASH_MON_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function dashLabel(k,w){const m=/^(\d{4})-(\d{2})$/.exec(String(k));if(!m)return String(k);const y=m[1],i=+m[2]-1;if(w.lf==='short')return DASH_MON[i]+' '+y.slice(2);if(w.lf==='long')return DASH_MON_LONG[i]+' '+y;if(w.lf==='mmyy')return m[2]+'/'+y.slice(2);return String(k);}
+function dashCompact(M,v){const s=String(M.fmt(1000));const money=s.indexOf('£')>=0,pct=/%$/.test(s);const a=Math.abs(v);const n=a>=1e6?(v/1e6).toFixed(a>=1e7?0:1)+'M':a>=1e3?(v/1e3).toFixed(a>=1e4?0:1)+'k':(Number.isInteger(v)?String(v):v.toFixed(1));return (money?'£':'')+n+(pct?'%':'');}
+function dashNiceStep(x){if(!(x>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
+function dashCut(s,n){s=String(s);return s.length>n?s.slice(0,Math.max(1,n-1))+'…':s;}
 function dashChartBody(M,G,w,rows,noun){
   const t=w.t||'bars';
   if(t==='stat'){
     const v=M.fn(rows);
-    return '<div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:var(--covase);margin:6px 0 2px">'+esc(M.fmt(v))+'</div><div style="font-size:11px;color:var(--n500)">across '+rows.length+' '+esc(noun||'records')+'</div>';
+    return '<div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:'+(w.c==='single'&&w.col?esc(w.col):'var(--covase)')+';margin:6px 0 2px">'+esc(M.fmt(v))+'</div><div style="font-size:11px;color:var(--n500)">across '+rows.length+' '+esc(noun||'records')+'</div>';
   }
   const by={};rows.forEach(f=>{const k=G.key(f);(by[k]=by[k]||[]).push(f);});
-  let entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]).filter(e=>e[1]!=null&&!isNaN(e[1]));
-  const inOrder=t==='line'||w.g==='month'||G.ordered;
-  const ok=G.order||(k=>String(k));
-  entries=inOrder?entries.sort((a,b)=>{const x=ok(a[0]),y=ok(b[0]);return typeof x==='number'?x-y:String(x).localeCompare(String(y));}):entries.sort((a,b)=>b[1]-a[1]);
-  const lim=t==='donut'?6:(t==='columns'?(inOrder?12:10):(w.topN||(inOrder?12:8)));
-  entries=inOrder?entries.slice(-lim):entries.slice(0,lim); // time series: keep the most recent
-  if(!entries.length)return '<div style="font-size:12px;color:var(--n400)">No data</div>';
-  const max=Math.max(...entries.map(e=>e[1]),1);
-  if(t==='columns'){
-    return '<div style="display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:6px">'
-      +entries.map(([k,v],i)=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0"><div style="font-size:9px;color:var(--n500)">'+esc(M.fmt(v))+'</div><div style="width:100%;border-radius:4px 4px 0 0;background:'+FINE_PALETTE[i%FINE_PALETTE.length]+';height:'+Math.max(4,Math.round(v/max*88))+'px"></div><div style="font-size:9px;color:var(--n500);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(k)+'">'+esc(k)+'</div></div>').join('')+'</div>';
+  let groups=Object.entries(by);
+  if(w.hb)groups=groups.filter(([k])=>!DASH_BLANKS.includes(String(k).trim()));
+  const all=groups.map(([k,rs])=>[k,M.fn(rs),rs]).filter(e=>e[1]!=null&&!isNaN(e[1]));
+  const natural=t==='line'||w.g==='month'||G.ordered;
+  const o=w.o&&w.o!=='auto'?w.o:(natural?'natural':'desc');
+  const defLim=t==='donut'?6:(t==='columns'?(natural?12:10):(w.topN||(natural?12:8)));
+  const lim=Math.max(1,parseInt(w.n,10)||defLim);
+  const okey=G.order||(k=>String(k));
+  const cmpNat=(a,b)=>{const x=okey(a[0]),y=okey(b[0]);return typeof x==='number'?x-y:String(x).localeCompare(String(y));};
+  let kept,rest;
+  if(o==='natural'){const s=all.slice().sort(cmpNat);kept=s.slice(-lim);rest=s.slice(0,Math.max(0,s.length-lim));} // time series: most recent
+  else{
+    const s=all.slice().sort((a,b)=>b[1]-a[1]);kept=s.slice(0,lim);rest=s.slice(lim); // keep the biggest, then order them
+    if(o==='asc')kept.reverse();
+    if(o==='az')kept.sort((a,b)=>dashLabel(a[0],w).localeCompare(dashLabel(b[0],w),undefined,{numeric:true}));
   }
+  if(w.rest&&rest.length){const rr=rest.flatMap(e=>e[2]);const v=M.fn(rr);if(v!=null&&!isNaN(v))kept.push(['Others',v,rr]);}
+  const entries=kept;
+  if(!entries.length)return '<div style="font-size:12px;color:var(--n400)">No data</div>';
+  const total=all.reduce((s,e)=>s+Math.max(0,e[1]),0)||1;
+  const vf=w.vf||(t==='donut'?'both':'value');
+  const pctOf=v=>Math.round(Math.max(0,v)/total*100)+'%';
+  const vt=v=>vf==='none'?'':vf==='pct'?pctOf(v):vf==='both'?M.fmt(v)+' · '+pctOf(v):M.fmt(v);
+  const multi=w.c==='multi'||(!w.c||w.c==='auto')&&(t==='columns'||t==='donut');
+  const one=w.col||'#03d3c6';
+  const colour=i=>multi?(entries[i]&&entries[i][0]==='Others'&&w.rest?'#94a3b8':FINE_PALETTE[i%FINE_PALETTE.length]):one;
+  const lab=k=>dashLabel(k,w);
+  const lg=w.lg&&w.lg!=='auto'?w.lg:(t==='donut'?'right':'none');
+  const legend=lg==='none'?'':'<div style="'+(lg==='right'?'flex:1;min-width:0':'display:flex;flex-wrap:wrap;gap:2px 14px;margin-top:8px')+'">'+entries.map(([k,v],i)=>'<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--n600);margin:2px 0;min-width:0"><span style="width:9px;height:9px;border-radius:2px;background:'+esc(colour(i))+';flex-shrink:0"></span><span style="'+(lg==='right'?'flex:1;':'')+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(lab(k))+'">'+esc(lab(k))+'</span>'+(vf!=='none'?'<span style="color:var(--n500)">'+esc(vt(v))+'</span>':'')+'</div>').join('')+'</div>';
+  const wrap=chart=>lg==='right'?'<div style="display:flex;gap:14px;align-items:center"><div style="flex:'+(t==='donut'?'0 0 auto':'1.6')+';min-width:0">'+chart+'</div>'+legend+'</div>':chart+legend;
   if(t==='donut'){
-    const total=entries.reduce((s,e)=>s+e[1],0)||1;
     const R=42,C=2*Math.PI*R;let off=0;
+    const sz={s:100,m:120,l:160}[w.h]||120;
     const segs=entries.map(([k,v],i)=>{
-      const len=v/total*C;
-      const s='<circle r="'+R+'" cx="60" cy="60" fill="none" stroke="'+FINE_PALETTE[i%FINE_PALETTE.length]+'" stroke-width="16" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 60 60)"/>';
+      const len=Math.max(0,v)/(entries.reduce((s,e)=>s+Math.max(0,e[1]),0)||1)*C;
+      const s='<circle r="'+R+'" cx="60" cy="60" fill="none" stroke="'+esc(colour(i))+'" stroke-width="16" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 60 60)"><title>'+esc(lab(k))+': '+esc(M.fmt(v))+'</title></circle>';
       off+=len;return s;
     }).join('');
-    const legend=entries.map(([k,v],i)=>'<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--n600);margin:2px 0"><span style="width:9px;height:9px;border-radius:2px;background:'+FINE_PALETTE[i%FINE_PALETTE.length]+';flex-shrink:0"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(k)+'">'+esc(k)+'</span><span style="color:var(--n500)">'+esc(M.fmt(v))+' · '+Math.round(v/total*100)+'%</span></div>').join('');
-    return '<div style="display:flex;gap:14px;align-items:center"><svg viewBox="0 0 120 120" style="width:120px;height:120px;flex-shrink:0">'+segs+'</svg><div style="flex:1;min-width:0">'+legend+'</div></div>';
+    return wrap('<svg viewBox="0 0 120 120" style="width:'+sz+'px;height:'+sz+'px;flex-shrink:0;display:block;margin:0 auto">'+segs+'</svg>');
   }
-  if(t==='line'){
-    const W=300,H=110,pad=8;
-    const pts=entries.map(([k,v],i)=>{
-      const x=entries.length>1?pad+i*(W-2*pad)/(entries.length-1):W/2;
-      const y=H-pad-(v/max)*(H-2*pad-14);
-      return {x,y,k,v};
-    });
-    const poly=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
-    const dots=pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="#03d3c6"><title>'+esc(p.k)+': '+esc(M.fmt(p.v))+'</title></circle>').join('');
-    const step=Math.max(1,Math.ceil(entries.length/6));
-    const labels=pts.filter((_,i)=>i%step===0||i===pts.length-1).map(p=>'<text x="'+p.x.toFixed(1)+'" y="'+(H-1)+'" font-size="8" fill="#8b93a7" text-anchor="middle">'+esc(String(p.k).slice(-5))+'</text>').join('');
-    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:130px"><polyline points="'+poly+'" fill="none" stroke="#03d3c6" stroke-width="2"/>'+dots+labels+'</svg>';
+  // Value scale: fixed top if set; with the scale shown, a rounded top; otherwise the biggest value.
+  const dmax=Math.max(...entries.map(e=>e[1]),0)||1;
+  const intData=entries.every(e=>Number.isInteger(e[1]));
+  const ymax=parseFloat(w.ymax)>0?parseFloat(w.ymax):null;
+  let top,step;
+  if(ymax){top=ymax;step=ymax/4;}
+  else{step=dashNiceStep(dmax/4);if(intData)step=Math.max(1,Math.ceil(step));top=w.ax?Math.ceil(dmax/step-1e-9)*step:dmax;}
+  const ticks=[];if(w.ax)for(let g=0;g<=top+1e-9&&ticks.length<12;g+=step)ticks.push(g);
+  const titleCss='font-size:10px;color:var(--n500);font-weight:600';
+  if(t==='columns'||t==='line'){
+    const W=320,H={s:130,m:190,l:260}[w.h]||(t==='line'?120:150);
+    const left=(w.ax?30:4)+(w.yt?12:0),right=W-4,topPad=vf!=='none'?14:6,bottom=H-14-(w.xt?13:0);
+    const y=v=>bottom-(Math.min(Math.max(0,v),top)/top)*(bottom-topPad);
+    const n=entries.length,band=(right-left)/n;
+    let s='';
+    ticks.forEach(g=>{s+='<line x1="'+left+'" x2="'+right+'" y1="'+y(g).toFixed(1)+'" y2="'+y(g).toFixed(1)+'" stroke="#e5e7eb" stroke-width="0.7"/><text x="'+(left-3)+'" y="'+(y(g)+3).toFixed(1)+'" font-size="8" fill="#8b93a7" text-anchor="end">'+esc(dashCompact(M,g))+'</text>';});
+    if(w.ax)s+='<line x1="'+left+'" x2="'+right+'" y1="'+bottom+'" y2="'+bottom+'" stroke="#cbd5e1" stroke-width="0.8"/>';
+    const lstep=Math.max(1,Math.ceil(n/(t==='line'?7:Math.max(1,Math.floor((right-left)/26)))));
+    const maxc=Math.max(3,Math.floor(band*lstep/4.6));
+    const xOf=i=>t==='line'?(n>1?left+6+i*(right-left-12)/(n-1):(left+right)/2):left+i*band+band/2;
+    if(t==='columns'){
+      const bw=Math.min(band*0.72,48);
+      entries.forEach(([k,v],i)=>{const x=xOf(i)-bw/2,yy=y(v);
+        s+='<rect x="'+x.toFixed(1)+'" y="'+yy.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bottom-yy).toFixed(1)+'" rx="3" fill="'+esc(colour(i))+'"><title>'+esc(lab(k))+': '+esc(M.fmt(v))+'</title></rect>';
+        if(vf!=='none'){const room=Math.max(4,Math.floor(band/3.8));let lv=vt(v);if(lv.length>room)lv=vf==='pct'?lv:(dashCompact(M,v)+(vf==='both'?' · '+pctOf(v):''));
+          s+='<text x="'+xOf(i).toFixed(1)+'" y="'+(yy-3).toFixed(1)+'" font-size="7.5" fill="#64748b" text-anchor="middle"><title>'+esc(vt(v))+'</title>'+esc(dashCut(lv,room+2))+'</text>';}});
+    }else{
+      const pts=entries.map(([k,v],i)=>[xOf(i),y(v),k,v]);
+      s+='<polyline points="'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'" fill="none" stroke="'+esc(one)+'" stroke-width="2"/>';
+      pts.forEach((p,i)=>{s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="'+esc(multi?colour(i):one)+'"><title>'+esc(lab(p[2]))+': '+esc(M.fmt(p[3]))+'</title></circle>';
+        if(vf!=='none'&&n<=12)s+='<text x="'+p[0].toFixed(1)+'" y="'+(p[1]-6).toFixed(1)+'" font-size="7.5" fill="#64748b" text-anchor="middle">'+esc(vt(p[3]))+'</text>';});
+    }
+    entries.forEach(([k],i)=>{if(i%lstep&&i!==n-1)return;s+='<text x="'+xOf(i).toFixed(1)+'" y="'+(bottom+10)+'" font-size="8" fill="#8b93a7" text-anchor="middle"><title>'+esc(lab(k))+'</title>'+esc(dashCut(lab(k),maxc))+'</text>';});
+    if(w.xt)s+='<text x="'+((left+right)/2).toFixed(1)+'" y="'+(H-2)+'" font-size="9" fill="#64748b" font-weight="600" text-anchor="middle">'+esc(w.xt)+'</text>';
+    if(w.yt)s+='<text transform="translate(9 '+((topPad+bottom)/2).toFixed(1)+') rotate(-90)" font-size="9" fill="#64748b" font-weight="600" text-anchor="middle">'+esc(w.yt)+'</text>';
+    return wrap('<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'+s+'</svg>');
   }
-  return entries.map(([k,v])=>clmBar(k,v,max,M.fmt(v))).join(''); // bars (default)
+  // bars (default): HTML rows; the scale (if shown) sits under the tracks.
+  const pc=v=>Math.max(0,Math.min(100,v/top*100));
+  const grid=ticks.slice(1).map(g=>'<span style="position:absolute;top:0;bottom:0;left:'+pc(g).toFixed(1)+'%;border-left:1px solid rgba(100,116,139,.25)"></span>').join('');
+  const labW={s:'110px',m:'150px',l:'190px'}[w.lw]||'';
+  let h=w.xt?'<div style="'+titleCss+';margin-bottom:4px">'+esc(w.xt)+'</div>':'';
+  const rowH={s:10,m:14,l:20}[w.h]||14;
+  h+=entries.map(([k,v],i)=>'<div class="clm-bar-row"><div class="clm-bar-label" title="'+esc(lab(k))+'"'+(labW?' style="width:'+labW+'"':'')+'>'+esc(lab(k))+'</div><div class="clm-bar-track" style="position:relative;height:'+rowH+'px">'+grid+'<div class="clm-bar-fill" style="position:relative;width:'+(v>0?Math.max(2,pc(v)):0).toFixed(1)+'%;background:'+esc(colour(i))+'" title="'+esc(lab(k))+': '+esc(M.fmt(v))+'"></div></div><div class="clm-bar-val">'+esc(vt(v))+'</div></div>').join('');
+  if(w.ax)h+='<div class="clm-bar-row" style="margin-top:0"><div class="clm-bar-label"'+(labW?' style="width:'+labW+'"':'')+'></div><div style="flex:1;position:relative;height:12px">'+ticks.map(g=>'<span style="position:absolute;left:'+pc(g).toFixed(1)+'%;transform:translateX('+(g===0?'0':(pc(g)>=99.5?'-100%':'-50%'))+');font-size:9px;color:var(--n400);white-space:nowrap">'+esc(dashCompact(M,g))+'</span>').join('')+'</div><div class="clm-bar-val"></div></div>';
+  if(w.yt)h+='<div class="clm-bar-row" style="margin-top:2px"><div class="clm-bar-label"'+(labW?' style="width:'+labW+'"':'')+'></div><div style="flex:1;text-align:center;'+titleCss+'">'+esc(w.yt)+'</div><div class="clm-bar-val"></div></div>';
+  return wrap(h);
 }
 function renderFinesDashboard(){
   const el=document.getElementById('fines-dashboard');if(!el)return;

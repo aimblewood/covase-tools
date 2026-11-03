@@ -183,7 +183,7 @@ function hdListBody(w){
   const t=hdToday();
   const rows=L.rows((allHires||[]).filter(h=>!c||(h.customer||'')===c),t);
   if(!rows.length)return '<div style="font-size:12px;color:var(--n400);padding:6px 0">✓ '+esc(L.empty)+'</div>';
-  const shown=rows.slice(0,8);
+  const shown=rows.slice(0,Math.max(1,parseInt(w.n,10)||8));
   return '<div style="font-size:11px;color:var(--n500);margin:-2px 0 6px">'+rows.length+' booking'+(rows.length===1?'':'s')+'</div>'
     +shown.map(h=>'<div onclick="openEditHire(\''+esc(h.id)+'\')" style="display:flex;gap:8px;align-items:center;padding:6px 4px;border-top:1px solid var(--n100);cursor:pointer;font-size:12px" title="Open booking">'
       +'<div style="flex:1;min-width:0"><div style="font-weight:600;color:var(--n700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(h.customer||'—')+(h.job_ref?' <span style="color:var(--n400);font-weight:400">'+esc(h.job_ref)+'</span>':'')+'</div>'
@@ -200,7 +200,6 @@ function hdWidgetBody(w,rows){
 }
 function hdMove(i,d){const j=i+d;if(j<0||j>=hireDashCfg.length)return;const x=hireDashCfg[i];hireDashCfg[i]=hireDashCfg[j];hireDashCfg[j]=x;hireDashSave();renderHireDash();}
 function hdRemove(i){hireDashCfg.splice(i,1);hireDashSave();renderHireDash();}
-function hdRename(i){const w=hireDashCfg[i];if(!w)return;const v=prompt('Widget title (leave blank for the automatic one):',w.title||hdWidgetTitle(w));if(v===null)return;const s=v.trim();if(s&&s!==hdWidgetTitle(Object.assign({},w,{title:''})))w.title=s;else delete w.title;hireDashSave();renderHireDash();}
 function hdAddChart(){const g=id=>document.getElementById(id).value;const w={m:g('hdw-m'),g:g('hdw-g'),t:g('hdw-t')};const s=g('hdw-s');if(s&&s!=='all')w.s=s;hireDashCfg.push(w);hireDashSave();renderHireDash();}
 function hdAddList(){hireDashCfg.push({t:'list',l:document.getElementById('hdw-l').value});hireDashSave();renderHireDash();}
 function hdReset(){if(!confirm('Put the dashboard back to the standard set of widgets? This changes it for everyone.'))return;hireDashCfg=DEFAULT_HIRE_DASH.map(w=>Object.assign({},w));hireDashSave();renderHireDash();}
@@ -212,8 +211,8 @@ function renderHireDash(){
   const rows=hdFiltered();
   const sel='font-size:12px;padding:5px;border:1px solid var(--n200);border-radius:6px';
   const ctl='cursor:pointer;color:var(--n300);font-size:12px;padding:0 3px';
-  const widgets=hireDashCfg.map((w,i)=>'<div class="clm-dash-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><div class="clm-dash-title" style="cursor:pointer" title="Click to rename" onclick="hdRename('+i+')">'+esc(hdWidgetTitle(w))+'</div>'
-    +'<span style="white-space:nowrap">'+(i>0?'<span style="'+ctl+'" title="Move earlier" onclick="hdMove('+i+',-1)">‹</span>':'')+(i<hireDashCfg.length-1?'<span style="'+ctl+'" title="Move later" onclick="hdMove('+i+',1)">›</span>':'')+'<span style="'+ctl+'" title="Remove widget" onclick="hdRemove('+i+')">✕</span></span></div>'
+  const widgets=hireDashCfg.map((w,i)=>'<div class="clm-dash-card"'+(w.wide?' style="grid-column:1/-1"':'')+'><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><div class="clm-dash-title" style="cursor:pointer" title="Edit this widget" onclick="hdEdOpen('+i+')">'+esc(hdWidgetTitle(w))+'</div>'
+    +'<span style="white-space:nowrap"><span style="'+ctl+';color:var(--n400)" title="Edit chart, axes, key and colours" onclick="hdEdOpen('+i+')">✎</span>'+(i>0?'<span style="'+ctl+'" title="Move earlier" onclick="hdMove('+i+',-1)">‹</span>':'')+(i<hireDashCfg.length-1?'<span style="'+ctl+'" title="Move later" onclick="hdMove('+i+',1)">›</span>':'')+'<span style="'+ctl+'" title="Remove widget" onclick="hdRemove('+i+')">✕</span></span></div>'
     +hdWidgetBody(w,rows)+'</div>').join('');
   const o=obj=>Object.entries(obj).map(([k,v])=>'<option value="'+k+'">'+esc(typeof v==='string'?v:v.label)+'</option>').join('');
   const cap=(allHires||[]).length>=500?'<div style="font-size:11px;color:var(--n400);margin-top:10px">Based on the latest 500 bookings by start date.</div>':'';
@@ -230,6 +229,97 @@ function renderHireDash(){
     +'<button class="topbar-btn" style="margin-left:auto" onclick="hdReset()">↺ Standard widgets</button></div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:12px">'+(widgets||'<div style="font-size:12px;color:var(--n400)">No widgets — add one above.</div>')+'</div>'
     +cap;
+}
+// ── Widget editor: every setting of one widget, with a live preview. Changes
+// stay in a draft until Save, so Cancel leaves the shared dashboard alone. ──
+let hdEd=null; // {i, w: draft}
+const HD_ED_KEYS=['title','t','m','g','s','l','o','n','rest','hb','ax','ymax','xt','yt','lf','lw','lg','vf','c','col','h','wide'];
+const HD_STYLE_KEYS=['o','n','rest','hb','ax','ymax','xt','yt','lf','lw','lg','vf','c','col','h','wide'];
+lsInjectModal('hd-edit-modal',`
+  <div class="modal-header"><div class="modal-title">Edit widget</div><button class="modal-close" onclick="hdEdClose()">✕</button></div>
+  <div class="modal-body" style="padding-top:14px">
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+      <div id="hde-form" style="flex:1 1 380px;min-width:0;display:flex;flex-direction:column;gap:10px"></div>
+      <div style="flex:1 1 360px;min-width:0;position:sticky;top:70px">
+        <div style="font-size:11px;color:var(--n500);font-weight:700;margin-bottom:6px">PREVIEW</div>
+        <div class="clm-dash-card"><div class="clm-dash-title" id="hde-ptitle"></div><div id="hde-preview"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" style="margin-right:auto" onclick="hdEdResetLook()">↺ Reset look</button><button class="btn btn-secondary" onclick="hdEdClose()">Cancel</button><button class="btn btn-primary" onclick="hdEdSave()">Save</button></div>`,true);
+function hdEdOpen(i){
+  const w=hireDashCfg&&hireDashCfg[i];if(!w)return;
+  hdEd={i:i,w:JSON.parse(JSON.stringify(w))};
+  hdEdForm();document.getElementById('hd-edit-modal').classList.add('open');
+}
+function hdEdClose(){hdEd=null;document.getElementById('hd-edit-modal').classList.remove('open');}
+function hdEdResetLook(){if(!hdEd)return;HD_STYLE_KEYS.forEach(k=>delete hdEd.w[k]);hdEdForm();}
+function hdEdSave(){if(!hdEd)return;hdEdRead();hireDashCfg[hdEd.i]=hdEd.w;hireDashSave();hdEdClose();renderHireDash();}
+// Read the form into the draft; blank / default values are dropped so the
+// stored widget stays small and the chart falls back to its automatic look.
+function hdEdRead(){
+  if(!hdEd)return;const w={};
+  HD_ED_KEYS.forEach(k=>{const e=document.getElementById('hde-'+k);if(!e)return;
+    if(e.type==='checkbox'){if(e.checked)w[k]=true;return;}
+    const v=String(e.value||'').trim();if(!v||v==='auto')return;
+    w[k]=(k==='n'||k==='ymax')?parseFloat(v):v;});
+  if(w.t!=='list'&&!w.s)delete w.s;
+  if(w.s==='all')delete w.s;
+  if(w.c!=='single')delete w.col;else if(!w.col)w.col='#03d3c6';
+  if(w.wide)w.wide=true;
+  if(w.t==='list'&&!w.l)w.l='ending';
+  hdEd.w=w;
+}
+function hdEdChange(rebuild){hdEdRead();if(rebuild)hdEdForm();else hdEdPreview();}
+function hdEdPreview(){
+  if(!hdEd)return;
+  document.getElementById('hde-ptitle').textContent=hdWidgetTitle(hdEd.w);
+  document.getElementById('hde-preview').innerHTML=hdWidgetBody(hdEd.w,hdFiltered());
+}
+function hdEdForm(){
+  const w=hdEd.w,t=w.t||'bars',isList=t==='list',isStat=t==='stat';
+  const opt=(list,cur)=>list.map(([v,l])=>'<option value="'+esc(v)+'"'+(String(cur??'')===String(v)?' selected':'')+'>'+esc(l)+'</option>').join('');
+  const fromObj=obj=>Object.entries(obj).map(([k,v])=>[k,typeof v==='string'?v:v.label]);
+  const sel=(k,list,cur,rebuild)=>'<select id="hde-'+k+'" onchange="hdEdChange('+(rebuild?'true':'false')+')">'+opt(list,cur)+'</select>';
+  const txt=(k,ph,type)=>'<input id="hde-'+k+'" type="'+(type||'text')+'" value="'+esc(w[k]??'')+'" placeholder="'+esc(ph||'')+'" oninput="hdEdChange(false)"'+(type==='number'?' min="0" step="any"':'')+'>';
+  const chk=(k,label)=>'<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--n600);cursor:pointer"><input type="checkbox" id="hde-'+k+'"'+(w[k]?' checked':'')+' onchange="hdEdChange(false)"> '+esc(label)+'</label>';
+  const fld=(label,html,hint)=>'<div class="form-field"><label>'+esc(label)+'</label>'+html+(hint?'<div style="font-size:10px;color:var(--n400);margin-top:2px">'+esc(hint)+'</div>':'')+'</div>';
+  const sec=l=>'<div class="form-section-label" style="margin-top:4px">'+esc(l)+'</div>';
+  const row=(...f)=>'<div class="form-row" style="display:grid;grid-template-columns:repeat('+f.length+',minmax(0,1fr));gap:10px">'+f.join('')+'</div>';
+  const typeList=[['list','Action list']].concat(fromObj(HIRE_CHART_TYPES));
+  let h=sec('What it shows')
+    +row(fld('Title',txt('title',hdWidgetTitle(Object.assign({},w,{title:''})))),fld('Widget type',sel('t',typeList,t,true)));
+  if(isList){
+    h+=row(fld('List',sel('l',fromObj(HIRE_LISTS),w.l,false)),fld('Rows shown',txt('n','8','number')));
+  }else{
+    h+=row(fld('Measure',sel('m',fromObj(HIRE_METRICS),w.m||'count',false)),isStat?'':fld('Group by',sel('g',fromObj(HIRE_GROUPS),w.g||'customer',false)),fld('Which bookings',sel('s',fromObj(HIRE_SCOPES),w.s||'all',false)));
+  }
+  if(!isList&&!isStat){
+    h+=sec('Items')
+      +row(fld('Order',sel('o',[['auto','Automatic'],['desc','Biggest first'],['asc','Smallest first'],['az','A–Z by name'],['natural','Natural (months / bands in order)']],w.o||'auto',false)),
+           fld('How many',txt('n','automatic','number'),'Biggest kept; months keep the most recent'))
+      +'<div style="display:flex;gap:18px;flex-wrap:wrap">'+chk('rest','Lump the rest together as “Others”')+chk('hb','Hide blanks (Not recorded / Unknown)')+'</div>';
+    const axisNA=t==='donut';
+    h+=sec('Axes')+(axisNA?'<div style="font-size:11px;color:var(--n400)">Donuts have no axes — the key does the work.</div>':
+      '<div style="display:flex;gap:18px;flex-wrap:wrap">'+chk('ax','Show scale and gridlines')+'</div>'
+      +row(fld('Scale maximum',txt('ymax','automatic','number'),'Fixes the top of the scale, e.g. 100 for %'),fld('Month labels',sel('lf',[['auto','2026-11'],['short','Nov 26'],['long','November 2026'],['mmyy','11/26']],w.lf||'auto',false)))
+      +row(fld(t==='bars'?'Title above the names':'Bottom axis title',txt('xt','none')),fld(t==='bars'?'Title under the scale':'Side axis title',txt('yt','none')))
+      +(t==='bars'?row(fld('Name column width',sel('lw',[['auto','Standard'],['s','Narrow'],['m','Medium'],['l','Wide']],w.lw||'auto',false))):''));
+    h+=sec('Key and labels')
+      +row(fld('Key',sel('lg',[['auto','Automatic'],['none','No key'],['right','Key on the right'],['below','Key underneath']],w.lg||'auto',false)),
+           fld('Value labels',sel('vf',[['auto','Automatic'],['value','Value'],['pct','% of total'],['both','Value and %'],['none','None']],w.vf||'auto',false)));
+  }
+  h+=sec('Look');
+  const look=[];
+  if(!isList){
+    look.push(fld('Colours',sel('c',isStat?[['auto','House teal'],['single','Pick a colour']]:[['auto','Automatic'],['multi','A colour per item'],['single','One colour']],w.c||'auto',true)));
+    if(w.c==='single')look.push(fld('Colour','<input id="hde-col" type="color" value="'+esc(w.col||'#03d3c6')+'" oninput="hdEdChange(false)" style="height:34px;padding:2px">'));
+    if(!isStat)look.push(fld('Height',sel('h',[['auto','Standard'],['s','Short'],['m','Medium'],['l','Tall']],w.h||'auto',false)));
+  }
+  look.push(fld('Card width',sel('wide',[['auto','Normal'],['true','Full width']],w.wide?'true':'auto',false)));
+  h+=row(...look);
+  document.getElementById('hde-form').innerHTML=h;
+  hdEdPreview();
 }
 window.EXTRA_VIEW_LOADERS=Object.assign(window.EXTRA_VIEW_LOADERS||{},{'hires-dashboard':loadHireDashboard});
 RT_TABLES.covase_hires=()=>{hiresLoaded=false;loadHires().then(()=>{if(currentViewId==='hires-dashboard')renderHireDash();});};
