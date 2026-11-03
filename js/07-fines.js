@@ -531,17 +531,23 @@ const FINE_METRICS={count:{label:'Number of fines',fn:rows=>rows.length,fmt:v=>S
 const FINE_GROUPS={driver:{label:'Driver',key:f=>f.driver_name||'Unknown'},offence_type:{label:'Offence type',key:f=>FINE_OFFENCE_LABEL[f.offence_type]||'Other'},status:{label:'Status',key:f=>FINE_STATUS_LABEL[f.status]||f.status},month:{label:'Month of offence',key:f=>f.offence_datetime?String(f.offence_datetime).slice(0,7):'Unknown'},client:{label:'Client',key:f=>{const a=(allAccounts||[]).find(x=>x.id===f.client_account_id);return a?a.company_name:'—';}},issuer:{label:'Issuer',key:f=>f.issuer||'Unknown'},reg:{label:'Vehicle reg',key:f=>f.vehicle_reg||'—'}};
 const FINE_CHART_TYPES={bars:'Bars',columns:'Columns',donut:'Donut',line:'Line',stat:'Stat tile'};
 const FINE_PALETTE=['#03d3c6','#6d5ef2','#f59e0b','#ef4444','#10b981','#3b82f6','#ec4899','#8b5cf6','#64748b','#f97316'];
-function fineWidgetBody(w,rows){
-  const M=FINE_METRICS[w.m]||FINE_METRICS.count,G=FINE_GROUPS[w.g]||FINE_GROUPS.offence_type;
+function fineWidgetBody(w,rows){return dashChartBody(FINE_METRICS[w.m]||FINE_METRICS.count,FINE_GROUPS[w.g]||FINE_GROUPS.offence_type,w,rows,'fines');}
+// Shared chart drawing for the configurable dashboards (fines, short hires).
+// M = {fn(rows),fmt(v)}, G = {key(row), ordered?}; groups flagged `ordered`
+// (months, length bands) keep their natural order instead of biggest-first.
+function dashChartBody(M,G,w,rows,noun){
   const t=w.t||'bars';
   if(t==='stat'){
     const v=M.fn(rows);
-    return '<div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:var(--covase);margin:6px 0 2px">'+esc(M.fmt(v))+'</div><div style="font-size:11px;color:var(--n500)">across '+rows.length+' fines</div>';
+    return '<div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:var(--covase);margin:6px 0 2px">'+esc(M.fmt(v))+'</div><div style="font-size:11px;color:var(--n500)">across '+rows.length+' '+esc(noun||'records')+'</div>';
   }
   const by={};rows.forEach(f=>{const k=G.key(f);(by[k]=by[k]||[]).push(f);});
-  let entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]);
-  entries=(t==='line'||w.g==='month')?entries.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):entries.sort((a,b)=>b[1]-a[1]);
-  entries=entries.slice(0,t==='donut'?6:(t==='columns'?10:(w.topN||8)));
+  let entries=Object.entries(by).map(([k,v])=>[k,M.fn(v)]).filter(e=>e[1]!=null&&!isNaN(e[1]));
+  const inOrder=t==='line'||w.g==='month'||G.ordered;
+  const ok=G.order||(k=>String(k));
+  entries=inOrder?entries.sort((a,b)=>{const x=ok(a[0]),y=ok(b[0]);return typeof x==='number'?x-y:String(x).localeCompare(String(y));}):entries.sort((a,b)=>b[1]-a[1]);
+  const lim=t==='donut'?6:(t==='columns'?(inOrder?12:10):(w.topN||(inOrder?12:8)));
+  entries=inOrder?entries.slice(-lim):entries.slice(0,lim); // time series: keep the most recent
   if(!entries.length)return '<div style="font-size:12px;color:var(--n400)">No data</div>';
   const max=Math.max(...entries.map(e=>e[1]),1);
   if(t==='columns'){
