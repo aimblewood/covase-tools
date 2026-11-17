@@ -565,7 +565,7 @@ async function openJourney(id){
     const orsKey=localStorage.getItem('covase_ors_api_key');
     if(orsKey){
       try{
-        const rr=await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson',{method:'POST',headers:{'Authorization':orsKey,'Content-Type':'application/json'},body:JSON.stringify({coordinates:[[A.lng,A.lat],[B.lng,B.lat]]})});
+        const rr=await fetch('https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson',{method:'POST',headers:{'Authorization':orsKey,'Content-Type':'application/json'},body:JSON.stringify({coordinates:[[A.lng,A.lat],[B.lng,B.lat]]})});
         if(rr.ok){const j=await rr.json();const cs=j.features&&j.features[0]&&j.features[0].geometry&&j.features[0].geometry.coordinates;
           if(Array.isArray(cs)&&cs.length>1){const stepN=Math.max(1,Math.floor(cs.length/400));latlngs=cs.filter((_,i)=>i%stepN===0||i===cs.length-1).map(c=>[c[1],c[0]]);}}
       }catch(e){}
@@ -843,11 +843,11 @@ async function lookupMovementMileage(){
     // OpenRouteService directions (driving-car). Returns distance in metres,
     // duration in seconds. Response shape can be either {routes:[...]} (json)
     // or {features:[...]} (geojson) — handle both defensively.
-    const orsRes=await fetch('https://api.openrouteservice.org/v2/directions/driving-car',{
+    const orsRes=await fetch('https://api.heigit.org/openrouteservice/v2/directions/driving-car',{
       method:'POST',
       headers:{'Authorization':apiKey,'Content-Type':'application/json','Accept':'application/json'},
       body:JSON.stringify({coordinates:[[pickup.longitude,pickup.latitude],[dropoff.longitude,dropoff.latitude]]})
-    }).catch(()=>{throw new Error("couldn't reach OpenRouteService (no response). Usually the API key in Settings ⚙ has expired or hit its daily limit — ORS refuses those without a readable reply. Check the key at openrouteservice.org, or try again later");});
+    }).catch(()=>{throw new Error("couldn't reach OpenRouteService (no response) — the service may be down (check status at heigit.org) or the API key in Settings ⚙ may be refused. Try again later or type the mileage in by hand");});
     if(!orsRes.ok){
       const txt=await orsRes.text();
       const why=orsRes.status===401||orsRes.status===403?' (API key rejected — check it in Settings ⚙)':orsRes.status===429?' (daily limit reached — try again tomorrow)':'';
@@ -942,7 +942,7 @@ async function lookupMvAddress(prefix,q){
     try{
       const pc=(document.getElementById('mv-'+prefix+'-postcode')?.value||'').trim();
       const text=q+(pc?' '+pc:'');
-      const r=await fetch('https://api.openrouteservice.org/geocode/autocomplete?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=6');
+      const r=await fetch('https://api.heigit.org/openrouteservice/geocode/autocomplete?api_key='+encodeURIComponent(apiKey)+'&text='+encodeURIComponent(text)+'&boundary.country=GBR&size=6');
       if(!r.ok){res.classList.remove('open');return;}
       const j=await r.json();
       const feats=(j.features||[]).filter(f=>f.properties);
