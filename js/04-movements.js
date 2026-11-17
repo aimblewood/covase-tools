@@ -824,9 +824,13 @@ async function lookupMovementMileage(){
   try{
     // Postcodes.io for postcode lat/lon — read-only: the mileage lookup never
     // writes to address fields, it only resolves coordinates for routing
+    // A bare browser 'NetworkError'/'Failed to fetch' means no readable
+    // response at all (service down, blocked, or an error reply without CORS
+    // headers) — say which service so the toast is actionable.
+    const reach=(label,url,opts)=>fetch(url,opts).catch(()=>{throw new Error(`couldn't reach ${label} (no response — the service may be down, or blocked by a browser extension / network)`);});
     const [pRes,dRes]=await Promise.all([
-      fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pickupPc)}`),
-      fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(dropoffPc)}`)
+      reach('the postcode service',`https://api.postcodes.io/postcodes/${encodeURIComponent(pickupPc)}`),
+      reach('the postcode service',`https://api.postcodes.io/postcodes/${encodeURIComponent(dropoffPc)}`)
     ]);
     if(!pRes.ok)throw new Error(`Pickup postcode not recognised (${pickupPc})`);
     if(!dRes.ok)throw new Error(`Dropoff postcode not recognised (${dropoffPc})`);
@@ -843,10 +847,11 @@ async function lookupMovementMileage(){
       method:'POST',
       headers:{'Authorization':apiKey,'Content-Type':'application/json','Accept':'application/json'},
       body:JSON.stringify({coordinates:[[pickup.longitude,pickup.latitude],[dropoff.longitude,dropoff.latitude]]})
-    });
+    }).catch(()=>{throw new Error("couldn't reach OpenRouteService (no response). Usually the API key in Settings ⚙ has expired or hit its daily limit — ORS refuses those without a readable reply. Check the key at openrouteservice.org, or try again later");});
     if(!orsRes.ok){
       const txt=await orsRes.text();
-      throw new Error(`OpenRouteService: ${orsRes.status} ${txt.slice(0,120)}`);
+      const why=orsRes.status===401||orsRes.status===403?' (API key rejected — check it in Settings ⚙)':orsRes.status===429?' (daily limit reached — try again tomorrow)':'';
+      throw new Error(`OpenRouteService: ${orsRes.status}${why} ${txt.slice(0,120)}`);
     }
     const data=await orsRes.json();
     let distMeters=null,durSeconds=null;
