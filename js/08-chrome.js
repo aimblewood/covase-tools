@@ -237,6 +237,7 @@ const SB_ITEMS={
   'fleet':{icon:'🛣',label:'Lease fleet',view:'fleet',badge:'badge-fleet',home:'vehicles'},
   'crm-dashboard':{icon:'📊',label:'CRM dashboard',view:'crm-dashboard',home:'accounts'},
   'choice-lists':{icon:'📋',label:'Choice lists',view:'choice-lists',home:'orders'},
+  'mileage':{icon:'📏',label:'Mileage',view:'mileage',home:'fleet'},
   'reconciliation':{icon:'⟷',label:'Reconciliation',disabled:true},
   'sage':{icon:'◎',label:'Sage',disabled:true},
   'gocardless':{icon:'◉',label:'GoCardless',disabled:true}
@@ -249,7 +250,7 @@ const DEFAULT_SB_LAYOUT={sections:[
   {label:'Fines & penalties',items:['fines']},
   {label:'Supplier replies',items:['supplier-replies']},
   {label:'CRM',items:['crm-dashboard','choice-lists','orders','accounts','contacts']},
-  {label:'Fleet',items:['fleet','vehicles']},
+  {label:'Fleet',items:['fleet','mileage','vehicles']},
   {label:'Reports',items:['reconciliation']},
   {label:'Integrations',items:['sage','gocardless']}
 ],hidden:[]};
