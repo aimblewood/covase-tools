@@ -94,8 +94,20 @@ Files are uploaded through the policy screen into the private `documents` bucket
 
 ## 9. Open questions / assumptions
 
-- **Assumed:** a short-hire driver gets both emails — Driving for Business on case open, short-hire email once booked. *To confirm.*
-- **Starters/leavers sheet:** does WT add the rows and Simon fills "Covase Actioned", or does Simon add starters? If WT add them, the sheet is a second intake source.
+- **Confirmed (Simon, 23 Nov):** a short-hire driver gets both emails — Driving for Business on case open, short-hire email once booked — with the wording tweaked so the two read as a pair (see §10).
+- **Starters/leavers sheet:** a mix — sometimes WT add the row, sometimes Simon does. So the sheet is both an intake source (new WT rows → draft case) and an output (Covase rows / "Covase Actioned"). Phase 4.
 - Calendar entry format (title, all-day vs timed, what goes in the body).
 - Nominee details: known at case open, or only learned when the driver registers with Drivetech?
 - Drivetech terms on automated access.
+
+## 10. Email alignment (proposed 23 Nov, awaiting Simon's OK)
+
+Base texts are Simon's (WT Driving for Business; short hire). Changes only:
+
+**Driving for Business** — after the opening paragraph, one paragraph chosen by vehicle route:
+- Short hire: "In the meantime I'm arranging a temporary hire car for you from {start date}. I'll email you separately with the delivery details once it's booked."
+- Existing fleet vehicle: "You'll be taking over {make model} ({reg}). I'll be in touch to arrange the handover."
+- None yet: paragraph left out.
+Lex essential contacts attached only on the existing/new Lex vehicle route. Typo: "processed with 48 hours" → "within 48 hours".
+
+**Short hire** — opening becomes "Further to my earlier email about the Woodland Trust car scheme, I can confirm I have booked a short hire for delivery on {day date} from {time} to {address}." The "week or two" sentence is a choice (spare fleet car / new car delivered / own words). New closing reminder before the sign-off: "A reminder that before you drive on company business we need your signed Driver Agreement and your DriveTech licence check (see my earlier email). If you haven't done these yet, please do so as soon as possible." Fix point 6: "with the same fuel level it was delivered with" and close the bracket.
