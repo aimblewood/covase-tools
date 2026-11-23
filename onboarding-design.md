@@ -1,6 +1,6 @@
 # Driver onboarding — design (draft for Simon, 23 Nov 2026)
 
-Status: **approved 23 Nov 2026. Phase 1 built** (SQL applied; js/16-onboarding.js; three n8n workflows built, awaiting publish). Covase Tools only — nothing to do with ORBIS (the connected-car venture with Alan).
+Status: **approved 23 Nov 2026. Phase 1 built** (SQL applied; js/16-onboarding.js; three n8n workflows published 23 Nov). Covase Tools only — nothing to do with ORBIS (the connected-car venture with Alan).
 
 ## 1. What it is
 
