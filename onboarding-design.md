@@ -12,7 +12,7 @@ A case per driver who is starting to drive on company business for a client. One
 | Role change / newly eligible | Bella Williams, Assistant Outreach Advisor SW, from 30/11 | `Opt in on 2/2/2026 Perm` |
 | Returning starter | Sarah Massey | `Returning starter 1/12/25 Perm` |
 
-Case fields: client, type, employment basis (**Perm / Fixed term**), job title, start date, driver (first, surname, preferred name, email, mobile — all required except preferred; address optional), nominee(s) (name, optional), vehicle route, vehicle type (**car / LCV**), notes, source email.
+Case fields: client, type, employment basis (**Perm / Fixed term**), job title, start date, driver (first, surname, preferred name, email, mobile — all required except preferred; address optional), vehicle route, vehicle type (**car / LCV**), notes, source email.
 
 Vehicle route — one of:
 - **Short hire** → links to a hire booking (`CVB-`).
@@ -49,7 +49,7 @@ Policy editor: same feel as the choice-list policy editor.
    - *Existing vehicle*: pick by reg (Dynamics Vehicle Lookup); new n8n write workflow changes the driver and **appends** a dated line to the description, keeping what's there (pattern from Simon's screenshot: "Going to Seb Austin mid July. Seb Austin as of 21/7/26"). Same handover also recorded in Covase Tools allocations.
 6. **Starters/leavers sheet** (WT only) — `Fleet movements, starters, leavers.xlsx` in WT's SharePoint site `EXT_CovaseWTCompanyVehicles` (WT's tenant; Simon is a guest). Columns: **Who? · Action · When (notes) · Added to list/Covase instructed · Covase Actioned**. Covase Tools drafts the row / "Covase Actioned" text from the case. Writing it: try Graph first (likely blocked — guest of another tenant, our credentials are Covase-tenant); otherwise a browser skill.
 
-**Waiting on the driver:** signed driver agreement (uploaded to the case when it comes back), licence check passed for driver and each nominee (from the status skill). Case is complete when every applicable step is done and every return is in.
+**Waiting on the driver:** signed driver agreement (uploaded to the case when it comes back), licence check passed for the driver (from the status skill); nominees shown for oversight only. Case is complete when every applicable step is done and every return is in.
 
 ## 4. Woodland Trust document pack
 
@@ -74,7 +74,7 @@ Files are uploaded through the policy screen into the private `documents` bucket
 
 - `covase_onboarding_cases` (id `onb-…`, ref `CVN-0001` from a sequence, client account, type, basis, job title, start date, driver fields, contact id / dynamics id, vehicle route, vehicle type, hire id, vehicle reg/dynamics id, status, sheet text, notes, timestamps).
 - `covase_onboarding_steps` (case id, step key, status, done at/by, result text, error) — also the browser skills' to-do list and result store.
-- `covase_onboarding_nominees` (case id, name, licence check status, checked at).
+- `covase_onboarding_nominees` (case id, name, licence check status, checked at) — written only by the Drivetech status skill.
 - Emails reuse the correspondence pattern; documents reuse `covase_documents` / `covase_document_links` with record type `onboarding`.
 
 ## 7. n8n work (never activated by Claude)
@@ -97,7 +97,7 @@ Files are uploaded through the policy screen into the private `documents` bucket
 - **Confirmed (Simon, 23 Nov):** a short-hire driver gets both emails — Driving for Business on case open, short-hire email once booked — with the wording tweaked so the two read as a pair (see §10).
 - **Starters/leavers sheet:** a mix — sometimes WT add the row, sometimes Simon does. So the sheet is both an intake source (new WT rows → draft case) and an output (Covase rows / "Covase Actioned"). Phase 4.
 - Calendar entry format (title, all-day vs timed, what goes in the body).
-- Nominee details: known at case open, or only learned when the driver registers with Drivetech?
+- **Nominees (Simon, 23 Nov):** the driver adds them on their own Drivetech account; Simon only needs occasional oversight. So the case never asks for them — the status skill reports whatever nominees it finds on the driver's account and their check status, shown read-only on the case. Nominee checks do not block a case from completing.
 - Drivetech terms on automated access.
 
 ## 10. Email alignment (proposed 23 Nov, awaiting Simon's OK)
