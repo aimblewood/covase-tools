@@ -694,3 +694,26 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .form-field:has(> label.qf-read:not(.qf-off)) :is(input,select,textarea){box-shadow:inset 3px 0 0 #03C4B8}
 .form-field label.qf-read.qf-off{color:var(--n500);text-decoration:line-through}
 .form-field.qf-field-off :is(input,select,textarea){opacity:.6}
+
+/* ─── Driver onboarding (js/16-onboarding.js) ─── */
+.onb-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.onb-cols{grid-template-columns:1fr}}
+.onb-progress{height:4px;background:var(--n100);border-radius:2px;overflow:hidden;margin:4px 0 2px}
+.onb-progress span{display:block;height:100%;background:var(--covase)}
+.kan-card.onb-late{border-left:3px solid #c0392b}
+.onb-step{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--n100)}
+.onb-step-ico{width:22px;flex:0 0 22px;text-align:center;font-size:14px;line-height:22px}
+.onb-step-main{flex:1;min-width:0}
+.onb-step-label{font-size:13px;font-weight:600;color:var(--n800,#222)}
+.onb-st-skipped .onb-step-label{color:var(--n400);font-weight:400;text-decoration:line-through}
+.onb-kind{font-size:10px;font-weight:400;color:var(--n400);margin-left:4px}
+.onb-step-res{font-size:11px;color:var(--n500);margin-top:2px}
+.onb-step-act{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:55%}
+.onb-step-act .btn{font-size:11px;padding:3px 8px}
+.onb-hint{font-size:11px;color:var(--n500)}
+.onb-dyn-row{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;margin-top:6px;background:var(--card);border:1px solid var(--n100);border-radius:6px;font-size:12px}
+.onb-att{display:block;font-size:13px;padding:3px 0}
+.onb-pol-step{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.onb-pol-step input.onb-ps-label{flex:1 1 220px;min-width:160px}
+.onb-pol-step select{flex:0 1 auto}
+.onb-pd-name{flex:1 1 220px;font-size:12px}
