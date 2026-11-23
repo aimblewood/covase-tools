@@ -142,7 +142,10 @@ lsInjectView('view-onboarding',`
     <div class="stat-card stat-indigo"><div class="stat-label">Waiting on drivers</div><div class="stat-val" id="onb-s-driver">—</div></div>
     <div class="stat-card stat-green"><div class="stat-label">Done (30 days)</div><div class="stat-val" id="onb-s-done">—</div></div>
   </div>
-  <div class="content"><div id="onb-kanban" class="kanban" style="grid-template-columns:repeat(4,minmax(230px,1fr))"><div class="loading">Loading cases…</div></div></div>`);
+  <div class="content">
+    <div id="claude-todo" class="onb-todo"></div>
+    <div id="onb-kanban" class="kanban" style="grid-template-columns:repeat(4,minmax(230px,1fr))"><div class="loading">Loading cases…</div></div>
+  </div>`);
 
 async function onbLoadPolicies(){
   try{const r=await sbReq('covase_config?key=eq.onboarding_policies&select=value');const v=r&&r[0]?r[0].value:null;onbPolicies=Array.isArray(v)&&v.length?v:JSON.parse(JSON.stringify(ONB_DEFAULT_POLICIES));}
@@ -179,7 +182,95 @@ function renderOnboarding(){
   set('onb-s-driver',open.filter(c=>onbLane(c)==='driver').length);
   set('onb-s-done',onbCases.filter(c=>c.status==='done'&&(c.completed_at||'')>=monthAgo).length);
   const b=document.getElementById('badge-onboarding');if(b)b.textContent=open.length||'0';
+  renderClaudeTodo();
 }
+
+// ── Claude's to-do list ──
+// Read and worked by the Drivetech browser skills in Simon's own browser
+// (brief: drivetech-skill-brief.md). Deliberately plain and stable: each job is a
+// .claude-job block with data-job / data-case-ref, labelled fields, an inline
+// note box and clearly named buttons -- no pop-up dialogs, which browser
+// automation handles badly. Deep link: covase-platform.html#claude-todo
+function onbJobs(){
+  const open=onbCases.filter(c=>c.status==='open');
+  const add=[],check=[];
+  open.forEach(c=>{
+    const st=onbStepsOf(c.id),dt=st.find(s=>s.step_key==='drivetech_add'),lic=st.find(s=>s.step_key==='licence');
+    if(dt&&['ready','in_progress'].includes(dt.status))add.push({c,s:dt});
+    if(lic&&!['done','skipped'].includes(lic.status)&&(!dt||['done','skipped'].includes(dt.status)))check.push({c,s:lic});
+  });
+  return {add,check};
+}
+function onbJobFields(c){
+  const f=[['Case',c.case_ref],['Client',c.client_name],['First name',c.first_name],['Surname',c.last_name],['Preferred name',c.preferred_name],['Email',c.email],['Mobile',c.mobile],['Job title',c.job_title],['Start date',fmtUK(c.start_date)],['Vehicle',onbLbl(ONB_VTYPES,c.vehicle_type)]];
+  return '<dl class="claude-fields">'+f.filter(x=>x[1]).map(([k,v])=>`<dt>${esc(k)}</dt><dd data-field="${esc(k.toLowerCase().replace(/ /g,'_'))}">${esc(v)}</dd>`).join('')+'</dl>';
+}
+function renderClaudeTodo(){
+  const el=document.getElementById('claude-todo');if(!el)return;
+  const {add,check}=onbJobs();
+  const noms=c=>onbNominees.filter(n=>n.case_id===c.id);
+  const addHtml=add.map(({c,s})=>`<div class="claude-job" data-job="drivetech_add" data-case-ref="${esc(c.case_ref)}" data-step-id="${esc(s.id)}">
+      <div class="claude-job-title">Add to Drivetech — ${esc(onbName(c))} <span class="onb-hint">${s.status==='in_progress'?'· started':''}</span></div>
+      ${onbJobFields(c)}
+      ${s.error?`<div class="onb-hint">Last problem: ${esc(s.error)}</div>`:''}
+      <input class="claude-note" id="cjn-${esc(s.id)}" placeholder="Note (what happened)">
+      <div class="claude-actions">
+        <button class="btn btn-edit" onclick="claudeJob('${esc(s.id)}','start')">Started</button>
+        <button class="btn btn-edit" onclick="claudeJob('${esc(s.id)}','done')">Done – driver added</button>
+        <button class="btn btn-danger" onclick="claudeJob('${esc(s.id)}','problem')">Problem</button>
+      </div></div>`).join('');
+  const checkHtml=check.map(({c,s})=>`<div class="claude-job" data-job="licence_check" data-case-ref="${esc(c.case_ref)}" data-step-id="${esc(s.id)}">
+      <div class="claude-job-title">Check licence — ${esc(onbName(c))}</div>
+      ${onbJobFields(c)}
+      ${s.result?`<div class="onb-hint">Last result: ${esc(s.result)}</div>`:''}
+      ${noms(c).length?'<div class="onb-hint">Nominees on file: '+noms(c).map(n=>esc(n.name+' ('+(n.check_status||'unknown')+')')).join(', ')+'</div>':''}
+      <input class="claude-note" id="cjn-${esc(s.id)}" placeholder="Note (what Drivetech shows)">
+      <div class="claude-actions">
+        <button class="btn btn-edit" onclick="claudeJob('${esc(s.id)}','passed')">Licence check passed</button>
+        <button class="btn btn-edit" onclick="claudeJob('${esc(s.id)}','waiting')">Not complete yet</button>
+        <button class="btn btn-danger" onclick="claudeJob('${esc(s.id)}','problem')">Problem</button>
+      </div>
+      <div class="claude-nominee">
+        <input class="claude-nom-name" id="cjnn-${esc(s.id)}" placeholder="Nominee name">
+        <input class="claude-nom-status" id="cjns-${esc(s.id)}" placeholder="Nominee check status">
+        <button class="btn btn-edit" onclick="claudeNominee('${esc(c.id)}','${esc(s.id)}')">Save nominee</button>
+      </div></div>`).join('');
+  const total=add.length+check.length;
+  if(window._onbTodoOpen==null)window._onbTodoOpen=location.hash==='#claude-todo';
+  el.innerHTML=`<details class="onb-todo-box" ontoggle="window._onbTodoOpen=this.open"${window._onbTodoOpen?' open':''}>
+    <summary>🤖 Claude's to-do list <span class="kan-col-count">${total}</span> <span class="onb-hint">· Drivetech jobs for the browser skill</span></summary>
+    <div class="onb-todo-cols">
+      <div><div class="form-section-label">Add to Drivetech (${add.length})</div>${addHtml||'<div class="onb-hint">Nothing waiting. A driver appears here when you click 🤖 Ready for Claude on their case.</div>'}</div>
+      <div><div class="form-section-label">Licence checks to look up (${check.length})</div>${checkHtml||'<div class="onb-hint">Nothing waiting. Drivers appear here once they are added to Drivetech, until their check has passed.</div>'}</div>
+    </div></details>`;
+}
+async function claudeJob(stepId,action){
+  const s=onbSteps.find(x=>x.id===stepId);if(!s)return;
+  const note=(document.getElementById('cjn-'+stepId)?.value||'').trim();
+  const today=fmtUK(new Date().toISOString().slice(0,10));
+  const map={
+    start:['in_progress',undefined,{}],
+    done:['done',note||'Added to Drivetech',{}],
+    problem:['failed',undefined,{error:(note||'Problem – see Drivetech')+' ('+today+')'}],
+    passed:['done',note||'Licence check passed',{}],
+    waiting:['todo',(note||'Not complete')+' as of '+today,{}]
+  };
+  const [status,result,extra]=map[action]||[];if(!status)return;
+  await onbSetStep(s.case_id,s.step_key,status,result,{...extra,...(status==='done'?{done_by:'Claude'}:{})});
+  toast(action==='waiting'?'Recorded – still waiting':'Recorded','success');
+}
+async function claudeNominee(caseId,stepId){
+  const name=(document.getElementById('cjnn-'+stepId)?.value||'').trim(),status=(document.getElementById('cjns-'+stepId)?.value||'').trim();
+  if(!name){toast('Nominee name needed','error');return;}
+  try{
+    const now=new Date().toISOString();
+    const r=await sbReq('covase_onboarding_nominees?on_conflict=case_id,name',{method:'POST',body:{case_id:caseId,name,check_status:status||null,checked_at:now,updated_at:now},prefer:'resolution=merge-duplicates,return=representation'});
+    const row=Array.isArray(r)?r[0]:r;const i=onbNominees.findIndex(n=>n.case_id===caseId&&n.name===name);if(i>=0)onbNominees[i]=row;else onbNominees.push(row);
+    toast('Nominee saved','success');renderClaudeTodo();if(onbEditId===caseId)onbRenderChecklist();
+  }catch(e){toast('Save failed: '+e.message,'error');}
+}
+// Deep link for the browser skill: …/covase-platform.html#claude-todo
+setTimeout(()=>{if(location.hash==='#claude-todo'){const it=document.querySelector('[data-view=onboarding]');showView('onboarding',it);}},1200);
 function onbCard(c){
   const st=onbStepsOf(c.id).filter(s=>s.status!=='skipped'),done=st.filter(s=>s.status==='done').length;
   const d=onbDays(c.start_date);
@@ -353,7 +444,7 @@ async function onbSetStep(caseId,key,status,result,extra){
   const s=onbStepsOf(caseId).find(x=>x.step_key===key);if(!s)return;
   const body={status,updated_at:new Date().toISOString(),...(extra||{})};
   if(result!==undefined)body.result=result;
-  if(status==='done'){body.done_at=body.updated_at;body.done_by='Simon';body.error=null;}
+  if(status==='done'){body.done_at=body.updated_at;body.done_by=body.done_by||'Simon';body.error=null;}
   try{await sbReq(`covase_onboarding_steps?id=eq.${encodeURIComponent(s.id)}`,{method:'PATCH',body,prefer:'return=minimal'});Object.assign(s,body);}
   catch(e){toast('Update failed: '+e.message,'error');return;}
   await onbMaybeComplete(caseId);
