@@ -6,7 +6,9 @@
 
 ## 1. What this is
 
-**ORBIS-SON** is Covase Ltd's internal fleet-management platform: short-hire bookings, CRM, vehicle movements (logistics), accident claims (FMG), fines & penalties, invoicing. Goal: fully detach from Dynamics 365 within months. Built and maintained conversationally with Claude; Simon Homer is the owner/operator and the only person who pushes deploys.
+**Naming (Simon, 23 Nov 2026):** in chat, call this system **Covase Tools**. **ORBIS** on its own means a *separate* system and company Simon is developing with Alan, built on connected-car data — not this codebase. Simon sometimes calls Covase Tools "ORBIS" too, so keep the two clearly apart.
+
+**ORBIS-SON** (= Covase Tools) is Covase Ltd's internal fleet-management platform: short-hire bookings, CRM, vehicle movements (logistics), accident claims (FMG), fines & penalties, invoicing. Goal: fully detach from Dynamics 365 within months. Built and maintained conversationally with Claude; Simon Homer is the owner/operator and the only person who pushes deploys.
 
 **Stack:** vanilla HTML/JS app — `covase-platform.html` is the page shell (markup only, ~210KB); styles live in `css/platform.css` and the script in `js/01-core.js` … `js/08-chrome.js`, one file per area (core/config/Dynamics/Supabase, invoices, hires, movements, CRM, claims, fines, chrome = edit mode/fonts/realtime/sidebar/mobile). They are classic `<script src>` tags loaded in that order, so every function is still a global and inline `onclick=` handlers work unchanged; split 2026-10-21 byte-for-byte from the old single file (concatenating the js files gives the old `<script>` exactly). **Load order matters:** code that runs at load in file N must not call something declared only in a later file. + Supabase (Postgres/PostgREST/Realtime/Storage via anon key) + n8n cloud for automation + Microsoft Graph for email + Claude API for extraction/classification. Deployed on **GitHub Pages**: repo `aimblewood/covase-tools` → https://aimblewood.github.io/covase-tools/. **Push = deploy.** Rollback = revert commit (or `covase-platform.old.html` snapshot).
 
