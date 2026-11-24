@@ -757,3 +757,6 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .usr-group{font-size:13px}
 .usr-group label{display:block;padding:2px 0}
 .usr-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n500);margin-bottom:2px}
+.onb-sig{min-height:70px;border:1px solid var(--n200,#ddd);border-radius:8px;padding:8px 10px;background:#fff;color:#222;font-family:Arial,sans-serif;font-size:13px;overflow:auto;max-height:260px}
+.onb-sig-preview{min-height:0;background:var(--card)}
+.onb-sig img{max-width:100%;height:auto}
