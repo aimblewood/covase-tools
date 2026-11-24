@@ -10,6 +10,7 @@
 // Steps of kind 'browser' with status 'ready' are the queue the Drivetech
 // browser skills will work through (phase 3); until then they're ticked by hand.
 const ONB_N8N={
+  calendar:'https://covase.app.n8n.cloud/webhook/covase-calendar-entry',
   read:'https://covase.app.n8n.cloud/webhook/covase-onboarding-read',
   create:'https://covase.app.n8n.cloud/webhook/covase-contact-create',
   email:'https://covase.app.n8n.cloud/webhook/covase-driver-email'
@@ -26,7 +27,7 @@ const ONB_LANES=[['new','New'],['progress','In progress'],['driver','Waiting on 
 // Default Woodland Trust policy — Simon's wording (20–23 Nov 2026), aligned so the
 // two emails read as a pair. Saved to covase_config the first time he presses Save.
 const ONB_DEFAULT_POLICIES=[{
-  key:'wt',name:'Woodland Trust',account_id:'acc-s006',sender:'simon.homer@covase.co.uk',cc:'',
+  key:'wt',name:'Woodland Trust',account_id:'acc-s006',sender:'simon.homer@covase.co.uk',cc:'',calendar_name:'Woodland Trust',
   steps:[
     {key:'dynamics',label:'Driver in Dynamics',kind:'auto',when:''},
     {key:'drivetech_add',label:'Add to Drivetech (Fleet Risk Manager)',kind:'browser',when:''},
@@ -380,6 +381,7 @@ function openEditOnb(id){
   document.getElementById('onb-check-col').style.display='';document.getElementById('onb-docs-btn').style.display='';document.getElementById('onb-cancel-case').style.display=c.status==='open'?'':'none';
   onbFill(c);onbRenderChecklist();
   document.getElementById('onb-modal').classList.add('open');
+  onbSyncSteps(c).then(()=>{if(onbEditId===id)onbRenderChecklist();renderOnboarding();}).catch(()=>{});
 }
 function closeOnbModal(){document.getElementById('onb-modal').classList.remove('open');onbEditId=null;}
 
@@ -436,6 +438,8 @@ async function onbSyncSteps(c){
     if(!ex&&ok)add.push({case_id:c.id,step_key:s.key,label:s.label,kind:s.kind,sort_order:i});
     else if(ex&&!ok&&ex.status!=='done'&&ex.status!=='skipped')patch.push([ex,{status:'skipped'}]);
     else if(ex&&ok&&ex.status==='skipped'&&ex.result!=='not needed')patch.push([ex,{status:'todo'}]);
+    // Policy edits (name, who does it, order) reach cases already open (Simon, 24 Nov 2026).
+    if(ex&&(ex.label!==s.label||ex.kind!==s.kind||ex.sort_order!==i)){const pp=patch.find(x=>x[0]===ex);const b={label:s.label,kind:s.kind,sort_order:i};if(pp)Object.assign(pp[1],b);else patch.push([ex,b]);}
   });
   if(add.length){const r=await sbReq('covase_onboarding_steps',{method:'POST',body:add});onbSteps.push(...(r||[]));}
   for(const [ex,b] of patch){await sbReq(`covase_onboarding_steps?id=eq.${encodeURIComponent(ex.id)}`,{method:'PATCH',body:{...b,updated_at:new Date().toISOString()},prefer:'return=minimal'});Object.assign(ex,b);}
@@ -492,6 +496,7 @@ function onbStepRow(c,s){
       else if(c.vehicle_route==='existing_vehicle')act=c.vehicle_reg?doneBtn:'<span class="onb-hint">Add the registration and save</span>';
       else act='<span class="onb-hint">Choose how they get a vehicle and save</span>'+doneBtn;
       break;
+    case 'calendar':act=s.kind==='auto'?`<button class="btn btn-edit" onclick="onbOpenCalendar()">📅 Add to calendar</button>`+doneBtn:doneBtn;break;
     case 'agreement':act=`<label class="btn btn-edit" style="cursor:pointer">📎 Upload signed copy<input type="file" style="display:none" onchange="onbUploadAgreement(this.files);this.value=''"></label>`+doneBtn;break;
     default:
       if(s.kind==='browser'&&s.status!=='ready')act=`<button class="btn btn-edit" title="Put it on Claude's to-do list" onclick="onbSetStep('${id}','${k}','ready')">🤖 Ready for Claude</button>`+doneBtn;
@@ -705,6 +710,45 @@ async function onbEmailSend(){
   finally{btn.disabled=false;btn.textContent='Send';}
 }
 
+// ── Calendar entry (n8n covase-calendar-entry → Graph, Simon's own calendars) ──
+lsInjectModal('onb-cal-modal',`
+  <div class="modal-header"><div class="modal-title">Add to calendar</div><button class="modal-close" onclick="document.getElementById('onb-cal-modal').classList.remove('open')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-row"><div class="form-field"><label>Calendar</label><input id="onb-cal-name"></div><div class="form-field"><label>Date (all day)</label><input type="date" id="onb-cal-date"></div></div>
+    <div class="form-field"><label>Title</label><input id="onb-cal-subject"></div>
+    <div class="form-field"><label>Notes</label><textarea id="onb-cal-notes" style="min-height:160px"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn-secondary-modal" onclick="document.getElementById('onb-cal-modal').classList.remove('open')">Cancel</button><button class="btn-primary-modal" id="onb-cal-go" onclick="onbCalendarSend()">Add to calendar</button></div>`);
+async function onbOpenCalendar(){
+  const c=await onbSaveFirst();if(!c)return;const pol=onbPolicy(c)||{};
+  const vehicle=c.vehicle_route==='short_hire'?'short hire':c.vehicle_route==='existing_vehicle'?('fleet car'+(c.vehicle_reg?' '+c.vehicle_reg:'')):onbLbl(ONB_ROUTES,c.vehicle_route).toLowerCase();
+  document.getElementById('onb-cal-name').value=pol.calendar_name||(ONB_DEFAULT_POLICIES.find(d=>d.key===pol.key)||{}).calendar_name||'';
+  document.getElementById('onb-cal-date').value=c.start_date||'';
+  document.getElementById('onb-cal-subject').value=[onbLbl(ONB_TYPES,c.case_type)+': '+onbName(c),vehicle].filter(Boolean).join(' – ')+(c.case_ref?' ('+c.case_ref+')':'');
+  document.getElementById('onb-cal-notes').value=[
+    'Client: '+(c.client_name||''),c.job_title?'Role: '+c.job_title:'',c.basis?'Basis: '+onbLbl(ONB_BASIS,c.basis):'',
+    'Driver: '+onbName(c)+(c.preferred_name?' (known as '+c.preferred_name+')':''),c.email?'Email: '+c.email:'',c.mobile?'Mobile: '+c.mobile:'',
+    'Vehicle: '+onbLbl(ONB_ROUTES,c.vehicle_route)+' · '+onbLbl(ONB_VTYPES,c.vehicle_type)+(c.vehicle_reg?' · '+c.vehicle_reg:''),
+    '','Covase Tools case '+(c.case_ref||'')].filter((x,i)=>x!==''||i>0).join('\n');
+  document.getElementById('onb-cal-modal').classList.add('open');
+}
+async function onbCalendarSend(){
+  const c=onbCases.find(x=>x.id===onbEditId);if(!c)return;
+  const g=id=>document.getElementById(id).value.trim();
+  if(!g('onb-cal-name')||!g('onb-cal-date')||!g('onb-cal-subject')){toast('Calendar, date and title are needed','error');return;}
+  const b=document.getElementById('onb-cal-go');b.disabled=true;
+  try{
+    await covaseAuthWait();
+    const r=await fetch(ONB_N8N.calendar,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:covaseAuthToken(),calendar:g('onb-cal-name'),date:g('onb-cal-date'),subject:g('onb-cal-subject'),body:'<div style="font-family:Arial,sans-serif;font-size:13px">'+esc(document.getElementById('onb-cal-notes').value).replace(/\n/g,'<br>')+'</div>'})});
+    if(r.status===404)throw new Error('the calendar workflow is not switched on in n8n yet');
+    const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.message||j.error||('HTTP '+r.status));
+    document.getElementById('onb-cal-modal').classList.remove('open');
+    await onbSetStep(c.id,'calendar','done','In '+g('onb-cal-name')+' calendar for '+fmtUK(g('onb-cal-date')));
+    toast('Added to your '+g('onb-cal-name')+' calendar','success');
+  }catch(e){toast('Couldn\'t add it: '+e.message,'error');}
+  finally{b.disabled=false;}
+}
+
 // ── Client policies ──
 lsInjectModal('onb-pol-modal',`
   <div class="modal-header"><div class="modal-title">Onboarding policies</div><button class="modal-close" onclick="document.getElementById('onb-pol-modal').classList.remove('open')">✕</button></div>
@@ -750,6 +794,7 @@ function onbPolRender(){
       <div class="form-field"><label>Client account</label><select id="onb-pol-acc">${lsAccountOptions(['client','both'],p.account_id)}</select></div>
       <div class="form-field"><label>Emails come from</label><select id="onb-pol-sender">${lsOptions(ONB_SENDERS,p.sender)}</select></div>
     </div>
+    <div class="form-field"><label>Outlook calendar for entries</label><input id="onb-pol-cal" value="${esc(p.calendar_name||(ONB_DEFAULT_POLICIES.find(d=>d.key===p.key)||{}).calendar_name||'')}" placeholder="e.g. Woodland Trust (must match the calendar name in your Outlook)"></div>
     <div class="form-field"><label>Always copy in (optional)</label><input id="onb-pol-cc" value="${esc(p.cc||'')}" placeholder="comma separated"></div>
     <div class="form-field"><label>Email signature (added under every email from this policy)</label><div id="onb-pol-sig" class="onb-sig" contenteditable="true">${onbCleanSig(p.signature_html||'')}</div>
       <div class="onb-hint">Copy your signature from an email you've sent in Outlook and paste it here. Text, links and formatting come across. A logo shows if it's a picture from a website; a pasted picture from your computer may not, so check a test email.</div></div>
@@ -776,7 +821,7 @@ function onbPolRender(){
 function onbPolCollect(){
   const p=onbPolDraft&&onbPolDraft[onbPolIdx];if(!p||!document.getElementById('onb-pol-name'))return;
   const g=id=>document.getElementById(id).value;
-  p.name=g('onb-pol-name').trim()||p.name;p.signature_html=onbCleanSig((document.getElementById('onb-pol-sig')||{}).innerHTML||'');p.account_id=g('onb-pol-acc');p.sender=g('onb-pol-sender');p.cc=g('onb-pol-cc').trim();
+  p.name=g('onb-pol-name').trim()||p.name;p.calendar_name=g('onb-pol-cal').trim();p.signature_html=onbCleanSig((document.getElementById('onb-pol-sig')||{}).innerHTML||'');p.account_id=g('onb-pol-acc');p.sender=g('onb-pol-sender');p.cc=g('onb-pol-cc').trim();
   p.steps=[...document.querySelectorAll('#onb-pol-steps .onb-pol-step')].map((row,i)=>({key:p.steps[i].key,label:row.querySelector('.onb-ps-label').value.trim()||p.steps[i].label,kind:row.querySelector('.onb-ps-kind').value,when:row.querySelector('.onb-ps-when').value}));
   [...document.querySelectorAll('#onb-pol-docs .onb-pol-step')].forEach((row,i)=>{const d=p.docs[i];if(!d)return;d.emails=row.querySelector('.onb-pd-emails').value;d.vehicle=row.querySelector('.onb-pd-vehicle').value;d.routes=row.querySelector('.onb-pd-routes').value;});
   p.emails={dfb:{subject:g('onb-pol-dfb-s'),body:g('onb-pol-dfb-b')},short_hire:{subject:g('onb-pol-sh-s'),body:g('onb-pol-sh-b')}};
