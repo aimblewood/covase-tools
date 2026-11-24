@@ -729,3 +729,31 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--n800);line-he
 .claude-note,.claude-nominee input{width:100%;font-size:12px;padding:5px 8px;margin-bottom:6px;box-sizing:border-box}
 .claude-actions{display:flex;gap:6px;flex-wrap:wrap}
 .claude-nominee{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px;align-items:start}
+
+/* ─── Sign-in + Users (js/00-auth.js, js/17-users.js) ─── */
+#auth-overlay{position:fixed;inset:0;z-index:1000;background:rgba(20,16,50,.72);display:none;align-items:center;justify-content:center;padding:16px}
+#auth-overlay.open{display:flex}
+.auth-card{position:relative;background:var(--card,#fff);border-radius:14px;padding:28px 26px 22px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column}
+.auth-card label{font-size:11px;font-weight:600;color:var(--n500);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+.auth-card input{padding:9px 11px;border:1px solid var(--n200,#ddd);border-radius:8px;font-size:14px}
+.auth-brand{font-size:20px;font-weight:700;margin-bottom:6px}
+.auth-btn{margin-top:16px;padding:10px;border:0;border-radius:8px;background:var(--covase,#03d3c6);color:#fff;font-weight:700;font-size:14px;cursor:pointer;width:100%}
+.auth-btn:disabled{opacity:.6}
+.auth-msg{font-size:12px;color:#c0392b;min-height:16px;margin-top:8px}
+.auth-link{font-size:12px;color:var(--n500);cursor:pointer;text-decoration:underline;margin-top:6px;align-self:flex-start}
+.auth-note{font-size:12px;color:var(--n500);margin-bottom:4px}
+.auth-close{position:absolute;top:10px;right:10px;border:0;background:none;font-size:16px;cursor:pointer;color:var(--n500)}
+#auth-signin,#auth-boot{display:flex;flex-direction:column}
+.auth-chip{font-size:12px;color:rgba(255,255,255,.85);background:rgba(255,255,255,.06);border-radius:8px;padding:8px 10px;margin-bottom:12px;line-height:1.5}
+.auth-chip-links a{color:#03d3c6;cursor:pointer;text-decoration:underline}
+.usr-table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:10px;overflow:hidden}
+.usr-table th,.usr-table td{padding:9px 10px;border-bottom:1px solid var(--n100);text-align:left;vertical-align:top}
+.usr-table th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--n500)}
+.usr-off td{color:var(--n400)}
+.usr-acts{white-space:nowrap;display:flex;gap:4px;flex-wrap:wrap}
+.usr-acts .btn{font-size:11px;padding:3px 8px}
+.usr-all{display:block;font-size:13px;margin-bottom:8px}
+.usr-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.usr-group{font-size:13px}
+.usr-group label{display:block;padding:2px 0}
+.usr-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--n500);margin-bottom:2px}

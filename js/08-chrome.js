@@ -194,6 +194,7 @@ function rtIndicator(on,msg){
   el.style.color=on?'#03d3c6':'rgba(255,255,255,.35)';
 }
 async function initRealtime(){
+  if(typeof covaseAuthWait==='function')await covaseAuthWait();
   const c=getConfig();
   if(!c.url||!c.key){rtIndicator(false,'Live updates off — no Supabase config');return;}
   try{
@@ -207,6 +208,7 @@ async function initRealtime(){
   }catch(e){rtIndicator(false,'Live updates unavailable (script blocked)');return;}
   try{
     const client=window.supabase.createClient(c.url,c.key);
+    window._rtClient=client;{const t=typeof covaseAuthToken==='function'&&covaseAuthToken();if(t)client.realtime.setAuth(t);}
     const ch=client.channel('orbis-live');
     Object.keys(RT_TABLES).forEach(t=>{
       ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>{
@@ -239,6 +241,7 @@ const SB_ITEMS={
   'choice-lists':{icon:'📋',label:'Choice lists',view:'choice-lists',home:'orders'},
   'mileage':{icon:'📏',label:'Mileage',view:'mileage',home:'fleet'},
   'onboarding':{icon:'🪪',label:'Driver onboarding',view:'onboarding',badge:'badge-onboarding',home:'contacts'},
+  'users':{icon:'🔑',label:'Users',view:'users',home:'sage'},
   'reconciliation':{icon:'⟷',label:'Reconciliation',disabled:true},
   'sage':{icon:'◎',label:'Sage',disabled:true},
   'gocardless':{icon:'◉',label:'GoCardless',disabled:true}
@@ -253,7 +256,7 @@ const DEFAULT_SB_LAYOUT={sections:[
   {label:'CRM',items:['crm-dashboard','choice-lists','orders','accounts','onboarding','contacts']},
   {label:'Fleet',items:['fleet','mileage','vehicles']},
   {label:'Reports',items:['reconciliation']},
-  {label:'Integrations',items:['sage','gocardless']}
+  {label:'Integrations',items:['users','sage','gocardless']}
 ],hidden:[]};
 let sbLayout=null,sboDraft=null,sbDrag=null;
 // Normalise any saved shape; unknown keys dropped, new modules auto-appended.
@@ -293,7 +296,7 @@ function renderSidebar(){
   const nav=document.querySelector('.sb-nav');if(!nav||!sbLayout)return;
   const cur=window._sbCurrentView||'hires-pipeline';
   const secs=sbLayout.sections.map(sec=>{
-    const items=sec.items.filter(k=>!sbLayout.hidden.includes(k));
+    const items=sec.items.filter(k=>!sbLayout.hidden.includes(k)&&(typeof covaseCanSee!=='function'||covaseCanSee(k)));
     if(!items.length)return '';
     const inner=items.map(k=>{
       const it=SB_ITEMS[k];if(!it)return '';

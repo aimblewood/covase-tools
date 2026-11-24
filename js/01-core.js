@@ -18,8 +18,8 @@ function searchHit(query,fields){
   return q.split(/\s+/).every(w=>hay.indexOf(w)!==-1||bare.indexOf(w)!==-1);
 }
 function getConfig(){return{
-  url:localStorage.getItem('covase_sb_url')||'',
-  key:localStorage.getItem('covase_sb_key')||'',
+  url:localStorage.getItem('covase_sb_url')||(typeof COVASE_AUTH!=='undefined'?COVASE_AUTH.url:'')||'',
+  key:localStorage.getItem('covase_sb_key')||(typeof COVASE_AUTH!=='undefined'?COVASE_AUTH.anonKey:'')||'',
   n8nClient:localStorage.getItem('covase_n8n_webhook')||DEFAULT_N8N_CLIENT,
   n8nContact:localStorage.getItem('covase_n8n_contact_webhook')||DEFAULT_N8N_CONTACT,
   n8nVehicle:localStorage.getItem('covase_n8n_vehicle_webhook')||DEFAULT_N8N_VEHICLE,
@@ -321,9 +321,11 @@ document.addEventListener('click',e=>{
 
 // ─── SUPABASE ───
 async function sbReq(path,opts={}){
+  if(typeof covaseAuthWait==='function')await covaseAuthWait(); // signed-in token when there is one (00-auth.js)
   const{url,key}=getConfig();
+  const bearer=(typeof covaseAuthToken==='function'&&covaseAuthToken())||key;
   const r=await fetch(`${url}/rest/v1/${path}`,{
-    headers:{'apikey':key,'Authorization':`Bearer ${key}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})},
+    headers:{'apikey':key,'Authorization':`Bearer ${bearer}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})},
     method:opts.method||'GET',body:opts.body?JSON.stringify(opts.body):undefined
   });
   if(!r.ok)throw new Error(await r.text());

@@ -7,6 +7,7 @@ Decisions: email + password (Supabase Auth). Lock included as the final step (Si
 ## Steps
 1. **n8n onto a private key.** Simon adds n8n variable `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API keys → service_role/secret). Claude swaps `$vars.SUPABASE_ANON_KEY` → `$vars.SUPABASE_SERVICE_KEY` in the 6 workflows below, publishes, checks executions.
 2. **Login screen + central settings.** Supabase Auth email/password; `sbReq`, Storage (`docHeaders`), realtime use the session token. Keys move to a settings row readable only when signed in. **User admin**: profiles table (user id, name, role admin/user, allowed modules = SB_ITEMS keys); sidebar + views hidden for modules not allowed (UI-level; per-module data rules can come later). Creating users needs the service key → a small n8n webhook that checks the caller is an admin (verifies their JWT) before calling the Auth admin API.
+   **Step 2 built 24 Nov 2026** (00-auth.js, 17-users.js, phase-logins.sql applied, User Admin workflow built, unpublished). Optional sign-in until step 4.
 3. **Accounts** for Simon and Andy (temporary passwords). Claude's browser skill signs in as Simon.
 4. **Go live + lock together:** RLS policies `anon` → `authenticated` on every covase_* table (audit stays SELECT-only), Storage policies likewise; bake URL + anon key into the code. One-step rollback SQL prepared.
 

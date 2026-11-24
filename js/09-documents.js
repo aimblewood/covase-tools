@@ -15,7 +15,7 @@ let docCtx=null; // {type,id,title}
 function docTypeLabel(t){return (DOC_TYPES.find(d=>d[0]===t)||[0,'Other'])[1];}
 function docSize(n){if(!n&&n!==0)return '';return n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n/1048576).toFixed(1)+' MB';}
 function docStorageUrl(path){const{url}=getConfig();return `${url}/storage/v1/object/${path}`;}
-function docHeaders(extra){const{key}=getConfig();return {'apikey':key,'Authorization':`Bearer ${key}`,...(extra||{})};}
+function docHeaders(extra){const{key}=getConfig();const t=(typeof covaseAuthToken==='function'&&covaseAuthToken())||key;return {'apikey':key,'Authorization':`Bearer ${t}`,...(extra||{})};}
 
 function openDocs(type,id,title){
   docCtx={type,id,title:title||''};
