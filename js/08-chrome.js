@@ -305,10 +305,37 @@ function renderSidebar(){
       return '<div class="sb-item'+(it.view===cur?' active':'')+'" data-view="'+esc(it.view)+'" onclick="window._sbCurrentView=\''+it.view+'\';showView(\''+it.view+'\',this)"><span class="icon">'+it.icon+'</span> '+esc(it.label)
         +(it.badge?' <span class="sb-badge'+(it.badgeCls?' '+it.badgeCls:'')+'" id="'+it.badge+'">—</span>':'')+'</div>';
     }).join('');
-    return '<div class="sb-section"><div class="sb-section-label">'+esc(sec.label)+'</div>'+inner+'</div>';
+    const closed=sbClosedSections().includes(sec.label);
+    return '<div class="sb-section'+(closed?' closed':'')+'" data-sec="'+esc(sec.label)+'"><div class="sb-section-label" role="button" tabindex="0" title="'+(closed?'Show':'Hide')+' this section" onclick="sbToggleSection(this.parentNode)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();sbToggleSection(this.parentNode)}"><span>'+esc(sec.label)+'</span><span class="sb-chev" aria-hidden="true">›</span></div>'+inner+'</div>';
   }).filter(Boolean);
-  nav.innerHTML=secs.join('<div class="sb-divider"></div>');
+  nav.innerHTML='<div class="sb-all-row"><button type="button" id="sb-all-toggle" class="sb-all-toggle" onclick="sbToggleAllSections()"></button></div>'+secs.join('<div class="sb-divider"></div>');
+  sbUpdateAllToggle();
   if(typeof updateBadges==='function'){try{updateBadges();}catch(e){}}
+}
+// ── Collapsible sections (per machine; Simon, 24 Nov 2026) ──
+// A closed section keeps only the screen you're on visible. Stored in
+// localStorage 'covase_sb_closed' as section labels. Ignored on the icon rail.
+function sbClosedSections(){try{const v=JSON.parse(localStorage.getItem('covase_sb_closed')||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}}
+function sbSaveClosed(list){try{localStorage.setItem('covase_sb_closed',JSON.stringify(list));}catch(e){}}
+function sbToggleSection(el){
+  const label=el.getAttribute('data-sec');let list=sbClosedSections();
+  const closing=!list.includes(label);
+  list=closing?list.concat(label):list.filter(x=>x!==label);
+  sbSaveClosed(list);el.classList.toggle('closed',closing);
+  const l=el.querySelector('.sb-section-label');if(l)l.title=(closing?'Show':'Hide')+' this section';
+  sbUpdateAllToggle();
+}
+function sbToggleAllSections(){
+  const secs=[...document.querySelectorAll('.sb-nav .sb-section')];
+  const anyOpen=secs.some(s=>!s.classList.contains('closed'));
+  sbSaveClosed(anyOpen?secs.map(s=>s.getAttribute('data-sec')):[]);
+  secs.forEach(s=>s.classList.toggle('closed',anyOpen));
+  sbUpdateAllToggle();
+}
+function sbUpdateAllToggle(){
+  const b=document.getElementById('sb-all-toggle');if(!b)return;
+  const anyOpen=[...document.querySelectorAll('.sb-nav .sb-section')].some(s=>!s.classList.contains('closed'));
+  b.textContent=anyOpen?'Collapse all':'Expand all';b.title=anyOpen?'Hide every section':'Show every section';
 }
 // ── Organiser modal ──
 function openSbOrganiser(){sboDraft=sbCloneLayout(sbLayout);sboRender();const cp=document.getElementById('config-panel');if(cp)cp.classList.remove('open');document.getElementById('sb-organiser-modal').classList.add('open');}
