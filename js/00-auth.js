@@ -6,7 +6,7 @@
 // optional — it just switches calls to your token and unlocks the Users screen.
 // Step 4 = set required:true and fill url + anonKey here (the anon key is only
 // safe in this public repo once the database is locked).
-const COVASE_AUTH={required:false,url:'',anonKey:''};
+const COVASE_AUTH={required:true,url:'https://nlvlyfdsvgrdlcqksafb.supabase.co',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sdmx5ZmRzdmdyZGxjcWtzYWZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4MDA0MjAsImV4cCI6MjA2OTM3NjQyMH0.MLg9xi2mOVSk6vQQxnlMBr58yVbUwzOrjNydsN_tWzg'}; // step 4 (lock on): public anon key is safe now — it reaches nothing without a member sign-in
 const COVASE_USER_ADMIN_HOOK='https://covase.app.n8n.cloud/webhook/covase-user-admin';
 const COVASE_KEY_MAP={ors_api_key:'covase_ors_api_key',idealpc_key:'covase_idealpc_key',tile_url:'covase_tile_url',tile_attribution:'covase_tile_attribution'};
 window.covaseMe=null; // {user_id,email,full_name,role,modules,active}
