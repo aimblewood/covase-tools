@@ -658,7 +658,7 @@ function onbEmailBuild(){
     vars.deliveryTime=tm?((+tm[1]%12||12)+(tm[2]!=='00'?':'+tm[2]:'')+(+tm[1]<12?'am':'pm')):'[time]';
     vars.deliveryAddress=[h.delivery_address_line1,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ')||'your home address';
     const k=document.getElementById('onb-em-keep').value;vars.keepSentence=k==='none'?'':((pol.keep_sentences||[])[+k]||'');}
-  document.getElementById('onb-em-subject').value=onbFill1(tpl.subject,vars)+(c.case_ref?' ['+c.case_ref+']':'');
+  document.getElementById('onb-em-subject').value=onbFill1(tpl.subject,vars); // no case ref: drivers don't need it (Simon, 24 Nov 2026); replies can be matched on the driver's email
   document.getElementById('onb-em-body').value=onbFill1(tpl.body,vars).replace(/\n{3,}/g,'\n\n').trim();
   const docs=onbEmailDocs(c,pol,ctx.kind);
   document.getElementById('onb-em-atts').innerHTML=docs.length?docs.map(d=>`<label class="onb-att"><input type="checkbox" class="onb-att-cb" value="${esc(d.doc_id)}" checked> 📄 ${esc(d.label||d.file_name)}</label>`).join(''):'<div class="onb-hint">No attachments for this driver under the policy.</div>';
