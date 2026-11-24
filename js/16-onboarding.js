@@ -601,6 +601,7 @@ lsInjectModal('onb-email-modal',`
     <div class="form-row"><div class="form-field"><label>Cc</label><input id="onb-em-cc" placeholder="(optional, comma separated)"></div><div class="form-field" id="onb-em-keep-wrap" style="display:none"><label>How long they keep the hire car</label><select id="onb-em-keep" onchange="onbEmailBuild()"></select></div></div>
     <div class="form-field"><label>Subject</label><input id="onb-em-subject"></div>
     <div class="form-field"><label>Message <span style="font-weight:400;color:var(--n400)">· blank line = new paragraph; lines starting "1." or "*" become lists</span></label><textarea id="onb-em-body" style="min-height:320px;font-size:13px;line-height:1.5"></textarea></div>
+    <div class="form-field"><label>Signature <span style="font-weight:400;color:var(--n400)">· from the client policy</span></label><div id="onb-em-sig" class="onb-sig onb-sig-preview"></div></div>
     <div class="form-section-label">Attachments</div>
     <div id="onb-em-atts"></div>
   </div>
@@ -610,6 +611,18 @@ lsInjectModal('onb-email-modal',`
     <button class="btn-primary-modal" id="onb-em-send" onclick="onbEmailSend()">Send</button>
   </div>`,true);
 
+// Signature HTML pasted from Outlook: keep formatting, drop anything that runs
+// code or points at the sender's own computer (file:/blob: pictures can't be sent).
+function onbCleanSig(html){
+  if(!html)return '';
+  const d=document.createElement('div');d.innerHTML=String(html);
+  d.querySelectorAll('script,style,meta,link,iframe,object,embed,form,input,button,o\\:p').forEach(x=>x.remove());
+  d.querySelectorAll('*').forEach(el=>{[...el.attributes].forEach(a=>{const n=a.name.toLowerCase(),v=String(a.value||'').trim().toLowerCase();
+    if(n.startsWith('on')||((n==='href'||n==='src')&&/^(javascript|vbscript|file|blob):/.test(v))||n==='contenteditable')el.removeAttribute(a.name);});
+    if(el.tagName==='IMG'&&!el.getAttribute('src'))el.remove();});
+  const out=d.innerHTML.trim();
+  return /^(<br\s*\/?>|\s|&nbsp;)*$/i.test(out)?'':out;
+}
 function onbFill1(tpl,vars){return String(tpl||'').replace(/\{(\w+)\}/g,(m,k)=>vars[k]!=null?vars[k]:m);}
 function onbLongDate(d){if(!d)return '';const t=new Date(String(d).slice(0,10)+'T00:00:00');return isNaN(t)?fmtUK(d):t.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});}
 async function onbOpenEmail(kind){
@@ -626,6 +639,7 @@ async function onbOpenEmail(kind){
   if(kind==='short_hire'){kw.style.display='';ks.innerHTML=(pol.keep_sentences||[]).map((s,i)=>`<option value="${i}">${esc(s.length>70?s.slice(0,70)+'…':s)}</option>`).join('')+'<option value="none">(leave it out — write your own)</option>';}
   else kw.style.display='none';
   onbEmailBuild();
+  document.getElementById('onb-em-sig').innerHTML=onbCleanSig(pol.signature_html||'')||'<span class="onb-hint">No signature set — add one under ⚙ Client policies.</span>';
   document.getElementById('onb-email-modal').classList.add('open');
 }
 function onbEmailDocs(c,pol,kind){
@@ -675,7 +689,7 @@ async function onbEmailSend(){
     if(ids.length){docs=await sbReq(`covase_documents?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,storage_path,file_name,mime_type`);}
     const attachments=[];for(const d of docs)attachments.push({name:d.file_name,contentType:d.mime_type||'application/pdf',url:await onbSignedUrl(d.storage_path)});
     const from=document.getElementById('onb-em-from').value,cc=document.getElementById('onb-em-cc').value.trim();
-    const r=await fetch(ONB_N8N.email,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from,to,cc,subject,bodyHtml:'<div style="font-family:Arial,sans-serif;font-size:14px">'+onbTextToHtml(text)+'</div>',attachments})});
+    const r=await fetch(ONB_N8N.email,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from,to,cc,subject,bodyHtml:'<div style="font-family:Arial,sans-serif;font-size:14px">'+onbTextToHtml(text)+'</div>'+(onbCleanSig((onbPolicy(c)||{}).signature_html||'')?'<br>'+onbCleanSig(onbPolicy(c).signature_html):''),attachments})});
     if(r.status===404)throw new Error('the email sender is not switched on in n8n yet');
     const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.message||('HTTP '+r.status));
     const entry={key:ctx.kind,subject,to,cc:cc||null,from,sent_at:new Date().toISOString(),attachments:docs.map(d=>d.file_name)};
@@ -734,6 +748,8 @@ function onbPolRender(){
       <div class="form-field"><label>Emails come from</label><select id="onb-pol-sender">${lsOptions(ONB_SENDERS,p.sender)}</select></div>
     </div>
     <div class="form-field"><label>Always copy in (optional)</label><input id="onb-pol-cc" value="${esc(p.cc||'')}" placeholder="comma separated"></div>
+    <div class="form-field"><label>Email signature (added under every email from this policy)</label><div id="onb-pol-sig" class="onb-sig" contenteditable="true">${onbCleanSig(p.signature_html||'')}</div>
+      <div class="onb-hint">Copy your signature from an email you've sent in Outlook and paste it here. Text, links and formatting come across. A logo shows if it's a picture from a website; a pasted picture from your computer may not, so check a test email.</div></div>
     <div class="form-section-label">Steps, in order</div>
     <div id="onb-pol-steps">${stepRows}</div>
     <button class="btn btn-edit" onclick="onbPolAddStep()">+ Add step</button>
@@ -757,7 +773,7 @@ function onbPolRender(){
 function onbPolCollect(){
   const p=onbPolDraft&&onbPolDraft[onbPolIdx];if(!p||!document.getElementById('onb-pol-name'))return;
   const g=id=>document.getElementById(id).value;
-  p.name=g('onb-pol-name').trim()||p.name;p.account_id=g('onb-pol-acc');p.sender=g('onb-pol-sender');p.cc=g('onb-pol-cc').trim();
+  p.name=g('onb-pol-name').trim()||p.name;p.signature_html=onbCleanSig((document.getElementById('onb-pol-sig')||{}).innerHTML||'');p.account_id=g('onb-pol-acc');p.sender=g('onb-pol-sender');p.cc=g('onb-pol-cc').trim();
   p.steps=[...document.querySelectorAll('#onb-pol-steps .onb-pol-step')].map((row,i)=>({key:p.steps[i].key,label:row.querySelector('.onb-ps-label').value.trim()||p.steps[i].label,kind:row.querySelector('.onb-ps-kind').value,when:row.querySelector('.onb-ps-when').value}));
   [...document.querySelectorAll('#onb-pol-docs .onb-pol-step')].forEach((row,i)=>{const d=p.docs[i];if(!d)return;d.emails=row.querySelector('.onb-pd-emails').value;d.vehicle=row.querySelector('.onb-pd-vehicle').value;d.routes=row.querySelector('.onb-pd-routes').value;});
   p.emails={dfb:{subject:g('onb-pol-dfb-s'),body:g('onb-pol-dfb-b')},short_hire:{subject:g('onb-pol-sh-s'),body:g('onb-pol-sh-b')}};
