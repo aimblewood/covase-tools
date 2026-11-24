@@ -351,6 +351,20 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 #dt-copy:hover { background: #05ece3; }
 #dt-minimise { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 14px; padding: 0 2px; }
 </style>
+<style>/* sign-in overlay (js/00-auth.js) */
+#auth-overlay{position:fixed;inset:0;z-index:1000;background:rgba(20,16,50,.72);display:none;align-items:center;justify-content:center;padding:16px;font-family:inherit}
+#auth-overlay.open{display:flex}
+.auth-card{position:relative;background:#fff;border-radius:14px;padding:28px 26px 22px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column}
+.auth-card label{font-size:11px;font-weight:600;color:#667;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+.auth-card input{padding:9px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+.auth-brand{font-size:20px;font-weight:700;margin-bottom:6px}
+.auth-btn{margin-top:16px;padding:10px;border:0;border-radius:8px;background:#03d3c6;color:#fff;font-weight:700;font-size:14px;cursor:pointer;width:100%}
+.auth-msg{font-size:12px;color:#c0392b;min-height:16px;margin-top:8px}
+.auth-link{font-size:12px;color:#667;cursor:pointer;text-decoration:underline;margin-top:6px;align-self:flex-start}
+.auth-note{font-size:12px;color:#667;margin-bottom:4px}
+.auth-close{position:absolute;top:10px;right:10px;border:0;background:none;font-size:16px;cursor:pointer;color:#667}
+#auth-signin,#auth-boot{display:flex;flex-direction:column}
+</style>
 </head>
 <body>
 <div class="app">
@@ -544,9 +558,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 
 <div class="toast" id="toast"></div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-const SB_URL = localStorage.getItem('covase_sb_url') || '';
-const SB_KEY = localStorage.getItem('covase_sb_key') || '';
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="js/00-auth.js"></script><script>
+// Sign-in shared with Covase Tools (same site, same browser storage): js/00-auth.js.
+const SB_URL = covaseAuthBase().url;
+const SB_KEY = covaseAuthBase().key;
+async function sbBearer(){ await covaseAuthWait(); return covaseAuthToken() || SB_KEY; }
 let pay = 'bacs', vat = true, items = [];
 let n8nWebhookUrl = localStorage.getItem('covase_n8n_webhook') || 'https://covase.app.n8n.cloud/webhook/covase-client-lookup';
 let editMode = false;   // true when loaded from Hub via ?id=
@@ -572,7 +588,7 @@ async function loadFromUrl() {
   if (!SB_URL || !SB_KEY) { toast('Supabase not configured — cannot load invoice', 'error'); return; }
   try {
     const r = await fetch(`${SB_URL}/rest/v1/covase_invoices?id=eq.${encodeURIComponent(id)}&limit=1`, {
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${await sbBearer()}` }
     });
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
@@ -664,7 +680,7 @@ async function loadRecharge(sourceId) {
   if (!SB_URL || !SB_KEY) { toast('Supabase not configured', 'error'); return; }
   try {
     const r = await fetch(`${SB_URL}/rest/v1/covase_invoices?id=eq.${encodeURIComponent(sourceId)}&limit=1`, {
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${await sbBearer()}` }
     });
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
@@ -885,7 +901,7 @@ async function save() {
       // PATCH existing row
       const r = await fetch(`${SB_URL}/rest/v1/covase_invoices?id=eq.${encodeURIComponent(editId)}`, {
         method: 'PATCH',
-        headers: {'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+        headers: {'apikey':SB_KEY,'Authorization':`Bearer ${await sbBearer()}`,'Content-Type':'application/json','Prefer':'return=minimal'},
         body: JSON.stringify(payload)
       });
       if(!r.ok) throw new Error(await r.text());
@@ -894,7 +910,7 @@ async function save() {
       // INSERT (upsert)
       const r = await fetch(`${SB_URL}/rest/v1/covase_invoices`,{
         method:'POST',
-        headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        headers:{'apikey':SB_KEY,'Authorization':`Bearer ${await sbBearer()}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
         body:JSON.stringify(payload)
       });
       if(!r.ok) throw new Error(await r.text());
