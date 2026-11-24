@@ -109,6 +109,8 @@ If you have any questions, please do not hesitate to contact me.`}
 let onbPolicies=null,onbCases=[],onbSteps=[],onbNominees=[],onbLoaded=false;
 let onbEditId=null,onbDraft=null,onbPolDraft=null,onbPolIdx=0,onbHireFor=null,onbEmailCtx=null,onbDynResults=[];
 
+// n8n checks this sign-in token on every onboarding web call (Simon, 24 Nov 2026).
+async function onbToken(){await covaseAuthWait();return covaseAuthToken();}
 function onbLbl(list,v){return (list.find(x=>x[0]===v)||[0,v||''])[1];}
 function onbDays(d){if(!d)return null;const t=Date.parse(String(d).slice(0,10)+'T00:00:00');if(isNaN(t))return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((t-n.getTime())/864e5);}
 function onbName(c){return [c.first_name,c.last_name].filter(Boolean).join(' ')||'(no name yet)';}
@@ -390,7 +392,7 @@ async function onbReadEmail(){
   const st=document.getElementById('onb-read-status'),btn=document.getElementById('onb-read-btn');
   st.textContent='Reading…';btn.disabled=true;
   try{
-    const r=await fetch(ONB_N8N.read,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,clients:(allAccounts||[]).filter(a=>a.type==='client'||a.type==='both').map(a=>a.company_name)})});
+    const r=await fetch(ONB_N8N.read,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await onbToken(),text,clients:(allAccounts||[]).filter(a=>a.type==='client'||a.type==='both').map(a=>a.company_name)})});
     if(!r.ok)throw new Error(r.status===404?'the email reader is not switched on in n8n yet':'HTTP '+r.status);
     const j=await r.json();const d=j.data||{};
     const set=(id,v)=>{if(v!=null&&v!==''){const e=document.getElementById(id);if(e&&!e.value)e.value=v;}};
@@ -557,7 +559,7 @@ async function onbDynCreate(){
   if(!acc||!acc.dynamics_id){toast(((acc&&acc.company_name)||'This client')+' has no Dynamics link, so the driver can\'t be filed under it','error');return;}
   if(!confirm('Create '+onbName(c)+' in Dynamics under '+acc.company_name+'?\n\nSearch first if they might already be there (existing employees usually are).'))return;
   try{
-    const r=await fetch(ONB_N8N.create,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firstName:c.first_name,lastName:c.last_name,preferredName:c.preferred_name,email:c.email,mobile:c.mobile,jobTitle:c.job_title,address1:c.address_line1,address2:c.address_line2,town:c.town,county:c.county,postcode:c.postcode,accountId:acc.dynamics_id})});
+    const r=await fetch(ONB_N8N.create,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await onbToken(),firstName:c.first_name,lastName:c.last_name,preferredName:c.preferred_name,email:c.email,mobile:c.mobile,jobTitle:c.job_title,address1:c.address_line1,address2:c.address_line2,town:c.town,county:c.county,postcode:c.postcode,accountId:acc.dynamics_id})});
     if(r.status===404)throw new Error('the Dynamics create workflow is not switched on in n8n yet');
     const j=await r.json().catch(()=>({}));if(!r.ok||!j.contactId)throw new Error(j.message||('HTTP '+r.status));
     await onbLinkContact(c,{contactId:j.contactId,fullName:j.fullName||onbName(c),firstName:c.first_name,lastName:c.last_name,email:c.email,mobile:c.mobile,accountId:acc.dynamics_id});
@@ -697,7 +699,7 @@ async function onbEmailSend(){
     if(ids.length){docs=await sbReq(`covase_documents?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,storage_path,file_name,mime_type`);}
     const attachments=[];for(const d of docs)attachments.push({name:d.file_name,contentType:d.mime_type||'application/pdf',url:await onbSignedUrl(d.storage_path)});
     const from=document.getElementById('onb-em-from').value,cc=document.getElementById('onb-em-cc').value.trim();
-    const r=await fetch(ONB_N8N.email,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from,to,cc,subject,bodyHtml:'<div style="font-family:Arial,sans-serif;font-size:14px">'+onbTextToHtml(text)+'</div>'+(onbCleanSig((onbPolicy(c)||{}).signature_html||'')?'<br>'+onbCleanSig(onbPolicy(c).signature_html):''),attachments})});
+    const r=await fetch(ONB_N8N.email,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:await onbToken(),from,to,cc,subject,bodyHtml:'<div style="font-family:Arial,sans-serif;font-size:14px">'+onbTextToHtml(text)+'</div>'+(onbCleanSig((onbPolicy(c)||{}).signature_html||'')?'<br>'+onbCleanSig(onbPolicy(c).signature_html):''),attachments})});
     if(r.status===404)throw new Error('the email sender is not switched on in n8n yet');
     const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.message||('HTTP '+r.status));
     const entry={key:ctx.kind,subject,to,cc:cc||null,from,sent_at:new Date().toISOString(),attachments:docs.map(d=>d.file_name)};
