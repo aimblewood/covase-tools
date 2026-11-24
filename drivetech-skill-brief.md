@@ -10,6 +10,8 @@ Your instructions always come from **Claude's to-do list** in Covase Tools:
 
 **https://aimblewood.github.io/covase-tools/covase-platform.html#claude-todo**
 
+Covase Tools needs a sign-in. Simon signs this browser in once, with the account set up for Claude's browser, and it stays signed in. **If you ever see the Covase Tools sign-in screen, or Drivetech's login page, stop and ask Simon to sign in. Never type, ask for or store a password yourself.**
+
 The list opens at the top of the Driver onboarding screen. If it's folded shut, click "🤖 Claude's to-do list". It has two columns. Each job is a box headed with the job and the driver's name, then labelled details (Case, Client, First name, Surname, Preferred name, Email, Mobile, Job title, Start date, Vehicle), a **Note** box and buttons.
 
 ## Skill 1: Add drivers to Drivetech
