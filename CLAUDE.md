@@ -23,7 +23,7 @@
 | n8n instance | `covase.app.n8n.cloud` (has an MCP server; workflows opt in via `availableInMCP`) |
 | Dynamics 365 | `covase.crm11.dynamics.com`, WebAPI v9.2 |
 | Mailboxes | `rentals@covase.co.uk` (shared — hires), `logistics@covase.co.uk` (shared — movements), `admin@covase.co.uk` (**alias** into Simon's own mailbox — fines intake + alert notifications land there) |
-| n8n env vars | `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
+| n8n env vars | `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (no longer used by Covase workflows), **`SUPABASE_SERVICE_KEY`** (service role, added by Simon 24 Nov 2026; all six Supabase-touching workflows — supplier/movement reply processors, manual reply, fines intake, invoice processor, WLC price feed — switched to it 24 Nov, step 1 of `logins-plan.md`). **New workflows that touch Supabase must use `SUPABASE_SERVICE_KEY`**; the anon key stops working for data once the lock goes on. |
 | Claude model for all n8n calls | **`claude-sonnet-5`** (`claude-sonnet-4-20250514` retired 2026-06-15 → 404; last stragglers migrated 2026-08/09) |
 
 **n8n credentials:** Outlook OAuth `b7m5qszXbptDsLfk` ("Microsoft Outlook account" = Simon's account; Full Access + Send As on rentals@ and logistics@ — shared mailboxes have no login, hence `/users/<mailbox>/...` Graph paths, never `/me` for sends). Dynamics OAuth `UJJCexfFbCVEDskT` ("Unnamed credential") **works**; `kyMHkwTl7hZdAB2v` ("365 credential") **fails auth — never use**. Excel/SharePoint credential `NOhaxGlt7URuTtcI` exists (unused; earmarked for WT sheet write).

@@ -10,6 +10,8 @@ Decisions: email + password (Supabase Auth). Lock included as the final step (Si
 3. **Accounts** for Simon and Andy (temporary passwords). Claude's browser skill signs in as Simon.
 4. **Go live + lock together:** RLS policies `anon` → `authenticated` on every covase_* table (audit stays SELECT-only), Storage policies likewise; bake URL + anon key into the code. One-step rollback SQL prepared.
 
+**Step 1 done 24 Nov 2026:** Simon added `SUPABASE_SERVICE_KEY`; all six workflows below switched (every `SUPABASE_ANON_KEY` reference → `SUPABASE_SERVICE_KEY`, verified by version diff) and published ~10:30.
+
 ## Step 1 audit (23 Nov) — workflows using `$vars.SUPABASE_URL` + `$vars.SUPABASE_ANON_KEY`
 | Workflow | ID | Touches |
 |---|---|---|
