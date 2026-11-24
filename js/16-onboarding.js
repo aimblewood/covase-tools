@@ -619,7 +619,10 @@ function onbCleanSig(html){
   d.querySelectorAll('script,style,meta,link,iframe,object,embed,form,input,button,o\\:p').forEach(x=>x.remove());
   d.querySelectorAll('*').forEach(el=>{[...el.attributes].forEach(a=>{const n=a.name.toLowerCase(),v=String(a.value||'').trim().toLowerCase();
     if(n.startsWith('on')||((n==='href'||n==='src')&&/^(javascript|vbscript|file|blob):/.test(v))||n==='contenteditable')el.removeAttribute(a.name);});
-    if(el.tagName==='IMG'&&!el.getAttribute('src'))el.remove();});
+    if(el.tagName==='IMG'&&!el.getAttribute('src'))el.remove();
+    // Outlook pastes <p class=MsoNormal> with paragraph spacing that mail programs apply but the
+    // editing box doesn't, so gaps doubled in received mail (Simon, 24 Nov 2026). Zero it out.
+    if(/^(P|DIV|H[1-6])$/.test(el.tagName)){el.style.margin='0';el.style.marginTop='0';el.style.marginBottom='0';}});
   const out=d.innerHTML.trim();
   return /^(<br\s*\/?>|\s|&nbsp;)*$/i.test(out)?'':out;
 }
@@ -658,7 +661,7 @@ function onbEmailBuild(){
     vars.deliveryTime=tm?((+tm[1]%12||12)+(tm[2]!=='00'?':'+tm[2]:'')+(+tm[1]<12?'am':'pm')):'[time]';
     vars.deliveryAddress=[h.delivery_address_line1,h.delivery_town,h.delivery_postcode].filter(Boolean).join(', ')||'your home address';
     const k=document.getElementById('onb-em-keep').value;vars.keepSentence=k==='none'?'':((pol.keep_sentences||[])[+k]||'');}
-  document.getElementById('onb-em-subject').value=onbFill1(tpl.subject,vars)+(c.case_ref?' ['+c.case_ref+']':'');
+  document.getElementById('onb-em-subject').value=onbFill1(tpl.subject,vars); // no case ref: drivers don't need it (Simon, 24 Nov 2026); replies can be matched on the driver's email
   document.getElementById('onb-em-body').value=onbFill1(tpl.body,vars).replace(/\n{3,}/g,'\n\n').trim();
   const docs=onbEmailDocs(c,pol,ctx.kind);
   document.getElementById('onb-em-atts').innerHTML=docs.length?docs.map(d=>`<label class="onb-att"><input type="checkbox" class="onb-att-cb" value="${esc(d.doc_id)}" checked> 📄 ${esc(d.label||d.file_name)}</label>`).join(''):'<div class="onb-hint">No attachments for this driver under the policy.</div>';
